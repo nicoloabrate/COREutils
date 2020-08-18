@@ -1,34 +1,32 @@
-################################
-#  _   _ ______ __  __  ____   #
-# | \ | |  ____|  \/  |/ __ \  #
-# |  \| | |__  | \  / | |  | | #
-# | . ` |  __| | |\/| | |  | | #
-# | |\  | |____| |  | | |__| | #
-# |_| \_|______|_|  |_|\____/  #
-#                              #
-################################
-# Author: N. Abrate
-# File: CoreMap.py
-# Description: This class defines the nuclear reactor core geometry defined in
-# an external text file. The class instance contains
+"""
+Author: N. Abrate.
 
-# load external modules
+File: CoreMap.py
+
+Description: Class to define the nuclear reactor core geometry defined in an
+external text file.
+"""
+
 import itertools as it
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
-import AssemblyGeometry as ag
+import coreutils.coremap.AssemblyGeometry as ag
 from matplotlib import rc
-from UnfoldCore import UnfoldCore
+from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
+from coreutils.coremap.UnfoldCore import UnfoldCore
 from numpy import pi, cos, sin
-from matplotlib.patches import Rectangle
 from matplotlib.patches import RegularPolygon
+from matplotlib.collections import PatchCollection
+
 
 class CoreMap:
     """
     This class defines the nuclear reactor core geometry defined in an external
     text file.
-    Parameters:
-    =========== INPUT
+
+    Attributes
+    ----------
     geinp: str
         <Path/filename> of the input file containing the geometry arrangement
         of the core.
@@ -39,10 +37,12 @@ class CoreMap:
         With rotangle=0 no rotation occurs.
     P: float
         assembly pitch (distance between centers in two adjacent assemblies)
-    =========== OUTPUT
-        coremap: array[int]
-            2D array representing the whole reactor core. The entries represent
-            the assembly types
+
+    Methods
+    -------
+    coremap: array[int]
+        2D array representing the whole reactor core. The entries represent
+        the assembly types
     """
 
     def __init__(self, geinp, rotangle, pitch):
@@ -167,10 +167,28 @@ class CoreMap:
         =========== OUTPUT
 
         """
+        ## FIXME
+        # # define assemblies characteristics
+        # Nx, Ny = np.shape(self.type)
+        # # define assembly numeration (flattening sq. or hex. lattice by rows)
+        # assnum = np.arange(1, Nx*Ny+1)
+        #
+        # if self.assembly.type == "H":
+        #
+        #     # flatten the matrix by rows
+        #     coretype = self.type.flatten('C')
+        #     # squeeze out void assembly numbers
+        #     assnum[coretype == 0] = 0
+        # # select non-zero elements
+        # sermap = assnum[assnum != 0]
+        # return sermap
         # define assemblies characteristics
         Nx, Ny = np.shape(self.type)
-        # define assembly numeration (flattening sq. or hex. lattice by rows)
-        assnum = np.arange(1, Nx*Ny+1)
+        L = self.assembly.edge  # assembly edge
+        # define assembly numeration (same for squared and hex.lattice)
+        assnum = np.arange(1, Nx*Ny+1)  # array with assembly numbers
+        assnum = assnum.reshape(Nx, Ny)  # reshape as a matrix
+        assnum = assnum.flatten('F')  # flattening the matrix by columns
 
         if self.assembly.type == "H":
 
@@ -349,21 +367,26 @@ class CoreMap:
             # load new assembly type
             self.type[rows, cols] = newtype[ipos]
 
-    def writecentermap(self, flatten=1, fname="centermap.txt"):
+    def writecentermap(self, numbers=True, fname="centermap.txt"):
         """ Write centermap to text file """
         # define regions
         typelabel = np.reshape(self.type, (self.Nx*self.Ny, 1))
         regions = []
         for key, coord in (self.serpcentermap).items():
             x, y = coord
-            asstype = typelabel[key-1, 0]
-            regions.append((asstype, x, y))
+            if numbers is False:
+                key = typelabel[key-1, 0]
+            regions.append((key, x, y))
         # write region to external file
         with open(fname, 'w') as f:  # open new file
-            f.write("\n".join("{} {} {}".format(elem[0], elem[1], elem[2])
+            f.write("\n".join("{:03d} {:5f} {:5f}".format(elem[0], elem[1], elem[2])
                               for elem in regions))
+            f.write("\n")
 
-    def writecoremap(self, flatten=None, fname="coremap.txt", serpheader=None):
+    # TODO: add writeregionmap method to plot region id, x and y for each assembly
+
+
+    def writecoremap(self, flatten=None, fname="coremap.txt", serpheader=False):
         """ Write centermap to text file """
         # define regions
         if flatten is None:
@@ -376,7 +399,7 @@ class CoreMap:
         fmt = "%0"+nd+"d"
 
         # determine header
-        if serpheader is None:
+        if serpheader is False:
             header = ""
             comm = '#'
         else:  # Serpent-2 style header (define core lattice)
@@ -398,21 +421,75 @@ class CoreMap:
         np.savetxt(fname, typelabel, delimiter=" ", fmt=fmt, header=header,
                    comments=comm)
 
-    def plot(self, flag_label=0, dictname=None, figname=None, fren=None):
+    def plot(self, label=False, dictname=None, figname=None, fren=False,
+             which=None, what=None, asstype=False, usetex=False, fill=True,
+             axes=None, cmap='Spectral_r', thresh=None, cbarLabel=None,
+             xlabel=None, ylabel=None, loglog=None, logx=None, logy=None,
+             title=None, scale=1, fmt="%.2f", **kwargs):
         """
-        This method plot a 2D map of the core with the assembly labels or
-        numbers, if needed
-        Parameters:
-        =========== INPUT
-            flag_label: int
-                1 to print labels on assemblies, 0 otherwise (default)
-        =========== OUTPUT
-            figure
+        Plot the core map.
+
+        Parameters
+        ----------
+        label : TYPE, optional
+            DESCRIPTION. The default is False.
+        dictname : TYPE, optional
+            DESCRIPTION. The default is None.
+        figname : TYPE, optional
+            DESCRIPTION. The default is None.
+        fren : TYPE, optional
+            DESCRIPTION. The default is False.
+        which : TYPE, optional
+            DESCRIPTION. The default is None.
+        what : TYPE, optional
+            DESCRIPTION. The default is None.
+        usetex : TYPE, optional
+            DESCRIPTION. The default is False.
+        fill : TYPE, optional
+            DESCRIPTION. The default is True.
+        axes : TYPE, optional
+            DESCRIPTION. The default is None.
+        cmap : TYPE, optional
+            DESCRIPTION. The default is 'Spectral_r'.
+        thresh : TYPE, optional
+            DESCRIPTION. The default is None.
+        cbarLabel : TYPE, optional
+            DESCRIPTION. The default is None.
+        xlabel : TYPE, optional
+            DESCRIPTION. The default is None.
+        ylabel : TYPE, optional
+            DESCRIPTION. The default is None.
+        loglog : TYPE, optional
+            DESCRIPTION. The default is None.
+        logx : TYPE, optional
+            DESCRIPTION. The default is None.
+        logy : TYPE, optional
+            DESCRIPTION. The default is None.
+        title : TYPE, optional
+            DESCRIPTION. The default is None.
+        scale : TYPE, optional
+            DESCRIPTION. The default is 1.
+        fmt : TYPE, optional
+            DESCRIPTION. The default is "%.2f".
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        IndexError
+            DESCRIPTION.
+        TypeError
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
         """
 
         # set default font and TeX interpreter
         rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
-        rc('text', usetex=True)
+        rc('text', usetex=usetex)
 
         L = self.assembly.edge
         Nass = self.type.size
@@ -421,99 +498,297 @@ class CoreMap:
         maxtype = int(max(typelabel))
         coretype = range(0, maxtype+1)  # define
 
-        # define default colorsets (if not enough, random colours are added)
-        if self.assembly.type == "S":
-            def_colors = ['deepskyblue', 'white', 'limegreen', 'gold',
-                          'lightgray', 'firebrick', 'orange', 'turquoise',
-                          'royalblue', 'yellow']
-        elif self.assembly.type == "H":
-            def_colors = ['turquoise', 'firebrick', 'chocolate', 'gold',
-                          'lightgray', 'seagreen', 'darkgoldenrod', 'grey',
-                          'royalblue', 'yellow', 'forestgreen', 'magenta',
-                          'lime']
+        kwargs.setdefault("edgecolor", "k")
+        kwargs.setdefault("ec", "k")
+        kwargs.setdefault("linewidth", 0.5)
+        kwargs.setdefault("lw", 0.5)
+        kwargs.setdefault("alpha", 1)
+        fontsize = kwargs.get("fontsize", 4)
+        # delete size from kwargs to use it in pathces
+        if 'fontsize' in kwargs:
+            del kwargs['fontsize']
 
-        # check if more colors are needed and append in case
-        if len(def_colors) < maxtype+1:
-            N = len(def_colors)-(maxtype+1)
-            for icol in range(0, N):
-                def_colors.append(np.random.rand(3,))
+        if what is None:
 
-        # color dict
-        asscol = dict(zip(coretype, def_colors))
+            physics = False
+            # define default colorsets (if not enough, random colours are added)
+            if self.assembly.type == "S":
+                def_colors = ['deepskyblue', 'white', 'limegreen', 'gold',
+                              'lightgray', 'firebrick', 'orange', 'turquoise',
+                              'royalblue', 'yellow']
+                orientation = np.pi/4
+                L = L/2*np.sqrt(2)
+
+            elif self.assembly.type == "H":
+                def_colors = ['turquoise', 'firebrick', 'chocolate', 'gold',
+                              'lightgray', 'seagreen', 'darkgoldenrod', 'grey',
+                              'royalblue', 'yellow', 'forestgreen', 'magenta',
+                              'lime']
+                orientation = 0
+
+            # check if more colors are needed and append in case
+            if len(def_colors) < maxtype+1:
+                N = len(def_colors)-(maxtype+1)
+                for icol in range(0, N):
+                    def_colors.append(np.random.rand(3,))
+
+            # color dict
+            asscol = dict(zip(coretype, def_colors))
+
+        else:  # cont. <- if type(fill) is bool
+
+            physics = True
+            patches = []
+            values = []
+            patchesapp = patches.append
+            valuesapp = values.append
+            errbar = False
+            # check data type is correct
+            if type(what) is dict:
+                # check keys
+                if 'tallies' in what.keys():
+                    tallies = what['tallies']
+
+                if 'errors' in what.keys():
+                    errors = what['errors']
+                    errbar = True
+
+            elif type(what) is np.ndarray:
+                tallies = what
+                # check on data shape
+                try:
+                    # associate tallies to Serpent assemblies numeration
+                    Nx, Ny = tallies.shape
+                    assnum = np.arange(1, Nx*Ny+1)
+                    # flattening sq. or hex. lattice by rows
+                    tallies = dict(zip(assnum, tallies.flatten('C')))
+                except ValueError:
+                    # TODO (possible enhancement: plot ND array slicing)
+                    raise IndexError('Only 2D arrays are currently supported!')
+
+            else:
+                raise TypeError('Data must be dict or numpy array!')
+
+            # TODO: place these lines somewhere where tallies is array for automatic formatting
+            # peak = np.max(np.max(tallies))
+            # if abs(peak) > 999:
+            #     fmt = ".2e"
+            # else:
+            #     fmt = ".2f"
 
         # open figure
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        # squared assembly
-        if self.assembly.type == "S":
-            for key, coord in (self.serpcentermap).items():
-                x, y = coord  # unpack coordinates
-                # shifts centers because of how Rectangle works
-                xc = x - L/2
-                yc = y - L/2
+
+        # check which variable
+        if which is None:
+            which = (self.serpcentermap).keys()
+
+        elif which is not None and fren is True:
+            which = [self.fren2serp[k] for k in which]
+
+        for key, coord in (self.serpcentermap).items():
+            x, y = coord
+            # scale coordinate
+            coord = (x*scale, y*scale)
+            # check key is in which list
+            if key not in which:
+                continue
+
+            if physics is False:
                 # select color
                 col = asscol[typelabel[key-1, 0]]
                 # define assembly patch
-                asspatch = Rectangle((xc, yc), L, L, color=col, ec='black',
-                                     label='Label', lw=0.5)
+                asspatch = RegularPolygon(coord, self.assembly.numedges, L*scale,
+                                          orientation=orientation, color=col,
+                                          fill=fill, **kwargs)
                 ax.add_patch(asspatch)
-                # plot text inside assemblies
-                if dictname is None:
-                    if flag_label > 0:  # plot assembly number
-                        plt.text(x, y, str(key), ha='center', va='center',
-                                 size=4)
-                else:  # plot assembly type
-                    plt.text(x, y, dictname[typelabel[key-1, 0]], ha='center',
-                             va='center', size=7)
 
-        # hexagonal assembly
-        elif self.assembly.type == "H":
-            for key, coord in (self.serpcentermap).items():
-                # select color
-                col = asscol[typelabel[key-1, 0]]
+            else:
                 # define assembly patch
-                asspatch = RegularPolygon(coord, 6, L, color=col, ec='black',
-                                          lw=0.5, label='Label')
-                ax.add_patch(asspatch)
-                # plot text inside assemblies
-                if dictname is None:
-                    x, y = coord  # unpack coordinates
-                    if flag_label > 0:  # plot assembly number
-                        if fren is not None:  # FRENETIC numeration
-                            keyF = self.serp2fren[key]  # translate keys
-                            plt.text(x, y, str(keyF), ha='center', va='center',
-                                     size=4)
-                        else:  # Serpent numeration (default)
-                            plt.text(x, y, str(key), ha='center', va='center',
-                                     size=4)
+                asspatch = RegularPolygon(coord, self.assembly.numedges, L*scale,
+                                          orientation=orientation, **kwargs)
+                patchesapp(asspatch)
+                # define value to be plotted
+                #if fren is False:  # Serpent numeration
+                valuesapp(tallies[key])
+                #else:  # Frenetic numeration
+                   # keyF = self.serp2fren[key]
+                   # valuesapp(tallies[keyF])
 
-                else:  # plot assembly type
-                    x, y = coord  # unpack coordinates
-                    plt.text(x, y, dictname[typelabel[key-1, 0]],
-                             ha='center', va='center', size=4)
+        # plot physics, if any
+        if physics is True:
+            values = np.asarray(values)
+            patches = np.asarray(patches, dtype=object)
+            coord = np.array(list(self.serpcentermap.values()))
+            normalizer = normalizerFactory(values, None, False, coord[:, 0]*scale,
+                                           coord[:, 1]*scale)
+            pc = PatchCollection(patches, cmap=cmap, **kwargs)
+            formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
+                       xlabel=xlabel or "X [cm]",
+                       ylabel=ylabel or "Y [cm]", title=title)
+            pc.set_array(values)
+            pc.set_norm(normalizer)
+            ax.add_collection(pc)
+            addColorbar(ax, pc, cbarLabel=cbarLabel)
+
+        # add labels on top of the polygons
+        for key, coord in (self.serpcentermap).items():
+            # check key is in "which" list
+            if key not in which:
+                continue
+
+            x, y = coord
+            # plot text inside assemblies
+            if dictname is None:
+                if label is True:  # plot assembly number
+                    if physics is False:
+                        if fren is True:  # FRENETIC numeration
+                            txt = str(self.serp2fren[key])  # translate keys
+                        else:
+                            txt = str(key)
+
+                    else:
+                        # define value to be plotted
+                        if fren is False:  # Serpent numeration
+                            txt = fmt % tallies[key]
+
+                        else:  # Frenetic numeration
+                            txt = fmt % tallies[key]  # self.serp2fren[key]
+
+                        if errbar is True:
+                            txt = "%s \n %.2f%%" % (txt, errors[key]*100)
+
+                    plt.text(x*scale, y*scale, txt, ha='center',
+                             va='center', size=fontsize)
+
+            else:
+                if asstype is True:  # plot assembly type
+                    txt = dictname[typelabel[key-1, 0]]
+                    plt.text(x*scale, y*scale, txt, ha='center', va='center', size=fontsize)
+
+                # FIXME: must be a better way to do this avoiding asstype, maybe.
+                # change "dictname" because maybe we want tuples to have overlappings (phytra fig)
+                # write other labels
+                if asstype is False:
+                    for assN, txt in dictname:
+                        x, y = self.serpcentermap[self.fren2serp[assN]]
+                        plt.text(x*scale, y*scale, txt, ha='center', va='center', size=fontsize)
+
 
         ax.axis('equal')
-        # plt.gca().set_aspect('equal', adjustable='box')
-        # plt.draw()
-        plt.axis('off')
-        # plt.show()
+        if xlabel is None and ylabel is None:
+            plt.axis('off')
 
         # save figure
         if figname is not None:
-            fig.savefig(figname, bbox_inches='tight', dpi=150)
+            fig.savefig(figname, bbox_inches='tight', dpi=250)
 
-if __name__ == "__main__":
-    # try this default file
-    fname = 'test_geometry'
-    rotangle = 45  # rotation angle
-    P = 21.61  # assembly pitch
+def normalizerFactory(data, norm, logScale, xticks, yticks):
+    """
+    Construct and return a :class:`~matplotlib.colors.Normalize` for this data
+    DISCLAIMER: taken from serpentTools.utils.plot
+    Parameters
+    ----------
+    data : :class:`numpy.ndarray`
+        Data to be plotted and normalized
+    norm : None or callable or :class:`matplotlib.colors.Normalize`
+        If a ``Normalize`` object, then use this as the normalizer.
+        If callable, set the normalizer with
+        ``norm(data, xticks, yticks)``. If not None, set the
+        normalizer to be based on the min and max of the data
+    logScale : bool
+        If this evaluates to true, construct a
+        :class:`matplotlib.colors.LogNorm` with the minimum
+        set to be the minimum of the positive values.
+    xticks : :class:`numpy.ndarray`
+    yticks : :class:`numpy.ndarray`
+        Arrays ideally corresponding to the data. Used with callable
+        `norm` function.
+    Returns
+    --------
+    :class:`matplotlib.colors.Normalize`
+    or :class:`matplotlib.colors.LogNorm`
+    or object:
+        Object used to normalize colormaps against these data
+    """
+    if norm is not None:
+        if isinstance(norm, matplotlib.colors.Normalize):
+            return norm
+        elif callable(norm):
+            return norm(data, xticks, yticks)
+        else:
+            raise TypeError("Normalizer {} not understood".format(norm))
 
-    try:
-        startingmap = np.loadtxt(fname, unpack=False, dtype=str, comments='%')
-        startingmap[startingmap == '*'] = '0'  # replace * with 0
-        startingmap = startingmap.astype(np.int)  # convert to int
-    except OSError:
-        print("%s not found!" % fname)
-        raise OSError()
+    if logScale:
+        if (data < 0).any():
+            print("Negative values will be excluded from logarithmic "
+                  "colormap.")
+        posData = data[data > 0]
+        return matplotlib.colors.LogNorm(posData.min(), posData.max())
+    return matplotlib.colors.Normalize(data.min(), data.max())
 
-    core = CoreMap(fname, rotangle, P)
+def addColorbar(ax, mappable, norm=None, cbarLabel=None):
+    """
+    Quick utility to add a colorbar to an axes object
+    The color bar is placed adjacent to the provided
+    axes argument, rather than in the provided space.
+    DISCLAIMER: taken from serpentTools.utils.plot
+    Parameters
+    ----------
+    mappable : iterable
+        Collection of meshes, patches, or values that are used to
+        construct the colorbar.
+    norm : :class:`matplotlib.colors.Normalize`, optional
+        Normalizer for this plot. Can be a subclass like
+        :class:`matplotlib.colors.LogNorm`
+    cbarLabel : str, optional
+        If given, place this as the y-label for the colorbar
+    Returns
+    -------
+    :class:`matplotlib.colorbar.Colorbar`
+        The colorbar that was added
+    """
+    cbar = matplotlib.pyplot.colorbar(mappable, ax=ax, norm=norm)
+    if cbarLabel:
+        cbar.ax.set_ylabel(cbarLabel)
+    return cbar
+
+def uncformat(data, std, fmtn=".5e", fmts=None):
+
+    if len(data) != len(std):
+        raise ValueError("Data and std dimension mismatch!")
+
+    if std is None:
+        try:
+            # data are ufloat
+            inptup = [(d.n, d.s) for d in data]
+        except OSError:
+            raise TypeError("If std is not provided, data must be ufloat type")
+    else:
+        inptup = list(zip(data, std))
+
+    percent = False
+
+    if '%' in fmtn:
+        fmtn.replace('%', '')
+
+    if fmts is None:
+        fmt = "{:%s}%s{:%s}" % (fmtn, u"\u00B1", fmtn)
+    else:
+        if '%' in fmts:
+            percent = True
+            fmts = fmts.replace('%', '')
+            fmt = "{:%s}%s{:%s}%%" % (fmtn, u"\u00B1", fmts)
+        else:
+            fmt = "{:%s}%s{:%s}" % (fmtn, u"\u00B1", fmts)
+
+    out = []
+    outapp = out.append
+    for tup in inptup:
+        d, s = tup
+        if percent is True:
+            s = s*100
+        outapp(fmt.format(d, s))
+
+    return out

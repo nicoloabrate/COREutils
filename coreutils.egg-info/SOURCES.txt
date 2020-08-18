@@ -1,0 +1,12 @@
+README.md
+setup.py
+FRENETICutils/FreneticInpGen.py
+FRENETICutils/__init__.py
+coremap/AssemblyGeometry.py
+coremap/CoreMap.py
+coremap/UnfoldCore.py
+coremap/__init__.py
+coreutils.egg-info/PKG-INFO
+coreutils.egg-info/SOURCES.txt
+coreutils.egg-info/dependency_links.txt
+coreutils.egg-info/top_level.txt

@@ -32,6 +32,7 @@ class AssemblyHex:
         self.area = 3*(3**0.5)/2*self.edge**2
         self.perimeter = 6*self.edge
         self.type = "H"
+        self.numedges = 6
 
     def compute_volume(self, height):
         self.height = height  # assign height property
@@ -52,6 +53,7 @@ class AssemblySqr:
         self.area = self.edge**2
         self.perimeter = 4*self.edge
         self.type = "S"
+        self.numedges = 4
 
     def compute_volume(self, height):
         volume = self.area*height  # compute volume
