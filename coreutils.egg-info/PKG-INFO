@@ -38,5 +38,5 @@ Description: # README #
 Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: MIT License
-Classifier: Operating System :: OS Independent
+Classifier: Operating System :: OS independent
 Requires-Python: >=3.6

@@ -363,6 +363,7 @@ class CoreMap:
             else:
                 index = [l-1 for l in ilst]  # -1 to match python indexing
             # get coordinates associated to these assemblies
+            index = (list(set(index)))
             rows, cols = np.unravel_index(index, self.type.shape)
             # load new assembly type
             self.type[rows, cols] = newtype[ipos]
@@ -383,6 +384,30 @@ class CoreMap:
                               for elem in regions))
             f.write("\n")
 
+    def getassemblylist(self, atype, match=True):
+        """
+        Return assemblies belonging to a certain type.
+
+        Parameters
+        ----------
+        atype : TYPE
+            DESCRIPTION.
+        match : TYPE, optional
+            DESCRIPTION. The default is True.
+
+        Returns
+        -------
+        matchedass : TYPE
+            DESCRIPTION.
+
+        """
+        asstypes = self.type.flatten(order='F')
+        if match is True:
+            matchedass = np.where(asstypes == atype)[0]+1
+        else:
+            matchedass = np.where(asstypes != atype)[0]+1
+
+        return matchedass
     # TODO: add writeregionmap method to plot region id, x and y for each assembly
 
 
@@ -425,7 +450,7 @@ class CoreMap:
              which=None, what=None, asstype=False, usetex=False, fill=True,
              axes=None, cmap='Spectral_r', thresh=None, cbarLabel=None,
              xlabel=None, ylabel=None, loglog=None, logx=None, logy=None,
-             title=None, scale=1, fmt="%.2f", **kwargs):
+             title=None, scale=1, fmt="%.2f", numbers=False, **kwargs):
         """
         Plot the core map.
 
@@ -537,11 +562,19 @@ class CoreMap:
 
         else:  # cont. <- if type(fill) is bool
 
+
+            if self.assembly.type == "S":
+                orientation = np.pi/4
+                L = L/2*np.sqrt(2)
+
+            elif self.assembly.type == "H":
+                orientation = 0
+
             physics = True
             patches = []
-            values = []
+            # values = []
             patchesapp = patches.append
-            valuesapp = values.append
+            # valuesapp = values.append
             errbar = False
             # check data type is correct
             if type(what) is dict:
@@ -584,8 +617,12 @@ class CoreMap:
         if which is None:
             which = (self.serpcentermap).keys()
 
-        elif which is not None and fren is True:
-            which = [self.fren2serp[k] for k in which]
+        elif which is not None:
+            if fren is True:
+                which = [self.fren2serp[k] for k in which]
+            # else:
+            #     tmp = list((self.serpcentermap).keys())
+            #     which = [tmp[k] for k in which]
 
         for key, coord in (self.serpcentermap).items():
             x, y = coord
@@ -611,16 +648,27 @@ class CoreMap:
                 patchesapp(asspatch)
                 # define value to be plotted
                 #if fren is False:  # Serpent numeration
-                valuesapp(tallies[key])
+                # FIXME: per ora "valuesapp(tallies[key])" viene messo sotto per evitare che sia tutto disordinato
+                #valuesapp(tallies[key])
                 #else:  # Frenetic numeration
                    # keyF = self.serp2fren[key]
                    # valuesapp(tallies[keyF])
 
         # plot physics, if any
         if physics is True:
-            values = np.asarray(values)
+            # values = np.asarray(values)
             patches = np.asarray(patches, dtype=object)
-            coord = np.array(list(self.serpcentermap.values()))
+            if which is None:
+                coord = np.array(list(self.serpcentermap.values()))
+            else:
+                coord, values = [], []
+                for k in which:
+                    coord.append(self.serpcentermap[k])
+                    values.append(tallies[k])
+
+                coord = np.asarray(coord)
+                values = np.asarray(values)
+
             normalizer = normalizerFactory(values, None, False, coord[:, 0]*scale,
                                            coord[:, 1]*scale)
             pc = PatchCollection(patches, cmap=cmap, **kwargs)
@@ -650,14 +698,20 @@ class CoreMap:
 
                     else:
                         # define value to be plotted
-                        if fren is False:  # Serpent numeration
-                            txt = fmt % tallies[key]
+                        if numbers is False:
+                            if fren is False:  # Serpent numeration
+                                txt = fmt % tallies[key]
 
-                        else:  # Frenetic numeration
-                            txt = fmt % tallies[key]  # self.serp2fren[key]
+                            else:  # Frenetic numeration
+                                txt = fmt % tallies[key]  # self.serp2fren[key]
 
-                        if errbar is True:
-                            txt = "%s \n %.2f%%" % (txt, errors[key]*100)
+                            if errbar is True:
+                                txt = "%s \n %.2f%%" % (txt, errors[key]*100)
+                        else:
+                            if fren is True:  # FRENETIC numeration
+                                txt = str(self.serp2fren[key])  # translate keys
+                            else:
+                                txt = str(key)
 
                     plt.text(x*scale, y*scale, txt, ha='center',
                              va='center', size=fontsize)

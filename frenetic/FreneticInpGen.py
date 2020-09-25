@@ -1,15 +1,11 @@
-################################
-#  _   _ ______ __  __  ____   #
-# | \ | |  ____|  \/  |/ __ \  #
-# |  \| | |__  | \  / | |  | | #
-# | . ` |  __| | |\/| | |  | | #
-# | |\  | |____| |  | | |__| | #
-# |_| \_|______|_|  |_|\____/  #
-#                              #
-################################
-# Author: N. Abrate
-# File: FreneticIngen.py
-# Description:
+"""
+Author: N. Abrate.
+
+File: FreneticInpGen.py
+
+Description: Set of methods for generating FRENETIC input files.
+
+"""
 
 import os
 from shutil import rmtree
@@ -19,10 +15,14 @@ import serpentTools as st
 import h5py as h5
 
 # TODO: definire una sequenza automatica che generi i file di input (e.g. InpGen)
+# TODO: implementare gestione proprieta' fotoni (con GFN e DV)
+# TODO: quale coppia di temperature considero per i param. cinetici?
 
-def parsetemp(datapath):
+
+def parsetemp(datapath, files=None):
     """
-    This method generates three lists (further details below)
+    This method generates three lists (further details below).
+
     Parameters
     =========== INPUT
     datapath: string
@@ -35,7 +35,24 @@ def parsetemp(datapath):
     Tf: list
         fuel temperatures
     """
-    resfiles = [f for f in os.listdir(datapath) if isfile(join(datapath, f))]
+    # parse "_res.m" files
+    resfiles = [f for f in os.listdir(datapath) if join(datapath, f).endswith('_res.m')]
+    # select files, if any
+    if files is not None:
+        if isinstance(files, str):
+            files = [files]
+
+        tmp = resfiles
+        resfiles = []
+
+        for f in files:
+            for nf, f2 in enumerate(tmp):
+                if f in tmp[nf]:
+                    resfiles.append(tmp[nf])
+
+            if resfiles == []:
+                raise OSError('File starting with %s does not exist!' % f)
+
     # get temperatures
     Tc, Tf, fname = [], [], []
     Tcapp, Tfapp, fnameapp = Tc.append, Tf.append, fname.append
@@ -43,6 +60,8 @@ def parsetemp(datapath):
         basename = (f.split("_res.m")[0]).split("_")  # consider only name
         fnameapp(basename[0])  # store filename in a list
         # find pos to handle both Tc_Tf and Tf_Tc
+
+        # FIXME: ignore .m files with no temperature
         posTc, posTf = basename.index("Tc"), basename.index("Tf")
         # append temperatures
         Tcapp(int(basename[posTc+1]))
@@ -51,29 +70,156 @@ def parsetemp(datapath):
     return fname, Tc, Tf
 
 
-def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
-                asciifmt=False, datalink=None):
+def writemacro(nmix, ngro, nprec, fname, Tf, Tc, unifuel=None,
+               datapath=None, unidictkeys=None):
     """
-    This method generates the input files for the NE module of FRENETIC and the
-    associated HDF5 file for easy reproducibility
+    Write the input file "macro.nml" for the NE module of FRENETIC.
+
     Parameters
-    =========== INPUT
+    ----------
     datapath: string
         path of the directory with the files
-    =========== OUTPUT
+    Returns
+    -------
     """
-    fname, Tc, Tf = parsetemp(datapath)   # call method to read useful lists
+    # --- define list of output filenames
+    macronames = ["DIFFCOEF", "XSTOT", "XS_SCATT", "XS_FISS", "NUSF", "EFISS"]
+    inpnames = ["filediff", "sigt", "sigs", "sigf", "nusigf", "esigf"]
+
+    # read Serpent output
+    res = st.read(fname)  # read results from Serpent
+
+    # store all universe keys
+    if unidictkeys is None:
+
+        unidictkeys = set()
+        for key in sorted(res.universes):
+            unidictkeys.add(key[0])
+
+            if unifuel is None:
+                if 'fuel'.lower() in key.lower():  # check also FUEL
+                    unifuel = key
+
+    if nmix != len(unidictkeys):
+        raise OSError("Input number of regions does not match with" +
+                      "universes in Serpent file!")
+
+    # -- write macro.nml file
+    fname = "macro.nml"
+    if datapath is not None:
+        fname = os.path.join(datapath, fname)
+
+    with open(fname, 'w') as f:
+        f.write('&MACROXS0\n')
+        f.write('NMAT = %d \n' % nmix)
+        f.write('NGRO = %d \n' % ngro)
+        f.write('NPRE = %d \n' % nprec)
+        f.write('NDHP = %d \n' % 1)
+        f.write('NGRP = %d \n' % 0)
+        f.write('NPRP = %d \n' % 0)
+        f.write('/ \n \n')
+        f.write('&MACROXS0\n')
+        f.write('IRHO = 0,\n')
+        f.write('VELOC0(1:%d) = ' % ngro)
+
+        if unifuel is not None:
+            vel = 1/res.getUniv(unifuel, 0).infExp['infInvv']
+
+        else:
+            raise OSError("Fuel region missing in universe list!")
+
+        for igro in range(0, ngro):
+            f.write('%1.6e, ' % vel(igro+1))
+
+        f.write('\n LAMBDA0(1:%d) = ' % nprec)
+        lambda0 = res.resdata['fwdAnaLambda']
+
+        for iprec in range(0, nprec):
+            f.write('%1.6e, ' % lambda0(iprec+1))
+
+        f.write(' \nlambdadhp0(1:1) = 1.000000e+00,\n')
+        f.write('betadhp0(1:1) = 1.000000e+00,\n')
+        f.write('IDIFF(1:%d) = %d*2,\n' % (nmix, nmix))
+        f.write('ISIGT(1:%d) = %d*2,\n' % (nmix, nmix))
+        f.write('ISIGF(1:%d) = %d*2,\n' % (nmix, nmix))
+        f.write('TEMPFUEL0 =	 %1.6e,\n' % Tf)
+        f.write('TEMPCOOL0 =	 %1.6e,\n' % Tc)
+        f.write('ISIGS(1:%d) = %d*2,\n\n' % (nmix, nmix))
+
+        for imix in range(0, nmix):
+
+            # write universe number and name
+            f.write('!Universe %d:(%s)\n' % (imix, unidictkeys[imix]))
+
+            # write kinetic and spectrum parameters
+            beta0 = res.resdata['fwdAnaBetaZero']
+            chid0 = res.getUniv(unidictkeys[imix], 0).infExp['infChit']
+            chit0 = res.getUniv(unidictkeys[imix], 0).infExp['infChit']
+
+            f.write('CHIT0(%d, 1:%d) = ' % (imix, ngro))
+            for igro in range(0, ngro):
+                f.write('%1.6e, ' % chit0(igro))
+
+            for igro in range(0, ngro):
+                f.write('\n CHID0(%d, %d, 1:%d) = %d*%1.6e' % (imix, igro,
+                                                               nprec, nprec,
+                                                               chid0(igro)))
+
+            f.write('BETA0(%d, 1:%d) = ' % (imix, nprec))
+            for iprec in range(0, nprec):
+                f.write('%1.6e' % (beta0(iprec)))
+
+            # write macroscopic NE multi-group data
+            for inp, macro in (inpnames, macronames):
+
+                if macro == "XS_SCATT":
+
+                    for igrostart in range(0, ngro):
+                        f.write('%s(%d, %d, 1:%d) =' % (inp, imix,
+                                                        igrostart, ngro))
+                        for igroend in range(0, ngro):
+                            f.write(' ''NEinputdata/%s_%d_%d_%d.txt'', '
+                                    % (macro, imix, igrostart, igroend))
+
+                        f.write('/n')
+
+                else:
+
+                    f.write('%s(%d, 1:%d) =' % (inp, imix, ngro))
+                    for igro in range(0, ngro):
+                        f.write(' ''NEinputdata/%s_%d_%d.txt'', ' % (macro, imix, igro))
+
+                    f.write('/n')
+
+        f.write('/n')
+
+
+def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
+                asciifmt=False, files=None):
+    """
+    Generate FRENETIC NE module input HDF5 file.
+
+    Parameters
+    ----------
+    datapath: string
+        path of the directory with the files
+    Returns
+    -------
+    """
+    fname, Tc, Tf = parsetemp(datapath, files)   # call method to read useful lists
 
     # --- define list of output filenames
-    outnames = ["DIFFCOEF", "EFISS", "NUSF", "XS_FISS", "XS_SCATT", "XSTOT"]
+    outnames = ["DIFFCOEF", "EFISS", "NUSF", "XS_FISS", "XS_SCATT", "XSTOT",
+                "CHIT", "XS_REM"]
     infkeys = ['infDiffcoef', 'infKappa', 'infNsf',
-               'infFiss', 'infS0', 'infTot']
-    b1keys = ['b1Diffcoef', 'b1Kappa', 'b1Nsf', 'b1Fiss', 'b1S0', 'b1Chit']
+               'infFiss', 'infS0', 'infTot', 'infChit', 'infRemxs']
+    b1keys = ['b1Diffcoef', 'b1Kappa', 'b1Nsf', 'b1Fiss', 'b1S0', 'b1Chit',
+              'b1Remxs']
 
     if verbose is True:
-        infverb = ['infCapt', 'infNubar', 'infRemxs', 'infSp0']
-        b1verb = ['b1Capt', 'b1Nubar', 'b1Remxs', 'b1Sp0']
-        verb_out = ["XS_CAPT", "NU", "XS_REM", "XS_PSCATT"]
+        infverb = ['infCapt', 'infNubar', 'infSp0']
+        b1verb = ['b1Capt', 'b1Nubar', 'b1Sp0']
+        verb_out = ["XS_CAPT", "NU", "XS_PSCATT"]
         # append to default list of names
         outnames.extend(verb_out)
         infkeys.extend(infverb)
@@ -172,17 +318,17 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
     if asciifmt is True:
         # ---- write steady data to txt files
         # create directory
-        if os.path.isdir("input"):
-            print("'input' directory exists. Overwriting?")
+        if os.path.isdir("NEinputdata"):
+            print("'NEinputdata' directory exists. Overwriting?")
             ans = input()
         else:
             ans = "no"
 
         if ans == "yes" or ans == "y":
-            rmtree("input")
-            os.mkdir("input")
+            rmtree("NEinputdata")
+            os.mkdir("NEinputdata")
         else:
-            os.mkdir("input")
+            os.mkdir("NEinputdata")
 
     # define tuple of couples of temperatures
     TfTc = list(zip(Tf, Tc))
@@ -206,10 +352,17 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
                         # take universe
                         uni = sorted(res.universes)[iUni]
 
+                        if uni[0] not in unidict.keys():
+                            continue
+
+                        uniname, burnup, step, days = uni
+                        unitup = (uniname, burnup, step, days)
+
                         if itup == len(TfTc)-1:
                             # define filename
-                            ireg = unidict[uni[0]]
-                            txtname = "_".join([out, str(ireg), str(iGro+1)])
+                            imix = unidict[uni[0]]
+                            # FIXME: save only selected universes
+                            txtname = "_".join([out, str(imix), str(iGro+1)])
 
                         # store value in proper position in temp matrix
                         row = np.where(frendata[:, 0] == tup[0])
@@ -217,7 +370,7 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
 
                         # select inf or b1 results
                         if inf is True:
-                            val = res.universes[uni].infExp[infkeys[idx]]
+                            val = res.getUniv(*unitup).infExp[infkeys[idx]]
                             # scattering has double group index
                             if infkeys[idx].startswith('infS'):
                                 # departure group
@@ -258,7 +411,7 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
                                                            dtype=np.float))
 
                         else:  # if inf is False
-                            val = res.universes[uni].b1Exp[b1keys[idx]]
+                            val = res.getUniv(*unitup).b1Exp[b1keys[idx]]
                             if b1keys[idx].startswith('b1S'):
                                 # departure group
                                 for iGroDep in range(0, NG):
@@ -298,8 +451,9 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
 
 
 def mysavetxt(fname, x, fmt="%.6e", delimiter=' '):
+    """Write file in txt format."""
     fname = fname+".txt"  # add file extension
-    fname = os.path.join("input", fname)
+    fname = os.path.join("NEinputdata", fname)
     with open(fname, 'w') as f:
         for idx, row in enumerate(x):
             if idx == 0:
@@ -311,9 +465,8 @@ def mysavetxt(fname, x, fmt="%.6e", delimiter=' '):
 
 def __wopen(h5name):
     """
-    Function that opens the hdf5 file "h5name.hdf5" in "append" mode.
-    If "h5name.hdf5" already exists, user is asked if their want to
-    overwrite.
+    Open "h5name.hdf5" in "append" mode. If exists, user is asked to overwrite.
+
     Parameters
     ----------
     h5name : string
