@@ -719,7 +719,8 @@ class CoreMap:
             else:
                 if asstype is True:  # plot assembly type
                     txt = dictname[typelabel[key-1, 0]]
-                    plt.text(x*scale, y*scale, txt, ha='center', va='center', size=fontsize)
+                    plt.text(x*scale, y*scale, txt, ha='center', va='center',
+                             size=fontsize)
 
                 # FIXME: must be a better way to do this avoiding asstype, maybe.
                 # change "dictname" because maybe we want tuples to have overlappings (phytra fig)
@@ -727,8 +728,8 @@ class CoreMap:
                 if asstype is False:
                     for assN, txt in dictname:
                         x, y = self.serpcentermap[self.fren2serp[assN]]
-                        plt.text(x*scale, y*scale, txt, ha='center', va='center', size=fontsize)
-
+                        plt.text(x*scale, y*scale, txt, ha='center',
+                                 va='center', size=fontsize)
 
         ax.axis('equal')
         if xlabel is None and ylabel is None:
@@ -738,75 +739,6 @@ class CoreMap:
         if figname is not None:
             fig.savefig(figname, bbox_inches='tight', dpi=250)
 
-def normalizerFactory(data, norm, logScale, xticks, yticks):
-    """
-    Construct and return a :class:`~matplotlib.colors.Normalize` for this data
-    DISCLAIMER: taken from serpentTools.utils.plot
-    Parameters
-    ----------
-    data : :class:`numpy.ndarray`
-        Data to be plotted and normalized
-    norm : None or callable or :class:`matplotlib.colors.Normalize`
-        If a ``Normalize`` object, then use this as the normalizer.
-        If callable, set the normalizer with
-        ``norm(data, xticks, yticks)``. If not None, set the
-        normalizer to be based on the min and max of the data
-    logScale : bool
-        If this evaluates to true, construct a
-        :class:`matplotlib.colors.LogNorm` with the minimum
-        set to be the minimum of the positive values.
-    xticks : :class:`numpy.ndarray`
-    yticks : :class:`numpy.ndarray`
-        Arrays ideally corresponding to the data. Used with callable
-        `norm` function.
-    Returns
-    --------
-    :class:`matplotlib.colors.Normalize`
-    or :class:`matplotlib.colors.LogNorm`
-    or object:
-        Object used to normalize colormaps against these data
-    """
-    if norm is not None:
-        if isinstance(norm, matplotlib.colors.Normalize):
-            return norm
-        elif callable(norm):
-            return norm(data, xticks, yticks)
-        else:
-            raise TypeError("Normalizer {} not understood".format(norm))
-
-    if logScale:
-        if (data < 0).any():
-            print("Negative values will be excluded from logarithmic "
-                  "colormap.")
-        posData = data[data > 0]
-        return matplotlib.colors.LogNorm(posData.min(), posData.max())
-    return matplotlib.colors.Normalize(data.min(), data.max())
-
-def addColorbar(ax, mappable, norm=None, cbarLabel=None):
-    """
-    Quick utility to add a colorbar to an axes object
-    The color bar is placed adjacent to the provided
-    axes argument, rather than in the provided space.
-    DISCLAIMER: taken from serpentTools.utils.plot
-    Parameters
-    ----------
-    mappable : iterable
-        Collection of meshes, patches, or values that are used to
-        construct the colorbar.
-    norm : :class:`matplotlib.colors.Normalize`, optional
-        Normalizer for this plot. Can be a subclass like
-        :class:`matplotlib.colors.LogNorm`
-    cbarLabel : str, optional
-        If given, place this as the y-label for the colorbar
-    Returns
-    -------
-    :class:`matplotlib.colorbar.Colorbar`
-        The colorbar that was added
-    """
-    cbar = matplotlib.pyplot.colorbar(mappable, ax=ax, norm=norm)
-    if cbarLabel:
-        cbar.ax.set_ylabel(cbarLabel)
-    return cbar
 
 def uncformat(data, std, fmtn=".5e", fmts=None):
 

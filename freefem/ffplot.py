@@ -11,8 +11,12 @@ import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.patches import RegularPolygon
-from matplotlib.collections import PatchCollection
+
+from matplotlib.tri import Triangulation as tri
+from matplotlib.patches import Polygon
+from matplotlib.collections import PolyCollection
+from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
+
 
 class mesh:
     """
@@ -28,7 +32,8 @@ class mesh:
     None.
 
     """
-    def __init__(self, fname, verbosity):
+
+    def __init__(self, fname, verbosity=False):
 
         lines = []
         linesapp = lines.append
@@ -53,7 +58,7 @@ class mesh:
             if meshformat == 'FF++':
 
                 dimension = len(lines[1].split(' '))-1
-                if dimension !=2:
+                if dimension != 2:
                     raise OSError('Only 2D meshes are supported!')
 
                 nv, nt, nbe = tests
@@ -65,17 +70,16 @@ class mesh:
                     p[:, i-1] = [float(j) for j in lines[idx].split(' ')]
 
                 # triangles
-                t = np.zeros((4, nt))*np.nan
+                t = np.zeros((4, nt), dtype=np.int64)
                 for i in range(1, nt+1):
                     idx = idx + 1
-                    t[:, i-1] = [float(j) for j in lines[idx].split(' ')]
-
+                    t[:, i-1] = [int(j) for j in lines[idx].split(' ')]
 
                 # boundaries
-                b = np.zeros((3, nbe))*np.nan
+                b = np.zeros((3, nbe), dtype=np.int64)
                 for i in range(1, nbe+1):
                     idx = idx + 1
-                    b[:, i-1] = [float(j) for j in lines[idx].split(' ')]
+                    b[:, i-1] = [int(j) for j in lines[idx].split(' ')]
 
                 # look for labels
                 labels = np.unique(b[2, :])
@@ -101,7 +105,7 @@ class ffdata:
     def __init__(self, ffnames, vhname):
 
         if os.path.exists(vhname):
-            vh = np.loadtxt(vhname)
+            vh = np.loadtxt(vhname, dtype=np.int8)
         else:
             raise OSError('%s not found!' % vhname)
 
@@ -110,11 +114,13 @@ class ffdata:
             if os.path.exists(f):
                 try:
                     data = np.loadtxt(f)
+                    if len(data.shape) == 1:
+                        data = data[:, np.newaxis]
                 except ValueError:
+                    tmp = {0: lambda s: complex(s.decode().replace('+-', '-'))}
                     data = np.loadtxt(f, dtype=complex,
-                                      converters={0: lambda
-                                                  s: complex(s.decode().replace('+-', '-'))})
-                f = f.split(os.filesep)[-1]
+                                      converters=tmp)
+                f = f.split(os.pathsep)[-1]
                 datadict[f] = data
             else:
                 raise OSError('%s not found!' % f)
@@ -122,18 +128,68 @@ class ffdata:
         self.data = datadict
         self.vh = vh
 
-def ffplot(ffdata, mesh, Vh, surf=False, dispmesh=False,
-           boundary=True, clevels=10, **kwargs):
 
+def ffplot(mesh, Vh, ffdata=None, surf=False, showmesh=False,
+           showboundary=True, clevels=10, contour=False, interp=True,
+           cmap='Spectral_r', levels=25, **kwargs):
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
     xp, yp, xmsh, ymsh = PrepareMesh(mesh.points, mesh.triangles)
-    xyrawdata = rowvec(ffdata)
-    elementType, xydata = ConvertPdeData(mesh, Vh, xyrawdata)
-    # Based on the Element Space create various Meshes for plotting and interpolation
-    xdata, xdataz, ydata, ydataz = PrepareCoordinates(elementType, xmesh,
-                                                      ymesh, true)
-    # Convert the color data according corresponding to xdata, xdataz and interpolation
-    cdata, cdataz, cdatainterpn = PrepareData(elementType, triangles, xydata,
-                                              xmesh, ymesh, true)
+
+    if ffdata is not None:
+        xyrawdata = rowvec(ffdata)
+        elementType, xydata = ConvertPdeData(mesh, Vh, xyrawdata)
+        # # Create meshes for plotting and interpolation according to FEtype
+        # xdata, ydata, xdataz, ydataz = PrepareCoordinates(elementType, xmsh,
+        #                                                   ymsh)
+        # # Convert the color data according to xdata, xdataz and interpolation
+        # cdata, cdataz, cdatainterpn = PrepareData(elementType,
+        #                                           mesh.triangles,
+        #                                           xydata, xmsh, ymsh)
+
+        if contour is False:
+
+            if surf is False:
+
+                if interp is True:
+
+                    if showmesh is False:
+
+                        if elementType in ['P0', 'P1']:
+
+                            triang = tri(mesh.points[0, :], mesh.points[1, :])
+                            plt.tricontourf(triang, np.squeeze(ffdata),
+                                            cmap=cmap, levels=levels)
+
+                        else:
+                            raise OSError('Unknown FE-space order!')
+
+                    else:
+                        triang = tri(mesh.points[0, :], mesh.points[1, :])
+                        plt.tricontourf(triang, np.squeeze(ffdata),
+                                        cmap=cmap, levels=levels)
+
+                else:
+                    print('Under develop')
+
+            else:
+                print('Under develop')
+
+        else:
+            print('Under develop')
+
+    else:
+        # plot Vh mesh
+        print('Under develop')
+
+    if showboundary is True:
+        boundary = rowvec(mesh.boundaries)
+        x = np.array([xp[boundary[0, :]-1], xp[boundary[1, :]-1]])
+        y = np.array([yp[boundary[0, :]-1], yp[boundary[1, :]-1]])
+        plt.plot(x, y, color='k', linewidth=1)
+        plt.gca().set_aspect('equal', adjustable='box')
+        # matplotlib.lines(xp, yp)
 
 
 def PrepareMesh(points, triangles):
@@ -160,12 +216,12 @@ def PrepareMesh(points, triangles):
 
     """
     xp, yp = points[0, :], points[1, :]
-    xmsh = np.array([xp[triangles[0, :]],
-                     xp[triangles[1, :]],
-                     xp[triangles[2, :]]])
-    ymsh = np.array([yp[triangles[0, :]],
-                     yp[triangles[1, :]],
-                     yp[triangles[2, :]]])
+    xmsh = np.array([xp[triangles[0, :]-1],
+                     xp[triangles[1, :]-1],
+                     xp[triangles[2, :]-1]])
+    ymsh = np.array([yp[triangles[0, :]-1],
+                     yp[triangles[1, :]-1],
+                     yp[triangles[2, :]-1]])
     return xp, yp, xmsh, ymsh
     return xp, yp, xmsh, ymsh
 
@@ -185,9 +241,12 @@ def rowvec(S):
         DESCRIPTION.
 
     """
-    s1, s2 = S.shape
-    if s1 > s2:
-        S = S.T
+    try:
+        s1, s2 = S.shape
+        if s1 > s2:
+            S = S.T
+    except ValueError:
+        S = S
     return S
 
 
@@ -212,37 +271,114 @@ def ConvertPdeData(mesh, Vh, xyrawdata):
     nt = mesh.nt
     ndim, ndof = xyrawdata.shape
     nv = mesh.nv
-    xydata = []
-    xydatapp = xydata.append
+    # xydata = []
+    # xydatapp = xydata.append
     nel = len(Vh)
+    t = mesh.triangles
 
-    if nel == nt:
-        eltype = 'P0'
-        for i in range(0, ndim):
-            cCols = xyrawdata[i, :]
-            tmp = cCols[Vh+1]
-            tmp = np.array([tmp, tmp, tmp])
-            xydatapp([tmp])
+    if Vh is not None:
 
-    elif nel == 3*nt:
-        eltype = 'P1'
-        for i in range(0, ndim):
-            cCols = xyrawdata[i, :]
-            tmp = np.reshape(cCols(Vh+1), (3, nt))
-            xydatapp([tmp])
+        if nel == nt:
+            eltype = 'P0'
+            for i in range(0, ndim):
+                cCols = xyrawdata[i, :]
+                tmp = cCols[Vh+1]
+                tmp = np.array([tmp, tmp, tmp])
+                xydata = tmp
 
-    elif nel == 4*nt:
-        eltype = 'P1b'
-        for i in range(0, ndim):
-            cCols = xyrawdata[i, :]
-            tmp = np.reshape(cCols(Vh+1), (4, nt))
-            xydatapp([tmp])
+        elif nel == 3*nt:
+            eltype = 'P1'
+            for i in range(0, ndim):
+                cCols = xyrawdata[i, :]
+                tmp = np.reshape(cCols[Vh+1], (3, nt))
+                xydata = tmp
 
-    elif nel == 6*nt:
-        eltype = 'P2'
-        for i in range(0, ndim):
-            cCols = xyrawdata[i, :]
-            tmp = np.reshape(cCols(Vh+1), (6, nt))
-            xydatapp([tmp])
+        elif nel == 4*nt:
+            eltype = 'P1b'
+            for i in range(0, ndim):
+                cCols = xyrawdata[i, :]
+                tmp = np.reshape(cCols[Vh+1], (4, nt))
+                # xydatapp([tmp])
+
+        elif nel == 6*nt:
+            eltype = 'P2'
+            for i in range(0, ndim):
+                cCols = xyrawdata[i, :]
+                tmp = np.array([cCols[t[0, :]],
+                                cCols[t[1, :]],
+                                cCols[t[2, :]]])
+                # xydatapp([tmp])
+        else:
+            raise OSError('Unknown Lagrangian FE: Vh does not match with no.' +
+                          ' of mesh triangles')
+
     else:
-        raise OSError('Unknown Lagrangian FE: Vh does not match with no. of mesh triangles')
+
+        if ndof == nv:
+            eltype = 'P1'
+            for i in range(0, ndim):
+                cCols = xyrawdata[i, :]
+                tmp = np.reshape(cCols(Vh+1), (6, nt))
+                # xydatapp([tmp])
+
+        else:
+            raise OSError('Unknown FE-space order: No Vh and NDOF != NV')
+
+    return eltype, xydata
+
+
+def PrepareCoordinates(eltype, xmsh, ymsh, doz=True):
+
+    if eltype in ['P0', 'P1']:
+
+        xdata, ydata = xmsh, ymsh
+        xdataz, ydataz = [], []
+
+    elif eltype == 'P1b':
+
+        px4, py4 = np.sum(xmsh, axis=0)/3, np.sum(ymsh, axis=0)/3
+        # refine mesh
+        xmsh124 = np.array([xmsh[0, :], xmsh[1, :], px4]).T
+        ymsh124 = np.array([ymsh[0, :], ymsh[1, :], py4]).T
+        xmsh234 = np.array([xmsh[1, :], xmsh[2, :], px4]).T
+        ymsh234 = np.array([ymsh[1, :], ymsh[2, :], py4]).T
+        xmsh143 = np.array([xmsh[0, :], px4, xmsh[2, :]]).T
+        ymsh143 = np.array([ymsh[0, :], py4, ymsh[2, :]]).T
+        # assemble the refined mesh
+        xdata = np.array([xmsh124, xmsh234, xmsh143])
+        ydata = np.array([ymsh124, ymsh234, ymsh143])
+        if doz:
+            xdataz, ydataz = xmsh, ymsh
+        else:
+            xdataz, ydataz = [], []
+
+    elif eltype == 'P2':
+
+        print('Under development!')
+
+    else:
+        raise OSError('Unknown FE-space order: No Vh and NDOF != NV')
+
+    return xdata, ydata, xdataz, ydataz
+
+
+def PrepareData(eltype, triangles, xydata, xmsh, ymsh):
+
+    ndim = len(xydata)
+    if eltype in ['P0', 'P1']:
+
+        cdata = xydata
+        cdataz, cdatainterp = None, None
+
+    elif eltype == 'P1b':
+
+        print('Under development!')
+
+    elif eltype == 'P2':
+
+        print('Under development!')
+
+    else:
+        raise OSError('Unknown FE-space order: No Vh and NDOF != NV')
+
+    return cdata, cdataz, cdatainterp
