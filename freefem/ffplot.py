@@ -102,10 +102,12 @@ class mesh:
 
 
 class ffdata:
+    """Gather pde data for plotting."""
+
     def __init__(self, ffnames, vhname):
 
         if os.path.exists(vhname):
-            vh = np.loadtxt(vhname, dtype=np.int8)
+            vh = np.loadtxt(vhname, dtype=np.int64)
         else:
             raise OSError('%s not found!' % vhname)
 
@@ -120,7 +122,7 @@ class ffdata:
                     tmp = {0: lambda s: complex(s.decode().replace('+-', '-'))}
                     data = np.loadtxt(f, dtype=complex,
                                       converters=tmp)
-                f = f.split(os.pathsep)[-1]
+                f = f.split(os.path.sep)[-1].split('.txt')[0]
                 datadict[f] = data
             else:
                 raise OSError('%s not found!' % f)
