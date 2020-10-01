@@ -133,7 +133,7 @@ class ffdata:
 
 def ffplot(mesh, Vh, ffdata=None, surf=False, showmesh=False,
            showboundary=True, clevels=10, contour=False, interp=True,
-           cmap='Spectral_r', levels=25, **kwargs):
+           cmap='Spectral_r', levels=25, figname=None, **kwargs):
 
     # fig = plt.figure()
     # ax = fig.add_subplot(111)
@@ -159,18 +159,21 @@ def ffplot(mesh, Vh, ffdata=None, surf=False, showmesh=False,
                     if showmesh is False:
 
                         if elementType in ['P0', 'P1']:
-
+                            fig = plt.figure()
                             triang = tri(mesh.points[0, :], mesh.points[1, :])
-                            plt.tricontourf(triang, np.squeeze(ffdata),
-                                            cmap=cmap, levels=levels)
+                            cax = plt.tricontourf(triang, np.squeeze(ffdata),
+                                                  cmap=cmap, levels=levels)
+                            fig.colorbar(cax)
 
                         else:
                             raise OSError('Unknown FE-space order!')
 
                     else:
+                        fig = plt.figure()
                         triang = tri(mesh.points[0, :], mesh.points[1, :])
-                        plt.tricontourf(triang, np.squeeze(ffdata),
-                                        cmap=cmap, levels=levels)
+                        cax = plt.tricontourf(triang, np.squeeze(ffdata),
+                                              cmap=cmap, levels=levels)
+                        fig.colorbar(cax)
 
                 else:
                     print('Under develop')
@@ -193,6 +196,8 @@ def ffplot(mesh, Vh, ffdata=None, surf=False, showmesh=False,
         plt.gca().set_aspect('equal', adjustable='box')
         # matplotlib.lines(xp, yp)
 
+    if figname is not None:
+        fig.savefig(figname, bbox_inches='tight', dpi=250)
 
 def PrepareMesh(points, triangles):
     """
@@ -284,7 +289,7 @@ def ConvertPdeData(mesh, Vh, xyrawdata):
             eltype = 'P0'
             for i in range(0, ndim):
                 cCols = xyrawdata[i, :]
-                tmp = cCols[Vh+1]
+                tmp = cCols[Vh]
                 tmp = np.array([tmp, tmp, tmp])
                 xydata = tmp
 
@@ -292,14 +297,14 @@ def ConvertPdeData(mesh, Vh, xyrawdata):
             eltype = 'P1'
             for i in range(0, ndim):
                 cCols = xyrawdata[i, :]
-                tmp = np.reshape(cCols[Vh+1], (3, nt))
+                tmp = np.reshape(cCols[Vh], (3, nt))
                 xydata = tmp
 
         elif nel == 4*nt:
             eltype = 'P1b'
             for i in range(0, ndim):
                 cCols = xyrawdata[i, :]
-                tmp = np.reshape(cCols[Vh+1], (4, nt))
+                tmp = np.reshape(cCols[Vh], (4, nt))
                 # xydatapp([tmp])
 
         elif nel == 6*nt:
@@ -320,7 +325,7 @@ def ConvertPdeData(mesh, Vh, xyrawdata):
             eltype = 'P1'
             for i in range(0, ndim):
                 cCols = xyrawdata[i, :]
-                tmp = np.reshape(cCols(Vh+1), (6, nt))
+                tmp = np.reshape(cCols(Vh), (6, nt))
                 # xydatapp([tmp])
 
         else:

@@ -9,6 +9,7 @@ coreutils.egg-info/SOURCES.txt
 coreutils.egg-info/dependency_links.txt
 coreutils.egg-info/top_level.txt
 freefem/__init__.py
+freefem/ffplot.py
 freefem/utils.py
 frenetic/FreneticInpGen.py
 frenetic/ParseFrenOut.py
