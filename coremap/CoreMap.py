@@ -47,7 +47,15 @@ class CoreMap:
 
     def __init__(self, geinp, rotangle, pitch):
 
-        rotangle = int(rotangle)
+        if isinstance(geinp, str):
+            rotangle = int(rotangle)
+            core = UnfoldCore(geinp, rotangle)
+            self.inp = core.inp
+            self.type = core.coremap
+
+        else:
+            self.inp = geinp
+            self.type = geinp
         # -- compute assembly geometrical features
         if rotangle == 60:
             assemblygeom = ag.AssemblyHex(pitch)
@@ -55,10 +63,7 @@ class CoreMap:
             assemblygeom = ag.AssemblySqr(pitch)
 
         # unfold input geometry over a certain rotation angle
-        core = UnfoldCore(geinp, rotangle)
         self.rotation_angle = rotangle
-        self.inp = core.inp
-        self.type = core.coremap
         self.assembly = assemblygeom  # assign assembly object
         self.Nx, self.Ny = (self.type).shape
         # define assembly map
@@ -351,7 +356,7 @@ class CoreMap:
         if type(newtype) is int:
             # convert integer to list
             newtype = list(newtype)
-        if type(asslst[0]) is int:
+        if type(asslst[0]) is not list:
             # convert list to list of lists
             asslst = [asslst]
 

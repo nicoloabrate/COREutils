@@ -76,18 +76,23 @@ def readfeinput(fname, datamap, NG, matrixfmt=False):
                 for ge in range(0, NG):
                     dictkey = key+"%d%d" % (g+1, ge+1)
                     tmp = data[0+nass*(skip-1):skip*nass]
-                    if matrixfmt is True:
-                        Nx = int(np.sqrt(nass))
-                        tmp = tmp.reshape((Nx, Nx))
+                    # reshape to make FF lexicographic order consistent with ours
+                    Nx = int(np.sqrt(nass))
+                    tmp = tmp.reshape((Nx, Nx), order='F')
+                    if matrixfmt is False:
+                        tmp = tmp.flatten(order='C')
                     parameters[dictkey] = tmp
                     skip = skip+1
 
             else:
                 dictkey = key+"%d" % (g+1)
                 tmp = data[0+nass*(skip-1):skip*nass]
-                if matrixfmt is True:
-                    Nx = int(np.sqrt(nass))
-                    tmp = tmp.reshape((Nx, Nx))
+                # reshape to make FF lexicographic order consistent with ours
+                Nx = int(np.sqrt(nass))
+                tmp = tmp.reshape((Nx, Nx), order='F')
+                if matrixfmt is False:
+                    tmp = tmp.flatten(order='C')
+
                 parameters[dictkey] = tmp
                 skip = skip+1
 
@@ -173,7 +178,7 @@ def makesnapshot(parameters, which=None, ismat=False):
 
 def rot(v, angle, ismat=True):
     """
-    Rotate matrix/array v of "angle"-degree
+    Rotate matrix/array v of "angle"-degree.
 
     Parameters
     ----------
@@ -187,7 +192,6 @@ def rot(v, angle, ismat=True):
     None.
 
     """
-
     for ik, key in enumerate(v.keys()):
 
         mat = v[key]
@@ -199,7 +203,7 @@ def rot(v, angle, ismat=True):
             mat = mat.reshape((Nx, Nx))
 
         nn = int(angle/90)
-        mat = np.rot90(mat, k=nn)
+        mat = np.rot90(mat, k=-nn)
         v[key] = mat
 
     return v

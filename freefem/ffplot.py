@@ -104,36 +104,37 @@ class mesh:
 class ffdata:
     """Gather pde data for plotting."""
 
-    def __init__(self, ffnames, vhname):
+    def __init__(self, vhname, ffnames=None):
 
         if os.path.exists(vhname):
             vh = np.loadtxt(vhname, dtype=np.int64)
         else:
             raise OSError('%s not found!' % vhname)
 
-        datadict = {}
-        for f in ffnames:
-            if os.path.exists(f):
-                try:
-                    data = np.loadtxt(f)
-                    if len(data.shape) == 1:
-                        data = data[:, np.newaxis]
-                except ValueError:
-                    tmp = {0: lambda s: complex(s.decode().replace('+-', '-'))}
-                    data = np.loadtxt(f, dtype=complex,
-                                      converters=tmp)
-                f = f.split(os.path.sep)[-1].split('.txt')[0]
-                datadict[f] = data
-            else:
-                raise OSError('%s not found!' % f)
-        # add dict with names in ffnames!
-        self.data = datadict
+        if ffnames is not None:
+            datadict = {}
+            for f in ffnames:
+                if os.path.exists(f):
+                    try:
+                        data = np.loadtxt(f)
+                        if len(data.shape) == 1:
+                            data = data[:, np.newaxis]
+                    except ValueError:
+                        tmp = {0: lambda s: complex(s.decode().replace('+-', '-'))}
+                        data = np.loadtxt(f, dtype=complex,
+                                          converters=tmp)
+                    f = f.split(os.path.sep)[-1].split('.txt')[0]
+                    datadict[f] = data
+                else:
+                    raise OSError('%s not found!' % f)
+            # add dict with names in ffnames!
+            self.data = datadict
         self.vh = vh
 
 
 def ffplot(mesh, Vh, ffdata=None, surf=False, showmesh=False,
            showboundary=True, clevels=10, contour=False, interp=True,
-           cmap='Spectral_r', levels=25, figname=None, **kwargs):
+           cmap='Spectral_r', levels=25, figname=None, regions=None, **kwargs):
 
     # fig = plt.figure()
     # ax = fig.add_subplot(111)
@@ -160,9 +161,26 @@ def ffplot(mesh, Vh, ffdata=None, surf=False, showmesh=False,
 
                         if elementType in ['P0', 'P1']:
                             fig = plt.figure()
-                            triang = tri(mesh.points[0, :], mesh.points[1, :])
+                            tri1=mesh.triangles[0:3,:].T-1
+                            triang = tri(xp, yp, tri1)
+                            if regions is None:
+                                cax = plt.tricontourf(triang, np.squeeze(ffdata),
+                                                      cmap=cmap, levels=levels)
+                                fig.colorbar(cax)
+                            else:
+                                mask = np.zeros((len(tri1), ))
+                                for r in regions:
+                                    tmp = np.where(mesh.triangles[-1, :] == r,
+                                                   1, 0)
+                                    mask = mask+tmp
+                                mask[mask == 0] = 2
+                                mask[mask == 1] = 0
+                                mask[mask == 2] = 1
+                                triang.set_mask(mask)
+
                             cax = plt.tricontourf(triang, np.squeeze(ffdata),
                                                   cmap=cmap, levels=levels)
+                            plt.axis('off')
                             fig.colorbar(cax)
 
                         else:
@@ -170,7 +188,7 @@ def ffplot(mesh, Vh, ffdata=None, surf=False, showmesh=False,
 
                     else:
                         fig = plt.figure()
-                        triang = tri(mesh.points[0, :], mesh.points[1, :])
+                        triang = tri(xp, yp)
                         cax = plt.tricontourf(triang, np.squeeze(ffdata),
                                               cmap=cmap, levels=levels)
                         fig.colorbar(cax)
@@ -229,6 +247,7 @@ def PrepareMesh(points, triangles):
     ymsh = np.array([yp[triangles[0, :]-1],
                      yp[triangles[1, :]-1],
                      yp[triangles[2, :]-1]])
+
     return xp, yp, xmsh, ymsh
     return xp, yp, xmsh, ymsh
 
