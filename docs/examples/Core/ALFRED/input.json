@@ -1,0 +1,68 @@
+{
+  "filename" : "ALFRED_1_6.txt",
+  "pitch" : 17.1,
+  "rotation" : 60,
+  "assemblynames" : ["IF", "OF", "CR", "SR", "DR", "BA", "EL"],
+  "fren" : true,
+  "replace" : {
+                "SR": [92, 326, 237, 3]
+              },
+  "cuts" : {
+              "IF" : [["IF_BOT_REF", 0, 79], ["IF_BOT_PLUG", 79, 84],
+                      ["IF_PLEN", 84, 139], ["IF_BOT_INS", 139, 140],
+                      ["INN_FUEL", 140, 200], ["IF_TOP_INS", 200, 201],
+                      ["IF_SPRING", 201, 213], ["IF_TOP_PLUG", 213, 218],
+                      ["IF_TOP_REF", 218, 340]],
+              "OF" : [["OF_BOT_REF", 0, 79], ["OF_BOT_PLUG", 79, 84],
+                      ["OF_PLEN", 84, 139], ["OF_BOT_INS", 139, 140],
+                      ["OUT_FUEL", 140, 200], ["OF_TOP_INS", 200, 201],
+                      ["OF_SPRING", 201, 213], ["OF_TOP_PLUG", 213, 218],
+                      ["OF_TOP_REF", 218, 340]],
+              "CR" : [["CR_BOT_REF", 0, 62], ["CR_BOT_PLUG", 62, 67],
+                      ["CR_BOT_INS", 67, 68], ["CR_ACT", 68, 136],
+                      ["CR_DUMM", 136, 204], ["CR_SPRING", 204, 264],
+                      ["CR_TOP_REF", 264, 340]],
+              "SR" : [["SR_BOT_REF", 0, 207], ["SR_BOT_PLUG", 207, 212],
+                      ["SR_ACT", 212, 236], ["SR_TOP_INS", 236, 237],
+                      ["SR_SPRING", 237, 307], ["SR_TOP_REF", 307, 340]],
+              "DR" : [["DR_BOT_REF", 0, 79], ["DR_BOT_PLUG", 79, 84],
+                      ["DR_DUMM", 84, 201], ["DR_SPRING", 201, 213],
+                      ["DR_TOP_PLUG", 213, 218], ["DR_TOP_REF", 218, 340]],
+              "BA" : [["BA", 0, 340]],
+              "EL" : [["ll", 0, 340]]
+           },
+  "mycuts" : [0, 68, 84, 136, 140, 200, 212, 264, 296, 340],
+  "config" : {
+              "5.4" : {
+                      "translate" : {
+                                      "which" : [[92, 326], [237, 3]],
+                                      "dz" : [-68, -68]
+                                    },
+                       "perturb" : {
+                                      "which" : [[1, 2], [4, 5]],
+                                      "what" : ["IF_BOT_REF", "IF_BOT_REF"],
+                                      "with" : ["OF_BOT_REF", "IF_TOP_REF"]
+                                   }
+                    },
+              "9" : {
+                      "perturb" : {
+                                      "which" : [[80, 158], [4, 5]],
+                                      "what" : ["IF_BOT_REF", "IF_TOP_REF"],
+                                      "with" : ["IF_TOP_REF", "IF_BOT_REF"]
+                                  }
+                    }
+             },
+   "regionsplot" : {"IF_TOP_REF": "TR", "IF_TOP_PLUG": "PU", "IF_SPRING": "SP",
+                    "IF_TOP_INS" : "TI", "INN_FUEL" : "IF", "IF_BOT_INS" : "BI",
+                    "IF_PLEN" : "PL", "IF_BOT_PLUG" : "PU", "IF_BOT_REF" : "BR",
+                    "OF_TOP_REF": "TR", "OF_TOP_PLUG": "PU", "OF_SPRING": "SP",
+                    "OF_TOP_INS" : "TI", "OUT_FUEL" : "OF", "OF_BOT_INS" : "BI",
+                    "OF_PLEN" : "PL", "OF_BOT_PLUG" : "PU", "OF_BOT_REF" : "BR",
+                    "CR_TOP_REF" : "TR", "CR_SPRING" : "SP", "CR_DUMM" : "CD",
+                    "CR_ACT" : "CA", "CR_BOT_INS" : "BI", "CR_BOT_PLUG" : "PU",
+                    "CR_BOT_REF" : "BR", "DR_TOP_REF" : "TR", "DR_TOP_PLUG" : "PU",
+                    "SR_BOT_REF" : "BR", "SR_BOT_PLUG" : "PU", "SR_ACT" : "SR",
+                    "SR_TOP_INS" : "TI", "SR_SPRING" : "SP", "SR_TOP_REF" : "TR",
+                    "DR_SPRING" : "SP", "DR_DUMM" : "DE", "DR_BOT_PLUG" : "PU",
+                    "DR_BOT_REF" : "BR", "BA" : "BA", "ll" : "Pb"}
+}

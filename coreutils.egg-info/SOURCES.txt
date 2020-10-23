@@ -1,9 +1,12 @@
 README.md
 setup.py
-coremap/AssemblyGeometry.py
-coremap/CoreMap.py
-coremap/UnfoldCore.py
-coremap/__init__.py
+core/Assembly.py
+core/Core.py
+core/Map.py
+core/MaterialData.py
+core/UnfoldCore.py
+core/__init__.py
+core/plot.py
 coreutils.egg-info/PKG-INFO
 coreutils.egg-info/SOURCES.txt
 coreutils.egg-info/dependency_links.txt
