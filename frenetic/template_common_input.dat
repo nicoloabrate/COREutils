@@ -1,0 +1,40 @@
+&PRELIMINARY
+ISSYM = 0	            !Simmetry flag: 0 = no simmetry; 1 = 60 degrees simmetry
+ISNETH = 2 	          !NE-TH codes coupling flag: 0 = no coupling; 1 = coupling (TISC); 2 = coupling (file r/w)
+IRESTA = 0 	          !Restart flag: 0 = start a new simulation deleting the old results; 1 = the run stats from results of the previous run
+SERVERPORT = 2000     !port number for the TISC coupling
+HOSTNAME	= 127.0.0.1 !host name of the pc where TISC is running
+/
+
+
+&COREGEO
+NCHAN	= $NH	                      !# of exagonal channels
+NDIFF	= $NDIFF,
+HEXPITCH = 0,                   ![m] lattice pitch of hexagonal mesh
+LEXAG	= $NH*0.0912d0,             ![m] side length of hexagon
+NR = $NR,	                        ![] # of rows in a sextant
+NL = $NL,             	          ![] # of hexagons in each row of a sextant (including the central hexagon)
+
+ITYCOOL	= 0 	![] Flag for coolant type (1=Pb, 2=LBE, 3=Na)
+/
+
+
+&COMMNUM
+NELEMS = $NH*350,             !spatial elements number
+XLENGT = $NH*3.4d0,
+ITYMSH = $NH*1, 		          !mesh type: =0 fixed and uniform, =1 fixed refined, =3 adapted with initial refinement
+NREF = $NH*1, 		            !spatial elements number in the refined zone (if itymsh != 0) !non e' vero
+NELREF(1, 1:$NH) = $NH*150, 	!spatial elements number in the refined zone (if itymsh != 0)
+XBREFI(1, 1:$NH) = $NH*1.4d0,	!beginning of the refined zone (if itymsh != 0)
+XEREFI(1, 1:$NH) = $NH*2.0d0,	!end of the refined zone (if itymsh != 0)
+SIZMIN = $NH*0.0001, 	        !spatial mesh minimum size (if refined)
+SIZMAX = $NH*1.0, 	          !spatial mesh maximum size (if refined)
+IADAPTIME	= 1,	           	  !time adaptivity flag (0=no adaptivity (tstep=tstepmin); 1=adaptivity; 2=adaptivity only with respect to temperatures)
+TEND = 000.0d0, 	            !simulation end time
+STPMIN = $NH*0.005, 	        !minimum timestep
+STPMAX = $NH*0.005, 	        !maximum timestep (for t<5tauq)
+STPMINSTEADY = $NH*0.05, 	    !minimum timestep
+NTIMEREF = 1,
+TREFBEG	= 0.0d0,
+TREFEND	= 0*000.0d0
+/

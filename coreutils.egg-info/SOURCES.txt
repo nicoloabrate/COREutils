@@ -14,7 +14,11 @@ coreutils.egg-info/top_level.txt
 freefem/__init__.py
 freefem/ffplot.py
 freefem/utils.py
-frenetic/FreneticInpGen.py
+frenetic/InpGen.py
+frenetic/InpNE.py
+frenetic/InpTH.py
+frenetic/NEInpGen.py
 frenetic/ParseFrenOut.py
+frenetic/THInpGen.py
 frenetic/__init__.py
 frenetic/devel.py

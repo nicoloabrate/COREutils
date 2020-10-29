@@ -1,0 +1,40 @@
+&COMMONS
+IHA = 1, ![] - integer number of the HAs of this type
+/
+
+&NEUTRONIC
+/
+
+&THERMALHYDRAULIC
+
+NFUELX = 0,	        !# of fuel rods in each exagonal channel
+NFUELHEATEDX	= 0,	!# of heated fuel rods in each exagonal channel
+
+IFUELX = 0,
+DFUELX = 0.0d0,
+INBOXINSIDEX = 0.0d0,
+INBOXOUTSIDEX	= 0.0d0,
+DWIREX = 0.00d0,
+PWIREX = 0.0d0,
+
+COSBETAX = 0.0d0, !if icosbeta=0, this is the constant value of cosbeta (-1 = down direction)
+PTOPDISTX	= 0.0d0,
+FPEAKX = 0.0d0, ![] Powern peaking factor in the assembly
+
+THICKBOXX(1:6)	= 0*0.008d0, ![m] Thickness of a single assembly box (it will be automatically doubled)
+QBOXX(1:6)	= 0*1.0d0, 	![] real - Multiplier of the inter-assembly heat transfer coefficient
+BOXMATX(1:6)	= 0*1, 		![] int - Flag for assembly box material (1=SS) WARNING: only 1 is valid
+THICKCLEARX(1:6)	= 0*0.005d0, ![m] Thickness of the coolant clearance between assembly boxes
+
+IHPBPINX 	= 0, 		![] Flag for pin-coolant HTC (0=constant, 1=Schad-Modified, 2=Ushakov, 3=Brasimone-exp, 4=Mikityuk)
+HPBPINX		= 0.0d0,
+QHPBPINX	= 0.0d0,
+
+ITYFRICTX	= 0,	![] Flag for the type of friction factor (1=Todreas, 2=Brasimone, 3=Todreas-wire)
+
+ICHCOUPLX	= 0,
+QCHCOUPLX	= 0.0d0,
+
+IMATX		= 1.0d0, ![] Flag for the type of hexagon (only 1)
+FFCORPBX	= 1.0d0, ![] Friction factor multiplier
+/

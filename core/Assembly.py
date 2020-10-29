@@ -48,6 +48,7 @@ class AssemblyGeometry:
         if asstype == 'H':
             # by definition of pitch between two hexagonal assemblies
             self.apothema = pitch/2
+            self.pitch = pitch
             self.edge = 2*self.apothema/3**0.5
             self.area = 3*(3**0.5)/2*self.edge**2
             self.perimeter = 6*self.edge

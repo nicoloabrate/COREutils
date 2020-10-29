@@ -1,41 +1,70 @@
 """
 Author: N. Abrate.
 
-File: core.py
+File: MaterialData.py
 
-Description: Class to define the nuclear reactor core geometry defined in an
-external text file.
+Description: Class that define core material (NE/TH/PH) data.
 """
 import os
-from os.path import isfile, join
-import numpy as np
+import warnings
+import coreutils
 import serpentTools as st
 
+from os.path import join
 
-class MaterialData:
+
+class NEMaterialData:
     """
-
+    Assign material data NE to reactor core.
 
     Attributes
     ----------
+    data : dict
+        Dictionary storing objects with macro-group constants parsed by
+        serpentTools.
+    temp : list
+        List with tuples (Tf, Tc).
 
     Methods
     -------
-
+    ``None``
     """
 
-    def __init__(self, geinp, rotangle, pitch, regionsdict,
-                 insertassemblies=None, cuts=None, fren=False, fill=None):
-        a=1
-
-    def __parsetemp(path, files=None):
+    def __init__(self, datapath, univ, files=None):
         """
-        Generates three lists with temperatures and file names.
+        Initialise object.
 
         Parameters
         ----------
-        datapath: string
+        datapath: str
+            path where files are stored.
+        univ : list
+            List with universes used in calculations. The universes names must
+            match the universes defined in Serpent 2 calculations.
+        files: list, optional.
+            List with file beginning (e.g. "ALFRED-FC" for file
+            "ALFRED-FC_Tf_1400_Tc_673_res.m"). Default is ``None``.
+
+        Returns
+        -------
+        ``None``
+        """
+        data, tempcouples = NEMaterialData.__parseNEdata(datapath, univ,
+                                                         files=files)
+        self.data = data
+        self.temp = tempcouples
+
+    def __parsetemp(path, files=None):
+        """
+        Generate lists with fuel, coolant temperatures and file names.
+
+        Parameters
+        ----------
+        path: str
             path of the directory with the files
+        files: list, optional.
+            List with file beginning (e.g. "ALFRED-FC" for file
+            "ALFRED-FC_Tf_1400_Tc_673_res.m"). Default is ``None``.
 
         Returns
         -------
@@ -68,43 +97,66 @@ class MaterialData:
         # get temperatures
         Tc, Tf, fname = [], [], []
         Tcapp, Tfapp, fnameapp = Tc.append, Tf.append, fname.append
+        deletefiles = []
         for f in resfiles:
             basename = (f.split("_res.m")[0]).split("_")  # consider only name
             fnameapp(basename[0])  # store filename in a list
-            # find pos to handle both Tc_Tf and Tf_Tc
 
-            # FIXME: ignore .m files with no temperature
-            posTc, posTf = basename.index("Tc"), basename.index("Tf")
-            # append temperatures
-            Tcapp(int(basename[posTc+1]))
-            Tfapp(int(basename[posTf+1]))
+            # find pos to handle both Tc_Tf and Tf_Tc
+            try:
+                posTc, posTf = basename.index("Tc"), basename.index("Tf")
+                # temperatures sanity check
+                T1, T2 = int(basename[posTc+1]), int(basename[posTf+1])
+                if T1 > T2:
+                    raise OSError("The fuel is cooler than coolant! Check %s"
+                                  % f)
+                # append temperatures
+                Tcapp(T1)
+                Tfapp(T2)
+
+            except ValueError:
+                deletefiles.append(basename[0])
+                warnings.warn("Ignoring %s file since no T is specified!"
+                              % f)
+                pass
+
+        if deletefiles != []:
+            for f in deletefiles:
+                fname.remove(f)
+
         # return lists
         return fname, Tc, Tf
 
+    def __parseNEdata(datapath, univ, files=None):
+        """
+        Generate FRENETIC NE module input HDF5 file.
 
-def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
-                asciifmt=False, files=None):
-    """
-    Generate FRENETIC NE module input HDF5 file.
+        Parameters
+        ----------
+        datapath: string
+            path of the directory with the files
+        Returns
+        -------
+        """
+        # manipulate datapath for examples
+        if "/" in datapath and os.name == 'nt':
+            datapath = datapath.split("/")
+            if "." in datapath:
+                idx = datapath.index(".")
+                modulepath = os.path.abspath(coreutils.__file__)
+                datapath[idx] = modulepath.split("__init__.py")[0]
+            datapath = join(*datapath)
 
-    Parameters
-    ----------
-    datapath: string
-        path of the directory with the files
-    Returns
-    -------
-    """
-    fname, Tc, Tf = parsetemp(datapath, files)   # call method to read useful lists
+        fname, Tc, Tf = NEMaterialData.__parsetemp(datapath, files)
 
-    # --- define list of output filenames
-    outnames = ["DIFFCOEF", "EFISS", "NUSF", "XS_FISS", "XS_SCATT", "XSTOT",
-                "CHIT", "XS_REM"]
-    infkeys = ['infDiffcoef', 'infKappa', 'infNsf',
-               'infFiss', 'infS0', 'infTot', 'infChit', 'infRemxs']
-    b1keys = ['b1Diffcoef', 'b1Kappa', 'b1Nsf', 'b1Fiss', 'b1S0', 'b1Chit',
-              'b1Remxs']
+        # --- define list of output filenames
+        outnames = ["DIFFCOEF", "EFISS", "NUSF", "XS_FISS", "XS_SCATT", "XSTOT",
+                    "CHIT", "XS_REM"]
+        infkeys = ['infDiffcoef', 'infKappa', 'infNsf',
+                   'infFiss', 'infS0', 'infTot', 'infChit', 'infRemxs']
+        b1keys = ['b1Diffcoef', 'b1Kappa', 'b1Nsf', 'b1Fiss', 'b1S0', 'b1Chit',
+                  'b1Remxs']
 
-    if verbose is True:
         infverb = ['infCapt', 'infNubar', 'infSp0']
         b1verb = ['b1Capt', 'b1Nubar', 'b1Sp0']
         verb_out = ["XS_CAPT", "NU", "XS_PSCATT"]
@@ -113,226 +165,143 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
         infkeys.extend(infverb)
         b1keys.extend(b1verb)
 
-    if steady is False:
         infkin_keys = ['infChit', 'infChip', 'infChid', 'infInvv']
         b1kin_keys = ['b1Chit', 'b1Chip', 'b1Chid', 'b1Invv']
         kin_out = ["CHIT", "CHIP", "CHID", "INVVEL"]
 
-    # -- create or overwrite hdf5 file (repro script)
-    h5name = "NE_inp.hdf5"
-    fh5 = __wopen(h5name)
-    # if unidict not provided, I/O with user required
-    flagIO = 0
-    if unidict is None:
-        flagIO = 1
-        unidictkeys = []
+        # -- serpentTools settings
+        st.settings.rc['microxs.getFlx'] = False
+        st.settings.rc['microxs.getXS'] = False
 
-    # --- store _res files in temperature-wise dict
-    resdict = {}  # define dict to store output
-    NU = []  # define list of universe number in each file
-    grid = []  # define list of group number in each file
-    for idx, f in enumerate(fname):  # loop over Serpent files
-        print(idx)
-        # define current filename
-        suffT = "_".join(["Tf", str(Tf[idx]), "Tc", str(Tc[idx])])
-        name = "_".join([f, suffT, "res.m"])  # concatenate name,temp and suff
-        fnameT = os.path.join(datapath, name)  # concatenate filename and path
+        # --- store _res files in temperature-wise dict
+        resdict = {}  # dict to store output
+        unidict = {}  # dict to check universes
+        templst = []  # list of temperature couples
+        for idx, f in enumerate(fname):  # loop over Serpent files
+            # define current filename
+            suffT = "_".join(["Tf", str(Tf[idx]), "Tc", str(Tc[idx])])
+            name = "_".join([f, suffT, "res.m"])  # concatenate name,temp and suff
+            fnameT = os.path.join(datapath, name)  # concatenate filename and path
 
-        # try to parse Serpent output with serpentTools
-        try:
-            res = st.read(fnameT)  # read results from Serpent
-            # maybe Tf and Tc swapped
-
-        except OSError():
-            suffT2 = "_".join(["Tc", str(Tc[idx]), "Tf", str(Tf[idx])])
-            name = "_".join([f, suffT2, "res.m"])  # join name,temp and suff
-            fnameT = os.path.join(datapath, name)  # join filename and path
-
+            # try to parse Serpent output with serpentTools
             try:
-                res = st.read(fnameT)
+                res = st.read(fnameT)  # read results from Serpent
+
+                # maybe Tf and Tc swapped
 
             except OSError():
-                print("File does not exist!")
+                suffT2 = "_".join(["Tc", str(Tc[idx]), "Tf", str(Tf[idx])])
+                name = "_".join([f, suffT2, "res.m"])  # join name,temp and suff
+                fnameT = os.path.join(datapath, name)  # join filename and path
 
-        # store in temp dict lists of ResObject
-        if (Tf[idx], Tc[idx]) in resdict:
-            resdict[(Tf[idx], Tc[idx])].append(res)  # append in list
-        else:
-            resdict[(Tf[idx], Tc[idx])] = []  # initialise as list
-            resdict[(Tf[idx], Tc[idx])].append(res)  # append in list
+                try:
+                    res = st.read(fnameT)
 
-        # store all universe keys for later print to the user
-        unidictkeys = set()
-        if flagIO == 1:
-            for key in sorted(res.universes):
-                unidictkeys.add(key[0])
+                except OSError():
+                    print("File does not exist!")
 
-        # store number of groups and universes
-        uni = (sorted(res.universes)[0]).universe  # get first universe
-        data = res.getUniv(uni, 0)
-        grid.append(tuple(data.groups))  # list to remove duplicates later
-        NU.append(len(res.universes))
+            # sanity check on number of groups
+            if idx == 0:
+                for k in res.universes.keys():
+                    ngro = res.universes[k]._numGroups
+                    break  # check only on 1st universe
+            else:
+                for k in res.universes.keys():
+                    if ngro != res.universes[k]._numGroups:
+                        raise OSError("Number of energy groups mismatch in %s!"
+                                      % f)
+                    break  # check only on 1st universe
 
-    # --- check energy grid consistency
-    grid = list(set(grid))
-    if len(grid) > 1:
-        raise OSError("Check MACRO_E in Serpent! Energy grid not the same")
+            # store in temp dict lists of ResObject
+            if (Tf[idx], Tc[idx]) in resdict:
+                resdict[(Tf[idx], Tc[idx])].append(res)  # append in list
+                for k in res.universes:
+                    unidict[(Tf[idx], Tc[idx])].append(k[0])
 
-    NG = len(grid[0])-1  # define number of groups
+            else:
+                templst.append((Tf[idx], Tc[idx]))
+                resdict[(Tf[idx], Tc[idx])] = []  # initialise as list
+                resdict[(Tf[idx], Tc[idx])].append(res)  # append in list
+                unidict[(Tf[idx], Tc[idx])] = []
+                for k in res.universes:
+                    unidict[(Tf[idx], Tc[idx])].append(k[0])
 
-    # --- ask for user input to define unidict
-    if flagIO == 1:
-        print("Please enter the id numbers for the following Serpent" +
-              " universes:", list(unidictkeys))
-        unidictval = []
-        for i in range(0, len(unidictkeys)):
-            elem = int(input())
-            unidictval.append(elem)  # adding the element
-        unidict = dict(zip(unidictkeys, unidictval))
-    # print dict to the user
-    print(unidict)
+        # check all T couples contain the same number of universes
+        for idx, tmpcouple in enumerate(unidict.keys()):
+            if idx == 0:
+                NP = len(unidict[tmpcouple])
 
-    # --- define temperature matrix to be filled with data
-    n, m = len(set(Tf))+2, len(set(Tc))+1  # temp matrix dimensions
-    frendata = np.zeros((n, m))
-    frendata[0, 0], frendata[0, 1] = n-2, m-1  # write matrix size
-    lstTf = list(set(Tf))
-    lstTf.sort()
-    frendata[2:, 0] = lstTf
-    lstTc = list(set(Tc))
-    lstTc.sort()
-    frendata[1, 1:] = lstTc
+            if len(unidict[tmpcouple]) != NP:
+                raise OSError("Universe numbers mismatch. " +
+                              "Check files with Tf,Tc = (%d,%d)!" % tmpcouple)
 
-    if asciifmt is True:
-        # ---- write steady data to txt files
-        # create directory
-        if os.path.isdir("NEinputdata"):
-            print("'NEinputdata' directory exists. Overwriting?")
-            ans = input()
-        else:
-            ans = "no"
+        # check if all user-defined universes are in Serpent files for each T
+        for u in univ:
+            # loop over temperature couples
+            for tmpcouple in unidict.keys():
+                if u not in unidict[tmpcouple]:
+                    raise OSError('%s not in Serpent universes. ' % u +
+                                  'Check "assemblynames" and "cuts" entries' +
+                                  ' in .json input file!')
 
-        if ans == "yes" or ans == "y":
-            rmtree("NEinputdata")
-            os.mkdir("NEinputdata")
-        else:
-            os.mkdir("NEinputdata")
+        return resdict, templst
 
-    # define tuple of couples of temperatures
-    TfTc = list(zip(Tf, Tc))
-    TfTc.sort(key=lambda t: t[0])
-    # delete repetitions from fname list
-    fname = list(dict.fromkeys(fname))
 
-    # file loop
-    for ifile in range(0, len(fname)):
-        # data loop
-        for idx, out in enumerate(outnames):
-            # universe loop
-            for iUni in range(0, NU[ifile]):
-                # group loop
-                for iGro in range(0, NG):
+class CZMaterialData:
+    """
+    Assign material data TH to reactor core.
 
-                    # temperature loop (fill temperature matrix)
-                    for itup, tup in enumerate(TfTc):
-                        # select file
-                        res = resdict[tup][ifile]
-                        # take universe
-                        uni = sorted(res.universes)[iUni]
+    Attributes
+    ----------
+    THdata : dict
+        Dictionary storing objects with macro-group constants parsed by
+        serpentTools.
+    THtemp : list
+        List with tuples (Tf, Tc).
 
-                        if uni[0] not in unidict.keys():
-                            continue
+    Methods
+    -------
+    ``None``
+    """
 
-                        uniname, burnup, step, days = uni
-                        unitup = (uniname, burnup, step, days)
+    def __init__(self, mflow, pressures, temperatures, CZassemblynames):
+        """
+        Initialise object.
 
-                        if itup == len(TfTc)-1:
-                            # define filename
-                            imix = unidict[uni[0]]
-                            # FIXME: save only selected universes
-                            txtname = "_".join([out, str(imix), str(iGro+1)])
+        Parameters
+        ----------
+        mflow: list
+            List with mass flow rates, one for each cooling zone.
+        pressures: list
+            List with pressures, one for each cooling zone.
+        temperatures: list
+            List with temperatures, one for each cooling zone.
+        CZassemblynames: list
+            List with cooling zone names, sorted consistently with the
+            physical parameter lists.
 
-                        # store value in proper position in temp matrix
-                        row = np.where(frendata[:, 0] == tup[0])
-                        col = np.where(frendata[1, :] == tup[1])
+        Returns
+        -------
+        ``None``
+        """
+        # check length consistency
+        if mflow is not None:
+            if len(mflow) != len(CZassemblynames):
+                raise OSError("The number of mass flow rates must match" +
+                              "with the number of the cooling zones!")
+            else:
+                self.massflowrates = dict(zip(CZassemblynames, mflow))
 
-                        # select inf or b1 results
-                        if inf is True:
-                            val = res.getUniv(*unitup).infExp[infkeys[idx]]
-                            # scattering has double group index
-                            if infkeys[idx].startswith('infS'):
-                                # departure group
-                                for iGroDep in range(0, NG):
+        if temperatures is not None:
+            if len(temperatures) != len(CZassemblynames):
+                raise OSError("The number of temperatures must match" +
+                              "with the number of the cooling zones!")
+            else:
+                self.temperatures = dict(zip(CZassemblynames, temperatures))
 
-                                    # edit name to include info on dep group
-                                    txtname2 = "_".join([txtname,
-                                                         str(iGroDep+1)])
-                                    frendata[row, col] = val[iGroDep+(iGro+1)
-                                                             * (iGro > 0)]
-
-                                    # write data if all T tuples spanned
-                                    if itup == len(TfTc)-1:
-                                        # write output
-                                        if asciifmt is True:
-                                            # write txt file
-                                            mysavetxt(txtname2, frendata)
-
-                                        # save in h5 file
-                                        fh5.create_dataset(txtname2,
-                                                           data=np.array(
-                                                               frendata,
-                                                               dtype=np.float))
-
-                            else:
-                                frendata[row, col] = val[iGro]
-                                # write data if all T tuples have been spanned
-                                if itup == len(TfTc)-1:
-                                    # write output
-                                    if asciifmt is True:
-                                        # write txt file
-                                        mysavetxt(txtname, frendata)
-
-                                    # save in h5 file
-                                    fh5.create_dataset(txtname,
-                                                       data=np.array(
-                                                           frendata,
-                                                           dtype=np.float))
-
-                        else:  # if inf is False
-                            val = res.getUniv(*unitup).b1Exp[b1keys[idx]]
-                            if b1keys[idx].startswith('b1S'):
-                                # departure group
-                                for iGroDep in range(0, NG):
-                                    # edit name to include info on dep group
-                                    txtname2 = "_".join([txtname,
-                                                         str(iGroDep+1)])
-                                    frendata[row, col] = val[iGroDep+(iGro+1)
-                                                             * (iGro > 0)]
-
-                                    # write data if all T tuples spanned
-                                    if itup == len(TfTc)-1:
-                                        # write output
-                                        if asciifmt is True:
-                                            # write txt file
-                                            mysavetxt(txtname2, frendata)
-
-                                        # save in h5 file
-                                        fh5.create_dataset(txtname2,
-                                                           data=np.array(
-                                                               frendata,
-                                                               dtype=np.float))
-
-                            else:  # no scattering data
-                                frendata[row, col] = val[iGro]
-                                # write data if all T tuples have been spanned
-                                if itup == len(TfTc)-1:
-                                    # write output
-                                    if asciifmt is True:
-                                        # write txt file
-                                        mysavetxt(txtname, frendata)
-
-                                    # save in h5 file
-                                    fh5.create_dataset(txtname,
-                                                       data=np.array(
-                                                            frendata,
-                                                            dtype=np.float))
+        if pressures is not None:
+            if len(pressures) != len(CZassemblynames):
+                raise OSError("The number of pressures must match" +
+                              "with the number of the cooling zones!")
+            else:
+                self.pressures = dict(zip(CZassemblynames, pressures))

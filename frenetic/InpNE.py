@@ -19,57 +19,6 @@ import h5py as h5
 # TODO: quale coppia di temperature considero per i param. cinetici?
 
 
-def parsetemp(datapath, files=None):
-    """
-    This method generates three lists (further details below).
-
-    Parameters
-    =========== INPUT
-    datapath: string
-        path of the directory with the files
-    =========== OUTPUT
-    filename: list
-        all the file names
-    Tc: list
-        coolant temperatures
-    Tf: list
-        fuel temperatures
-    """
-    # parse "_res.m" files
-    resfiles = [f for f in os.listdir(datapath) if join(datapath, f).endswith('_res.m')]
-    # select files, if any
-    if files is not None:
-        if isinstance(files, str):
-            files = [files]
-
-        tmp = resfiles
-        resfiles = []
-
-        for f in files:
-            for nf, f2 in enumerate(tmp):
-                if f in tmp[nf]:
-                    resfiles.append(tmp[nf])
-
-            if resfiles == []:
-                raise OSError('File starting with %s does not exist!' % f)
-
-    # get temperatures
-    Tc, Tf, fname = [], [], []
-    Tcapp, Tfapp, fnameapp = Tc.append, Tf.append, fname.append
-    for f in resfiles:
-        basename = (f.split("_res.m")[0]).split("_")  # consider only name
-        fnameapp(basename[0])  # store filename in a list
-        # find pos to handle both Tc_Tf and Tf_Tc
-
-        # FIXME: ignore .m files with no temperature
-        posTc, posTf = basename.index("Tc"), basename.index("Tf")
-        # append temperatures
-        Tcapp(int(basename[posTc+1]))
-        Tfapp(int(basename[posTf+1]))
-    # return lists
-    return fname, Tc, Tf
-
-
 def writemacro(nmix, ngro, nprec, fname, Tf, Tc, unifuel=None,
                datapath=None, unidictkeys=None):
     """

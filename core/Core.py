@@ -15,91 +15,286 @@ from collections import OrderedDict
 
 from coreutils.utils import parse
 from coreutils.core.Map import Map
-from coreutils.core.MaterialData import MaterialData
+from coreutils.core.UnfoldCore import UnfoldCore
+from coreutils.core.MaterialData import NEMaterialData, CZMaterialData
 from coreutils.core.Assembly import AssemblyGeometry, AxialConfig, AxialCuts
 
 
 class Core:
     """
-
+    Define NE, TH and CZ core configurations.
 
     Attributes
     ----------
+    AssemblyGeom : obj
+        Object with assembly geometrical features.
+    NEregionslegendplot : dict
+        Dictionary with regions names and strings for plot labelling.
+    NEassemblytypes : dict
+        Ordered dictionary with names of assembly NE types.
+    THassemblytypes : dict
+        Ordered dictionary with names of assembly TH types.
+    CZassemblytypes : dict
+        Ordered dictionary with names of assembly CZ types.
+    Map : obj
+        Object mapping the core assemblies with the different numerations.
+    NEAxialConfig : obj
+        Axial regions defined for NE purposes.
+    NEMaterialData : obj
+        NE data (multi-group constants) for each region defined in input.
+    CZMaterialData : obj
+        NE data (multi-group constants) for each region defined in input.
+    NEconfig : dict
+        Neutronics configurations according to time.
+    NEtime : list
+        Neutronics time instants when configuration changes.
+    CZconfig : dict
+        Cooling zones configurations according to time.
+    CZtime : list
+        Cooling zones time instants when configuration changes.
 
     Methods
     -------
-
+    getassemblytype :
+        Get type of a certain assembly.
+    replace :
+        Replace assemblies with user-defined new or existing type.
+    perturb :
+        Replace assemblies with user-defined new or existing type.
+    translate :
+        Replace assemblies with user-defined new or existing type.
+    perturbBC :
+        Spatially perturb cooling zone boundary conditions.
+    writecentermap :
+        Write assembly number and x and y coordinates of centers to text file.
+    getassemblylist :
+        Return assemblies belonging to a certain type.
+    writecorelattice :
+        Write core lattice to txt file.
     """
 
-    def __init__(self, geinp, rotation=None, pitch=None, assemblynames=None,
-                 replace=None, cuts=None, config=None, fren=False, fill=None):
+    def __init__(self, inpjson):
 
-        if ".json" in geinp:
-            [geinp, rotation, pitch, assemblynames, replace, cuts, config,
-             fren, fill, regionslegendplot] = parse(geinp)
+        # -- parse input file
+        if ".json" in inpjson:
 
-        if None in [rotation, pitch, assemblynames]:
-            raise OSError("Input args must be a .json path or " +
-                          "(geinp, rotation=rotation, pitch=pitch, " +
-                          "assemblynames=assemblynames)")
+            NEargs, THargs = parse(inpjson)
 
-        if rotation == 60:
-            shape = 'H'
+            # check if NEargs is not empty
+            if NEargs is not None:
+                [NEinp, NErotation, pitch, shape, NEassemblynames,
+                 NEreplace, cuts, config, NEfren, NEregionslegendplot,
+                 NEdata] = NEargs
+                isNE = True
+
+            # check if THargs is not empty
+            if THargs is not None:
+                # pitch and shape may be overwritten but they are equal
+                [CZinp, THrotation, pitch, shape, CZassemblynames,
+                 CZreplace, THfren, bcs, mflow, temperatures, pressures,
+                 THdata] = THargs
+                isTH = True
+
         else:
-            shape = 'S'
+            raise OSError("Input file must be in .json format!")
 
-        # store legend plot
-        self.regionslegendplot = regionslegendplot
-        # sort list
-        assnum = np.arange(1, len(assemblynames)+1)
-        assemblynames = OrderedDict(dict(zip(assemblynames, assnum)))
-        # define dict between strings and ints for assembly type
-        self.assemblytypes = OrderedDict(dict(zip(assnum, assemblynames)))
         # initialise assembly radial geometry object
-        self.AssemblyGeom = AssemblyGeometry(pitch, shape)
+        self.AssemblyGeom = AssemblyGeometry(pitch, shape)  # module indep.
+
+        if isNE:
+            # store legend plot
+            self.NEregionslegendplot = NEregionslegendplot
+            # sort list
+            assnum = np.arange(1, len(NEassemblynames)+1)
+            if cuts is not None:
+                univ = []  # consider axial regions in "cuts"
+            else:
+                univ = deepcopy(assemblynames)  # regions are assembly names
+
+            NEassemblynames = OrderedDict(dict(zip(NEassemblynames, assnum)))
+            # define dict between strings and ints for assembly type
+            self.NEassemblytypes = OrderedDict(dict(zip(assnum,
+                                                        NEassemblynames)))
+
+            # define NE core with assembly types
+            tmp = UnfoldCore(NEinp, NErotation, NEassemblynames)
+            NEcore = tmp.coremap
+            NEinp = tmp.inp
+            # define input matrix for core mapping
+            MAPcore = NEcore
+            MAPinp = NEinp
+            rotation = NErotation
+
+        if isTH:
+
+            # sort list
+            assnum = np.arange(1, len(CZassemblynames)+1)
+
+            CZassemblynames = OrderedDict(dict(zip(CZassemblynames, assnum)))
+            # define dict between strings and ints for assembly type
+            self.CZassemblytypes = OrderedDict(dict(zip(assnum,
+                                                        CZassemblynames)))
+
+            # define TH core with assembly types
+            CZcore = UnfoldCore(CZinp, THrotation, CZassemblynames).coremap
+
+            if THdata is not None:
+                THassemblynames = THdata['assemblynames']
+                assnum = np.arange(1, len(THassemblynames)+1)
+                THassemblynames = OrderedDict(dict(zip(THassemblynames,
+                                                       assnum)))
+                # define dict between strings and ints for assembly type
+                self.THassemblytypes = OrderedDict(dict(zip(assnum,
+                                                        THassemblynames)))
+                THinp = THdata['filename']
+                tmp = UnfoldCore(THinp, THrotation, THassemblynames)
+                THcore = tmp.coremap
+                THinp = tmp.inp
+
+                # define input matrix for core mapping
+                # if already assigned, not an issue if shape is ok
+                MAPcore = THcore
+                MAPinp = THinp
+                rotation = THrotation
+
+            if THcore.shape != CZcore.shape:
+                raise OSError("CZ and TH core dimensions mismatch!")
+
+        # --- define core geometry and map
+        if shape == 'H' and rotation != 60:
+            raise OSError('Hexagonal core geometry requires one sextant, so' +
+                          '"rotation" must be 60 degree!')
+
+        if isNE and isTH:
+            # dimensions consistency check
+            if CZcore.shape != NEcore.shape:
+                raise OSError("NE and TH core dimensions mismatch:" +
+                              "%s vs. %s"
+                              % (CZcore.shape, NEcore.shape))
+
+            # non-zero elements location consistency check
+            tmp1 = deepcopy(CZcore)
+            tmp1[tmp1 != 0] = 1
+
+            tmp2 = deepcopy(NEcore)
+            tmp2[tmp2 != 0] = 1
+
+            if THdata is not None:
+                tmp3 = deepcopy(THcore)
+                tmp3[tmp3 != 0] = 1
+
+            if (tmp1 != tmp2).all():
+                raise OSError("Assembly positions in CZ and NE mismatch. " +
+                              "Check core input file!")
+
+            if (tmp1 != tmp3).all():
+                raise OSError("Assembly positions in CZ and TH mismatch. " +
+                              "Check core input file!")
+
         # initialise core map object
-        self.Map = Map(geinp, rotation, self.AssemblyGeom, assemblynames)
+        self.Map = Map(MAPcore, rotation, self.AssemblyGeom, inp=MAPinp)
+        self.NAss = len((self.Map.serpcentermap))
 
-        # initialise assembly axial geometry object
-        if cuts is not None:
-            # initial axial configuration
-            self.AxialConfig = AxialConfig(cuts)
+        # --- define NE material and configurations
+        if isNE:
+            # --- Axial geometry
+            if cuts is not None:
+                # initial axial configuration
+                self.NEAxialConfig = AxialConfig(cuts)
+                for k in self.NEAxialConfig.cuts.keys():
+                    univ.extend(self.NEAxialConfig.cuts[k].reg)
+            # squeeze repetitions
+            univ = list(set(univ))
 
-        # initialise material data object
-        if fill is not None:
-            self.MaterialData = MaterialData()
+            # -- Material data
+            if NEdata is not None:
 
-        # user-defined assembly type insertion
-        if isinstance(replace, dict):
-            # loop over assembly types
-            for k in replace.keys():
-                self.replace(assemblynames[k], replace[k], fren)
+                try:
+                    path = NEdata['path']
+                except KeyError:
+                    raise OSError('"path" missing in "NEdata"!')
 
-        else:
-            if replace is not None:
-                raise OSError("'replace' must be of type dict!")
+                try:
+                    files = NEdata['beginwith']
+                except KeyError:
+                    files = None
 
-        # keep each core configuration in time
-        self.Config = {}
-        self.Config[0] = deepcopy(self.Map.type)
-        self.time = [0]
-        # check core configuration
-        if config is not None:
-            for time in config.keys():
-                t = float(time)
-                # increment time list
-                self.time.append(t)
+                self.NEMaterialData = NEMaterialData(path, univ, files=files)
 
-                # check operation
-                if "translate" in config[time]:
-                    self.translate(config[time]["translate"], time,
-                                   flagfren=fren)
+            # user-defined assembly type insertion
+            if isinstance(NEreplace, dict):
+                # loop over assembly types
+                for k, v in NEreplace.items():
+                    NEcore = self.replace(NEassemblynames[k], v, NEfren,
+                                          NEcore)
 
-                if "perturb" in config[time]:
-                    self.perturb(config[time]["perturb"], time,
-                                 flagfren=fren)
+            else:
+                if NEreplace is not None:
+                    raise OSError("'replace' in NE must be of type dict!")
 
-    def getassemblytype(self, assemblynumber, time=0, flagfren=False):
+            # keep each core configuration in time
+            self.NEconfig = {}
+            self.NEconfig[0] = NEcore
+            self.NEtime = [0]
+            # check core configuration
+            if config is not None:
+                for time in config.keys():
+                    t = float(time)
+                    # increment time list
+                    self.NEtime.append(t)
+
+                    # check operation
+                    if "translate" in config[time]:
+                        self.translate(config[time]["translate"], time,
+                                       flagfren=NEfren)
+
+                    if "perturb" in config[time]:
+                        self.perturb(config[time]["perturb"], time,
+                                     flagfren=NEfren)
+
+        # --- define TH core geometry and data
+        if isTH:
+
+            if THdata is not None and "replace" in THdata.keys():
+                # loop over assembly types
+                for k, v in THdata["replace"].items():
+                    THcore = self.replace(THassemblynames[k], v, THfren,
+                                          THcore)
+
+            # TH configuration
+            self.THtime = [0]
+            self.THconfig = {}
+            self.THconfig[0] = THcore
+
+            # CZ replace
+            if isinstance(CZreplace, dict):
+                # loop over assembly types
+                for k, v in CZreplace.items():
+                    CZcore = self.replace(CZassemblynames[k], v, THfren,
+                                          CZcore)
+            else:
+                if CZreplace is not None:
+                    raise OSError("'replace' in TH must be of type dict!")
+
+            # assign material properties
+            cz = CZMaterialData(mflow, pressures, temperatures,
+                                self.CZassemblytypes.values())
+            self.CZMaterialData = cz
+
+            # keep each core configuration in time
+            self.CZconfig = {}
+            self.CZconfig[0] = CZcore
+            self.CZtime = [0]
+            # check if boundary conditions change in time
+            if bcs is not None:
+                for time in bcs.keys():
+                    t = float(time)
+                    # increment time list
+                    self.CZtime.append(t)
+                    self.perturbBC(bcs[time], time, flagfren=THfren)
+
+    def getassemblytype(self, assemblynumber, time=0, flagfren=False,
+                        whichconf="NEconfig"):
         """
         Get type of a certain assembly.
 
@@ -123,10 +318,19 @@ class Core:
             index = assemblynumber-1  # -1 for py indexing
         # get coordinates associated to these assemblies
         rows, cols = np.unravel_index(index, self.Map.type.shape)
-        which = self.Config[time][rows, cols]
+
+        if whichconf == "NEconfig":
+            which = self.NEconfig[time][rows, cols]
+        elif whichconf == "THconfig":
+            which = self.THconfig[time][rows, cols]
+        elif whichconf == "CZconfig":
+            which = self.CZconfig[time][rows, cols]
+        else:
+            raise OSError("Unknown core config!")
+
         return which
 
-    def replace(self, newtype, asslst, flagfren=False):
+    def replace(self, newtype, asslst, flagfren=False, core=None):
         """
         Replace assemblies with user-defined new or existing type.
 
@@ -155,6 +359,12 @@ class Core:
         elif isinstance(asslst[0], list) is False:
             asslst = [asslst]
 
+        # if user do not provide core, returns None
+        if core is None:
+            newcore = None
+        else:
+            newcore = core+0
+
         for ipos, ilst in enumerate(asslst):  # loop over lists
             # check map convention
             if flagfren is True:
@@ -165,8 +375,14 @@ class Core:
             # get coordinates associated to these assemblies
             index = (list(set(index)))
             rows, cols = np.unravel_index(index, self.Map.type.shape)
+
             # load new assembly type
-            self.Map.type[rows, cols] = newtype[ipos]
+            if core is None:
+                self.Map.type[rows, cols] = newtype[ipos]
+            else:
+                newcore[rows, cols] = newtype[ipos]
+
+        return newcore
 
     def perturb(self, pertconfig, time, flagfren=False):
         """
@@ -191,43 +407,61 @@ class Core:
             # check consistency between dz and which
             if len(pertconfig['which']) != len(pertconfig['what']):
                 raise OSError('Groups of assemblies and number of ' +
-                              'perturbations do not match!')
+                              'perturbations do not match in NE!')
 
             if len(pertconfig['with']) != len(pertconfig['what']):
                 raise OSError('New regions and number of ' +
-                              'perturbations do not match!')
+                              'perturbations do not match in NE!')
 
             pconf = zip(pertconfig['which'], pertconfig['with'],
                         pertconfig['what'])
+
+            newcore = None
+            if float(time) in self.NEconfig.keys():
+                now = float(time)
+            else:
+                nt = self.NEtime.index(float(time))
+                now = self.NEtime[nt-1]
 
             p = 0
             for which, withass, whatass in pconf:
                 p = p + 1
                 for assbly in which:
-                    nt = self.time.index(float(time))
-                    atype = self.getassemblytype(assbly, flagfren=flagfren,
-                                                 time=self.time[nt-1])
-                    what = self.assemblytypes[atype]
+                    nt = self.NEtime.index(float(time))
+                    atype = self.getassemblytype(assbly, now,
+                                                 flagfren=flagfren,
+                                                 whichconf="NEconfig")
+                    what = self.NEassemblytypes[atype]
                     # take region name
                     basename = re.split(r"_t\d+.\d+_p\d+", what)[0]
                     newname = "%s_t%s_p%d" % (basename, time, p)
                     # define new cuts, if any
-                    if newname not in self.AxialConfig.cuts.keys():
-                        cuts = deepcopy(self.AxialConfig.cuts[what])
-                        nass = len(self.assemblytypes.keys())
-                        self.assemblytypes[nass + 1] = newname
+                    if newname not in self.NEAxialConfig.cuts.keys():
+                        cuts = deepcopy(self.NEAxialConfig.cuts[what])
+                        nass = len(self.NEassemblytypes.keys())
+                        self.NEassemblytypes[nass + 1] = newname
                         if whatass in cuts.reg:
                             cuts.reg[cuts.reg == whatass] = withass
                             upz, loz, reg = cuts.upz, cuts.loz, cuts.reg
-                            self.AxialConfig.cuts[newname] = AxialCuts(upz, loz, reg)
+                            self.NEAxialConfig.cuts[newname] = AxialCuts(upz,
+                                                                         loz,
+                                                                         reg)
 
                         else:
                             raise OSError('%s not in assembly %d at time %ss'
                                           % (whatass, assbly, time))
 
                     # replace assembly
-                    self.replace(nass + 1, assbly, flagfren)
-                    self.Config[float(time)] = deepcopy(self.Map.type)
+                    if newcore is None:
+                        # take previous time-step configuration
+                        newcore = self.replace(nass+1, assbly, flagfren,
+                                               self.NEconfig[now])
+                    else:
+                        # take "newcore"
+                        newcore = self.replace(nass+1, assbly, flagfren,
+                                               newcore)
+
+            self.NEconfig[float(time)] = newcore
 
         except KeyError:
             raise OSError('"which" and/or "dz" keys missing in "translate"!')
@@ -255,29 +489,120 @@ class Core:
                 raise OSError('Groups of assemblies and number of ' +
                               'translations do not match!')
 
+            newcore = None
+            if float(time) in self.NEconfig.keys():
+                now = float(time)
+            else:
+                nt = self.NEtime.index(float(time))
+                now = self.NEtime[nt-1]
+
             for dz, which in zip(transconfig['dz'], transconfig['which']):
                 for assbly in which:
-                    nt = self.time.index(float(time))
                     atype = self.getassemblytype(assbly, flagfren=flagfren,
-                                                 time=self.time[nt-1])
-                    what = self.assemblytypes[atype]
+                                                 time=now,
+                                                 whichconf="NEconfig")
+                    what = self.NEassemblytypes[atype]
                     newname = "%st%sz%d" % (what, time, dz)
                     # define new cuts, if any
-                    if newname not in self.AxialConfig.cuts.keys():
-                        cuts = deepcopy(self.AxialConfig.cuts[what])
+                    if newname not in self.NEAxialConfig.cuts.keys():
+                        cuts = deepcopy(self.NEAxialConfig.cuts[what])
                         cuts.upz[0:-1] = [z+dz for z in cuts.upz[0:-1]]
                         cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]
-                        nass = len(self.assemblytypes.keys())
-                        self.assemblytypes[nass + 1] = newname
+                        nass = len(self.NEassemblytypes.keys())
+                        self.NEassemblytypes[nass + 1] = newname
                         upz, loz, reg = cuts.upz, cuts.loz, cuts.reg
-                        self.AxialConfig.cuts[newname] = AxialCuts(upz, loz, reg)
+                        self.NEAxialConfig.cuts[newname] = AxialCuts(upz, loz,
+                                                                     reg)
 
                     # replace assembly
-                    self.replace(nass + 1, assbly, flagfren)
-                    self.Config[float(time)] = deepcopy(self.Map.type)
+                    if newcore is None:
+                        # take previous time-step configuration
+                        newcore = self.replace(nass+1, assbly,
+                                               flagfren=flagfren,
+                                               core=self.NEconfig[now])
+                    else:
+                        # take "newcore"
+                        newcore = self.replace(nass+1, assbly, flagfren,
+                                               newcore)
+
+            self.NEconfig[float(time)] = newcore
 
         except KeyError:
             raise OSError('"which" and/or "dz" keys missing in "translate"!')
+
+    def perturbBC(self, pertconfig, time, flagfren=False):
+        """
+        Spatially perturb cooling zone boundary conditions.
+
+        Parameters
+        ----------
+        newtype : list
+            List of new/existing types of assemblies.
+        asslst : list
+            List of assemblies to be replaced.
+        flagfren : bool, optional
+            Flag for FRENETIC numeration. The default is ``False``.
+
+        Returns
+        -------
+        ``None``
+
+        """
+        # check input type
+        try:
+            # check consistency between dz and which
+            if len(pertconfig['which']) != len(pertconfig['what']):
+                raise OSError('Groups of assemblies and perturbations do' +
+                              'not match in TH "boundaryconditions"!')
+
+            if len(pertconfig['with']) != len(pertconfig['what']):
+                raise OSError('Each new value in TH "boundaryconditions"' +
+                              ' must come with its identifying parameter!')
+
+            pconf = zip(pertconfig['which'], pertconfig['with'],
+                        pertconfig['what'])
+
+            newcore = None
+            if float(time) in self.CZconfig.keys():
+                now = float(time)
+            else:
+                nt = self.CZtime.index(float(time))
+                now = self.CZtime[nt-1]
+
+            p = 0
+            for which, withpar, whatpar in pconf:
+                p = p + 1
+                for assbly in which:
+                    nt = self.CZtime.index(float(time))
+                    atype = self.getassemblytype(assbly, now,
+                                                 flagfren=flagfren,
+                                                 whichconf="CZconfig")
+                    what = self.CZassemblytypes[atype]
+                    basename = re.split(r"_t\d+.\d+_p\d+", what)[0]
+                    newname = "%s_t%s_p%d" % (basename, time, p)
+
+                    # take region name
+                    if newname not in self.CZassemblytypes.values():
+                        nass = len(self.CZassemblytypes.keys())
+                        self.CZassemblytypes[nass + 1] = newname
+                        # update values inside parameters
+                        self.CZMaterialData.__dict__[whatpar][newname] = withpar
+
+                    # replace assembly
+                    if newcore is None:
+                        # take previous time-step configuration
+                        newcore = self.replace(nass+1, assbly, flagfren,
+                                               self.CZconfig[now])
+                    else:
+                        # take "newcore"
+                        newcore = self.replace(nass+1, assbly, flagfren,
+                                               newcore)
+            # update cooling zones
+            self.CZconfig[float(time)] = newcore
+
+        except KeyError:
+            raise OSError('"which" and/or "with" and/or "what" keys missing' +
+                          ' in "boundaryconditions" in TH!')
 
     def writecentermap(self, numbers=True, fname="centermap.txt"):
         """
@@ -307,11 +632,13 @@ class Core:
 
         # write region to external file
         with open(fname, 'w') as f:  # open new file
-            f.write("\n".join("{:03d} {:5f} {:5f}".format(elem[0], elem[1], elem[2])
+            f.write("\n".join("{:03d} {:5f} {:5f}".format(elem[0], elem[1],
+                                                          elem[2])
                               for elem in regions))
             f.write("\n")
 
-    def getassemblylist(self, atype, time=0, match=True):
+    def getassemblylist(self, atype, time=0, match=True, flagfren=False,
+                        whichconf="NEconfig"):
         """
         Return assemblies belonging to a certain type.
 
@@ -329,18 +656,30 @@ class Core:
             List of matching/non-matching assemblies.
 
         """
-        asstypes = self.Config[time].flatten(order='F')
+        if whichconf == "NEconfig":
+            asstypes = self.NEconfig[time].flatten(order='F')
+        elif whichconf == "THconfig":
+            asstypes = self.THconfig[time].flatten(order='F')
+        elif whichconf == "CZconfig":
+            asstypes = self.CZconfig[time].flatten(order='F')
+        else:
+            raise OSError("Unknown core config!")
 
         if match is True:
             matchedass = np.where(asstypes == atype)[0]+1  # +1 for py indexing
         else:
             matchedass = np.where(asstypes != atype)[0]+1
 
+        if flagfren is True:
+            matchedass = [self.Map.serp2fren[m] for m in matchedass]
+
+        matchedass.sort()
+
         return matchedass
     # TODO: add writeregionmap method to plot region id, x and y for each assembly
 
     def writecorelattice(self, flatten=False, fname="corelattice.txt",
-                         serpheader=False, string=True):
+                         serpheader=False, string=True, whichconf="NEconfig"):
         """
         Write core lattice to txt file.
 
@@ -359,21 +698,33 @@ class Core:
         ``None``
 
         """
+        if whichconf == "NEconfig":
+            asstypes = self.NEconfig[0]
+            assemblynames = self.NEassemblytypes
+        elif whichconf == "THconfig":
+            asstypes = self.THconfig[0]
+            assemblynames = self.THassemblytypes
+        elif whichconf == "CZconfig":
+            asstypes = self.CZconfig[0]
+            assemblynames = self.CZassemblytypes
+        else:
+            raise OSError("Unknown core config!")
         # define regions
         if flatten is False:
-            typelabel = self.Map.type
+            typelabel = asstypes
         else:
-            typelabel = np.reshape(self.Map.type, (self.Map.Nx*self.Map.Ny, 1))
+            typelabel = np.reshape(asstypes, (self.Map.Nx*self.Map.Ny, 1))
 
         # determine file format
         if string is False:
-            nd = str(len(str(self.Map.type.max())))  # determine number of digits
+            # determine number of digits
+            nd = str(len(str(self.Map.type.max())))
             fmt = "%0"+nd+"d"
         else:
             fmt = "%s"
             typelabel = typelabel.astype(str)
-            for key in self.assemblytypes.keys():
-                typelabel[typelabel == str(key)] = self.assemblytypes[key]
+            for key, val in assemblynames.items():
+                typelabel[typelabel == str(key)] = val
 
             typelabel[typelabel == '0'] = 'VV'
 
@@ -400,12 +751,14 @@ class Core:
         np.savetxt(fname, typelabel, delimiter=" ", fmt=fmt, header=header,
                    comments=comm)
 
+
 if __name__ == "__main__":
 
     # make input
+    # FIXME: args in piu, rendi consistente con codice
+    # TODO fare main a parte magari, in modo che venga costruito l'input FR/FF
     [geinp, rotation, pitch, assemblynames, replace, cuts, config,
      fren, fill] = parse(sys.argv)
     core = Core(geinp, rotation, pitch, assemblynames, replace=replace,
                 cuts=cuts, config=config, fren=fren, fill=fill)
     # post-process
-

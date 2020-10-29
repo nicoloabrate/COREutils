@@ -40,7 +40,8 @@ class Map:
     ``None``
     """
 
-    def __init__(self, geinp, rotangle, AssRadGeom, regionsdict):
+    def __init__(self, geinp, rotangle, AssRadGeom, regionsdict=None,
+                 inp=None):
         """
         Initialise the object.
 
@@ -70,7 +71,7 @@ class Map:
             self.type = core.coremap
 
         else:
-            self.inp = geinp
+            self.inp = inp
             self.type = geinp
 
         # -- compute assembly geometrical features

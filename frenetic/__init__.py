@@ -1,2 +1,2 @@
 from .ParseFrenOut import ParseFrenOut
-from .FreneticInpGen import parsetemp, writemacro, writeNEdata
+from .InpGen import inpgen, makecommoninput

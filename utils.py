@@ -6,11 +6,31 @@ File: utils.py
 Description: Set of utilities.
 """
 import json
-# from coreutils.utils import OSError
 
 
 def parse(inp):
+    """
+    Parse .json input file.
 
+    Parameters
+    ----------
+    inp : str
+        Path for .json file.
+
+    Raises
+    ------
+    OSError
+        -Input file path is missing!
+        -File %s is missing!
+        -Something is wrong with the input .json file!
+
+    Returns
+    -------
+    NEargs : list
+        List of NE module arguments.
+    THargs : list
+        List of TH module arguments.
+    """
     if isinstance(inp, str) is False:
         raise OSError("Input file path is missing!")
 
@@ -21,73 +41,218 @@ def parse(inp):
         except FileNotFoundError:
             raise OSError("File %s is missing!" % inp)
 
+    # assign default args
+    NEargs, THargs = None, None
+
+    # parse .json dict
     if isinstance(inp, dict):
 
-        # check mandatory arguments
-        if 'filename' in inp.keys():
-            geinp = inp['filename']
-        else:
-            raise OSError("No core geometry input file is provided!")
+        # check NE/PH and TH namelists
+        if 'NE' in inp.keys():
+            NEargs = __parseNE(inp['NE'])
 
-        if 'pitch' in inp.keys():
-            pitch = inp['pitch']
-        else:
-            raise OSError("Core pitch is missing!")
+        if 'TH' in inp.keys():
+            THargs = __parseTH(inp['TH'])
 
-        if 'assemblynames' in inp.keys():
-            assemblynames = inp['assemblynames']
-        else:
-            raise OSError("Core assembly names are missing!")
+        # input sanity check
+        if THargs is not None and NEargs is not None:
+            if inp['NE']['pitch'] != inp['TH']['pitch']:
+                raise OSError('NE and TH pitch must be equal! Check .json!')
 
-        if 'rotation' in inp.keys():
-            rotation = inp['rotation']
-        else:
-            rotation = 0
+            if inp['NE']['shape'] != inp['TH']['shape']:
+                raise OSError('NE and TH shape must be equal! Check .json!')
 
-        if 'replace' in inp.keys():
-            replace = inp['replace']
-        else:
-            replace = None
-
-        if 'config' in inp.keys():
-            config = inp['config']
-        else:
-            config = None
-
-        if 'cuts' in inp.keys():
-            cuts = {}
-            if 'mycuts' in inp.keys():
-                mycuts = inp['mycuts']
-            else:
-                mycuts = None
-
-            cuts['mycuts'] = mycuts
-            cuts['xscuts'] = inp['cuts']
-
-        else:
-            cuts = None
-
-        if 'fren' in inp.keys():
-            fren = inp['fren']
-        else:
-            fren = False
-
-        if 'fill' in inp.keys():
-            fill = inp['fill']
-        else:
-            fill = None
-
-        if 'regionsplot' in inp.keys():
-            regionslegendplot = inp['regionsplot']
-        else:
-            regionslegendplot = None
     else:
-        raise OSError("Something is wrong with the input .json file!")
+        raise OSError('Something is wrong with the input .json file!')
 
-    args = [geinp, rotation, pitch, assemblynames, replace, cuts, config,
-            fren, fill, regionslegendplot]
+    return NEargs, THargs
 
-    return args
+
+def __parseNE(NEinp):
+    """
+    Parse NE input from .json dict.
+
+    Parameters
+    ----------
+    NEinp : dict
+        NE input.
+
+    Raises
+    ------
+    OSError
+        Missing mandatory arguments.
+
+    Returns
+    -------
+    NEargs : list
+        List of arguments.
+
+    """
+    # check mandatory arguments
+    if 'filename' in NEinp.keys():
+        geinp = NEinp['filename']
+    else:
+        raise OSError("No core geometry input file is provided!")
+
+    if 'pitch' in NEinp.keys():
+        pitch = NEinp['pitch']
+    else:
+        raise OSError("Core pitch is missing!")
+
+    if 'shape' in NEinp.keys():
+        shape = NEinp['shape']
+    else:
+        raise OSError("Assembly shape is missing!")
+
+    if 'assemblynames' in NEinp.keys():
+        assemblynames = NEinp['assemblynames']
+    else:
+        raise OSError("Core assembly names are missing!")
+
+    if 'rotation' in NEinp.keys():
+        rotation = NEinp['rotation']
+    else:
+        rotation = 0
+
+    if 'replace' in NEinp.keys():
+        replace = NEinp['replace']
+    else:
+        replace = None
+
+    if 'config' in NEinp.keys():
+        config = NEinp['config']
+    else:
+        config = None
+
+    if 'cuts' in NEinp.keys():
+        cuts = {}
+        if 'mycuts' in NEinp.keys():
+            mycuts = NEinp['mycuts']
+        else:
+            mycuts = None
+
+        cuts['mycuts'] = mycuts
+        cuts['xscuts'] = NEinp['cuts']
+
+    else:
+        cuts = None
+
+    if 'fren' in NEinp.keys():
+        fren = NEinp['fren']
+    else:
+        fren = False
+
+    if 'regionsplot' in NEinp.keys():
+        regionslegendplot = NEinp['regionsplot']
+    else:
+        regionslegendplot = None
+
+    if 'NEdata' in NEinp.keys():
+        NEdata = NEinp['NEdata']
+    else:
+        NEdata = None
+
+    NEargs = [geinp, rotation, pitch, shape, assemblynames, replace, cuts,
+              config, fren, regionslegendplot, NEdata]
+
+    return NEargs
+
+
+def __parseTH(THinp):
+    """
+    Parse TH input from .json dict.
+
+    Parameters
+    ----------
+    THinp : dict
+        TH input.
+
+    Raises
+    ------
+    OSError
+        Missing mandatory arguments.
+
+    Returns
+    -------
+    THargs : list
+        List of arguments.
+
+    """
+    # check mandatory arguments
+    if 'coolingzonesfile' in THinp.keys():
+        geinp = THinp['coolingzonesfile']
+    else:
+        # check if name is mispelled
+        if 'coolingzonefile' in THinp.keys():
+            geinp = THinp['coolingzonefile']
+
+        else:
+            raise OSError("No core cooling zones input file is provided!")
+
+    if 'pitch' in THinp.keys():
+        pitch = THinp['pitch']
+    else:
+        raise OSError("Core pitch is missing!")
+
+    if 'shape' in THinp.keys():
+        shape = THinp['shape']
+    else:
+        raise OSError("Assembly shape is missing!")
+
+    if 'rotation' in THinp.keys():
+        rotation = THinp['rotation']
+    else:
+        rotation = 0
+
+    if 'massflowrates' in THinp.keys():
+        mflow = THinp['massflowrates']
+    else:
+        raise OSError('"massflowrates" is missing!')
+
+    if 'temperatures' in THinp.keys():
+        temperatures = THinp['temperatures']
+    else:
+        raise OSError('"temperatures" is missing!')
+
+    if 'pressures' in THinp.keys():
+        pressures = THinp['pressures']
+    else:
+        raise OSError('"pressures" is missing!')
+
+    if 'coolingzonenames' in THinp.keys():
+        cznames = THinp['coolingzonenames']
+    else:
+        # check if name is mispelled
+        if 'coolingzonesnames' in THinp.keys():
+            cznames = THinp['coolingzonenames']
+
+        else:
+            raise OSError("Core cooling zones names are missing!")
+
+    if 'fren' in THinp.keys():
+        fren = THinp['fren']
+    else:
+        fren = False
+
+    if 'THdata' in THinp.keys():
+        THdata = THinp['THdata']
+    else:
+        THdata = None
+
+    if 'replace' in THinp.keys():
+        replace = THinp['replace']
+    else:
+        replace = None
+
+    if 'boundaryconditions' in THinp.keys():
+        bcs = THinp['boundaryconditions']
+    else:
+        bcs = None
+
+    THargs = [geinp, rotation, pitch, shape, cznames, replace, fren,
+              bcs, mflow, temperatures, pressures, THdata]
+
+    return THargs
 
 
 def uncformat(data, std, fmtn=".5e", fmts=None):

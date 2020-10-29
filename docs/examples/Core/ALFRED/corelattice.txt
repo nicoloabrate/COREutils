@@ -429,7 +429,7 @@ CR
 OF
 IF
 IF
-SRt5.4z-68
+SR
 IF
 IF
 IF
@@ -463,7 +463,7 @@ IF
 IF
 IF
 IF
-SRt5.4z-68
+SR
 IF
 IF
 OF
@@ -492,8 +492,8 @@ OF
 IF
 IF
 IF
-IF_t9_p1
-IF_t5.4_p1
+IF
+IF
 IF
 IF
 IF
@@ -523,9 +523,9 @@ OF
 OF
 IF
 IF
-SRt5.4z-68
-IF_t9_p1
-IF_t5.4_p1
+SR
+IF
+IF
 IF
 IF
 IF
@@ -557,7 +557,7 @@ IF
 IF
 IF
 IF
-SRt5.4z-68
+SR
 IF
 IF
 OF
@@ -589,7 +589,7 @@ IF
 IF
 IF
 IF
-IF_t9_p2
+IF
 IF
 OF
 OF
@@ -621,7 +621,7 @@ IF
 IF
 IF
 IF
-IF_t9_p2
+IF
 OF
 CR
 OF
