@@ -149,26 +149,6 @@ class NEMaterialData:
 
         fname, Tc, Tf = NEMaterialData.__parsetemp(datapath, files)
 
-        # --- define list of output filenames
-        outnames = ["DIFFCOEF", "EFISS", "NUSF", "XS_FISS", "XS_SCATT", "XSTOT",
-                    "CHIT", "XS_REM"]
-        infkeys = ['infDiffcoef', 'infKappa', 'infNsf',
-                   'infFiss', 'infS0', 'infTot', 'infChit', 'infRemxs']
-        b1keys = ['b1Diffcoef', 'b1Kappa', 'b1Nsf', 'b1Fiss', 'b1S0', 'b1Chit',
-                  'b1Remxs']
-
-        infverb = ['infCapt', 'infNubar', 'infSp0']
-        b1verb = ['b1Capt', 'b1Nubar', 'b1Sp0']
-        verb_out = ["XS_CAPT", "NU", "XS_PSCATT"]
-        # append to default list of names
-        outnames.extend(verb_out)
-        infkeys.extend(infverb)
-        b1keys.extend(b1verb)
-
-        infkin_keys = ['infChit', 'infChip', 'infChid', 'infInvv']
-        b1kin_keys = ['b1Chit', 'b1Chip', 'b1Chid', 'b1Invv']
-        kin_out = ["CHIT", "CHIP", "CHID", "INVVEL"]
-
         # -- serpentTools settings
         st.settings.rc['microxs.getFlx'] = False
         st.settings.rc['microxs.getXS'] = False
@@ -180,8 +160,10 @@ class NEMaterialData:
         for idx, f in enumerate(fname):  # loop over Serpent files
             # define current filename
             suffT = "_".join(["Tf", str(Tf[idx]), "Tc", str(Tc[idx])])
-            name = "_".join([f, suffT, "res.m"])  # concatenate name,temp and suff
-            fnameT = os.path.join(datapath, name)  # concatenate filename and path
+            # concatenate name,temp and suff
+            name = "_".join([f, suffT, "res.m"])
+            # concatenate filename and path
+            fnameT = os.path.join(datapath, name)
 
             # try to parse Serpent output with serpentTools
             try:
@@ -191,8 +173,10 @@ class NEMaterialData:
 
             except OSError():
                 suffT2 = "_".join(["Tc", str(Tc[idx]), "Tf", str(Tf[idx])])
-                name = "_".join([f, suffT2, "res.m"])  # join name,temp and suff
-                fnameT = os.path.join(datapath, name)  # join filename and path
+                # join name,temp and suff
+                name = "_".join([f, suffT2, "res.m"])
+                # join filename and path
+                fnameT = os.path.join(datapath, name)
 
                 try:
                     res = st.read(fnameT)

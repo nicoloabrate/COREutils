@@ -1,43 +1,31 @@
 {
   "NE" : {
-            "filename" : "C:\\Users\\39346\\Documenti\\mycodes\\coreutils\\docs\\examples\\Core\\ALFRED\\ALFRED_1_6_NE.txt",
+            "filename" : "TOY_1_6_NE.txt",
             "pitch" : 17.1,
             "shape" : "H",
             "rotation" : 60,
-            "assemblynames" : ["IF", "OF", "CR", "SR", "DR", "BA", "EL"],
+            "assemblynames" : ["IF", "CR", "DR", "EL"],
             "fren" : true,
             "NEdata" : {
-                          "path" : "C:\\Users\\39346\\Documenti\\mycodes\\coreutils\\docs\\data\\ALFRED",
-                          "beginwith" : ["ALFRED-FC", "ALFRED-CC"]
+                          "path" : "./docs/NEdata",
+                          "beginwith" : ["ALFRED-FC"]
                        },
-            "replace" : {
-                          "SR": [92, 326, 237, 3]
-                        },
             "cuts" : {
                         "IF" : [["IF_BOT_REF", 0, 79], ["IF_BOT_PLUG", 79, 84],
                                 ["IF_PLEN", 84, 139], ["IF_BOT_INS", 139, 140],
                                 ["INN_FUEL", 140, 200], ["IF_TOP_INS", 200, 201],
                                 ["IF_SPRING", 201, 213], ["IF_TOP_PLUG", 213, 218],
                                 ["IF_TOP_REF", 218, 340]],
-                        "OF" : [["OF_BOT_REF", 0, 79], ["OF_BOT_PLUG", 79, 84],
-                                ["OF_PLEN", 84, 139], ["OF_BOT_INS", 139, 140],
-                                ["OUT_FUEL", 140, 200], ["OF_TOP_INS", 200, 201],
-                                ["OF_SPRING", 201, 213], ["OF_TOP_PLUG", 213, 218],
-                                ["OF_TOP_REF", 218, 340]],
-                        "CR" : [["CR_BOT_REF", 0, 62], ["CR_BOT_PLUG", 62, 67],
-                                ["CR_BOT_INS", 67, 68], ["CR_ACT", 68, 136],
-                                ["CR_DUMM", 136, 204], ["CR_SPRING", 204, 264],
-                                ["CR_TOP_REF", 264, 340]],
-                        "SR" : [["SR_BOT_REF", 0, 207], ["SR_BOT_PLUG", 207, 212],
-                                ["SR_ACT", 212, 236], ["SR_TOP_INS", 236, 237],
-                                ["SR_SPRING", 237, 307], ["SR_TOP_REF", 307, 340]],
+                        "CR" : [["CR_BOT_REF", 0, 91], ["CR_BOT_PLUG", 91, 96],
+                                ["CR_BOT_INS", 96, 97], ["CR_ACT", 97, 165],
+                                ["CR_DUMM", 165, 233], ["CR_SPRING", 233, 293],
+                                ["CR_TOP_REF", 293, 340]],
                         "DR" : [["DR_BOT_REF", 0, 79], ["DR_BOT_PLUG", 79, 84],
                                 ["DR_DUMM", 84, 201], ["DR_SPRING", 201, 213],
                                 ["DR_TOP_PLUG", 213, 218], ["DR_TOP_REF", 218, 340]],
-                        "BA" : [["BA", 0, 340]],
                         "EL" : [["ll", 0, 340]]
                      },
-            "mycuts" : [0, 68, 84, 136, 140, 200, 212, 264, 296, 340],
+            "mycuts" : [0, 140, 200, 340],
             "config" : {
                         "5.4" : {
                                 "translate" : {
@@ -73,7 +61,7 @@
                               "DR_BOT_REF" : "BR", "BA" : "BA", "ll" : "Pb"}
           },
   "TH" : {
-          "coolingzonefile" : "C:\\Users\\39346\\Documenti\\mycodes\\coreutils\\docs\\examples\\Core\\ALFRED\\ALFRED_1_6_CZ.txt",
+          "coolingzonefile" : "TOY_1_6_CZ.txt",
           "pitch" : 17.1,
           "shape" : "H",
           "rotation" : 60,
@@ -83,7 +71,7 @@
           "coolingzonenames" : ["Z1", "Z2", "Z3", "Z4", "CR", "RE", "ST"],
           "fren" : true,
           "THdata" : {
-                        "filename" : "C:\\Users\\39346\\Documenti\\mycodes\\coreutils\\docs\\examples\\Core\\ALFRED\\ALFRED_1_6_TH.txt",
+                        "filename" : "TOY_1_6_TH.txt",
                         "assemblynames" : ["IF", "OF", "CR", "SR", "DR", "BA", "EL"],
                         "replace" : {
                                       "SR": [92, 326, 237, 3]

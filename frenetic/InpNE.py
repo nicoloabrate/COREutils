@@ -6,157 +6,175 @@ File: FreneticInpGen.py
 Description: Set of methods for generating FRENETIC input files.
 
 """
-
+import io
 import os
 from shutil import rmtree
-from os.path import isfile, join
 import numpy as np
-import serpentTools as st
 import h5py as h5
+import coreutils.frenetic.InpNE as inpNE
 
-# TODO: definire una sequenza automatica che generi i file di input (e.g. InpGen)
+
 # TODO: implementare gestione proprieta' fotoni (con GFN e DV)
 # TODO: quale coppia di temperature considero per i param. cinetici?
+# TODO: evita ripetizione regioni quando omogenee (complica codice di molto)
+# TODO: omogenizzazione velocita' su tutto il core?
 
 
-def writemacro(nmix, ngro, nprec, fname, Tf, Tc, unifuel=None,
-               datapath=None, unidictkeys=None):
+def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
+               unimap):
     """
     Write the input file "macro.nml" for the NE module of FRENETIC.
 
     Parameters
     ----------
-    datapath: string
-        path of the directory with the files
+    core : obj
+        Core object created with Core class
+    nmix : int
+        Number of different regions after homogenisation in the core
+    NG : int
+        Number of energy groups
+    NP : int
+        Number of precursors families
+    vel : ndarray
+        Multi-group velocity [cm/s]
+    lambda0 : ndarray
+        Precursors' families decay constants
+    beta0 : ndarray
+        Precursors' families physical neutron delayed fraction
+    nFrenCuts : int
+        Number of axial cuts in FRENETIC geometry
+    temps : list
+        List of tuples with T fuel and T coolant used to evaluate NE data
+    unimap : dict
+        Dictionary mapping in which list each universe is located in
+        core.NEMaterialData.data dict
+
     Returns
     -------
+    ``None``
     """
-    # --- define list of output filenames
     macronames = ["DIFFCOEF", "XSTOT", "XS_SCATT", "XS_FISS", "NUSF", "EFISS"]
-    inpnames = ["filediff", "sigt", "sigs", "sigf", "nusigf", "esigf"]
-
-    # read Serpent output
-    res = st.read(fname)  # read results from Serpent
-
-    # store all universe keys
-    if unidictkeys is None:
-
-        unidictkeys = set()
-        for key in sorted(res.universes):
-            unidictkeys.add(key[0])
-
-            if unifuel is None:
-                if 'fuel'.lower() in key.lower():  # check also FUEL
-                    unifuel = key
-
-    if nmix != len(unidictkeys):
-        raise OSError("Input number of regions does not match with" +
-                      "universes in Serpent file!")
-
+    inpnames = ["filediff", "filesigt", "filesigs", "filesigf", "filenusigf",
+                "fileesigf"]
+    (Tf, Tc) = temps
     # -- write macro.nml file
-    fname = "macro.nml"
-    if datapath is not None:
-        fname = os.path.join(datapath, fname)
+    asstypeN = 0
+    f = io.open('macro.nml', 'w', newline='\n')
+    f.write('&MACROXS0\n')
+    f.write('NMAT = %d \n' % nmix)
+    f.write('NGRO = %d \n' % NG)
+    f.write('NPRE = %d \n' % NP)
+    # FIXME: include photon data
+    f.write('NDHP = %d \n' % 1)
+    f.write('NGRP = %d \n' % 0)
+    f.write('NPRP = %d \n' % 0)
+    f.write('/ \n \n')
+    f.write('&MACROXS\n')
+    f.write('IRHO = 0,\n')
+    f.write('VELOC0(1:%d) = ' % NG)
 
-    with open(fname, 'w') as f:
-        f.write('&MACROXS0\n')
-        f.write('NMAT = %d \n' % nmix)
-        f.write('NGRO = %d \n' % ngro)
-        f.write('NPRE = %d \n' % nprec)
-        f.write('NDHP = %d \n' % 1)
-        f.write('NGRP = %d \n' % 0)
-        f.write('NPRP = %d \n' % 0)
-        f.write('/ \n \n')
-        f.write('&MACROXS0\n')
-        f.write('IRHO = 0,\n')
-        f.write('VELOC0(1:%d) = ' % ngro)
+    for igro in range(0, NG):
+        f.write('%1.6e, ' % vel[igro])
 
-        if unifuel is not None:
-            vel = 1/res.getUniv(unifuel, 0).infExp['infInvv']
+    f.write('\nLAMBDA0(1:%d) = ' % NP)
 
-        else:
-            raise OSError("Fuel region missing in universe list!")
+    for iprec in range(0, NP):
+        f.write('%1.6e, ' % lambda0[iprec])
 
-        for igro in range(0, ngro):
-            f.write('%1.6e, ' % vel(igro+1))
+    f.write(' \nlambdadhp0(1:1) = 1.000000e+00,\n')
+    f.write('betadhp0(1:1) = 0.000000e+00,\n')
+    f.write('IDIFF(1:%d) = %d*2,\n' % (nmix, nmix))
+    f.write('ISIGT(1:%d) = %d*2,\n' % (nmix, nmix))
+    f.write('ISIGF(1:%d) = %d*2,\n' % (nmix, nmix))
+    f.write('TEMPFUEL0 =	 %1.6e,\n' % Tf)
+    f.write('TEMPCOOL0 =	 %1.6e,\n' % Tc)
+    f.write('ISIGS(1:%d) = %d*2,\n\n' % (nmix, nmix))
 
-        f.write('\n LAMBDA0(1:%d) = ' % nprec)
-        lambda0 = res.resdata['fwdAnaLambda']
+    for imix in range(0, nmix):
 
-        for iprec in range(0, nprec):
-            f.write('%1.6e, ' % lambda0(iprec+1))
+        # perform operations only when the assembly is changed
+        if imix % nFrenCuts == 0:
+            asstypeN = asstypeN+1
+            u = core.NEassemblytypes[asstypeN]
+            # perform homogenisation for total and delayed spectra
+            chit = AxHomogenise(core, 'infChit', u, NG, (Tf, Tc), unimap)
+            chid = AxHomogenise(core, 'infChid', u, NG, (Tf, Tc), unimap)
+            imixF = 0
 
-        f.write(' \nlambdadhp0(1:1) = 1.000000e+00,\n')
-        f.write('betadhp0(1:1) = 1.000000e+00,\n')
-        f.write('IDIFF(1:%d) = %d*2,\n' % (nmix, nmix))
-        f.write('ISIGT(1:%d) = %d*2,\n' % (nmix, nmix))
-        f.write('ISIGF(1:%d) = %d*2,\n' % (nmix, nmix))
-        f.write('TEMPFUEL0 =	 %1.6e,\n' % Tf)
-        f.write('TEMPCOOL0 =	 %1.6e,\n' % Tc)
-        f.write('ISIGS(1:%d) = %d*2,\n\n' % (nmix, nmix))
+        # write universe number and name
+        f.write('!Universe %d belongs to %s\n' % (imix+1, u))
 
-        for imix in range(0, nmix):
+        # write kinetic and spectrum parameters
+        f.write('CHIT0(%d, 1:%d) = ' % (imix+1, NG))
+        for igro in range(0, NG):
+            f.write('%1.6e, ' % chit[imixF, igro])
 
-            # write universe number and name
-            f.write('!Universe %d:(%s)\n' % (imix, unidictkeys[imix]))
+        for igro in range(0, NG):
+            f.write('\nCHID0(%d, %d, 1:%d) = %d*%1.6e' % (imix+1, igro+1,
+                                                          NP, NP,
+                                                          chid[imixF,
+                                                               igro]))
+        f.write('\n')
+        imixF = imixF+1
+        f.write('BETA0(%d, 1:%d) = ' % (imix+1, NP))
+        for iprec in range(0, NP):
+            f.write('%1.6e,' % (beta0[iprec]))
 
-            # write kinetic and spectrum parameters
-            beta0 = res.resdata['fwdAnaBetaZero']
-            chid0 = res.getUniv(unidictkeys[imix], 0).infExp['infChit']
-            chit0 = res.getUniv(unidictkeys[imix], 0).infExp['infChit']
+        f.write('\n\n')
+        # write macroscopic NE multi-group data
+        for inp, macro in zip(inpnames, macronames):
 
-            f.write('CHIT0(%d, 1:%d) = ' % (imix, ngro))
-            for igro in range(0, ngro):
-                f.write('%1.6e, ' % chit0(igro))
+            if macro == "XS_SCATT":
 
-            for igro in range(0, ngro):
-                f.write('\n CHID0(%d, %d, 1:%d) = %d*%1.6e' % (imix, igro,
-                                                               nprec, nprec,
-                                                               chid0(igro)))
+                for igrostart in range(0, NG):
+                    f.write('%s(%d, %d, 1:%d) =' % (inp, imix+1,
+                                                    igrostart+1, NG))
+                    for igroend in range(0, NG):
+                        f.write(" '%s_%d_%d_%d', "
+                                % (macro, imix+1, igrostart+1, igroend+1))
 
-            f.write('BETA0(%d, 1:%d) = ' % (imix, nprec))
-            for iprec in range(0, nprec):
-                f.write('%1.6e' % (beta0(iprec)))
+                    f.write('\n')
 
-            # write macroscopic NE multi-group data
-            for inp, macro in (inpnames, macronames):
+            else:
 
-                if macro == "XS_SCATT":
+                f.write('%s(%d, %d, 1:%d) =' % (inp, imix+1, igro+1, NG))
+                for igro in range(0, NG):
+                    triple = (macro, imix+1, igro+1)
+                    f.write(" '%s_%d_%d', " % triple)
 
-                    for igrostart in range(0, ngro):
-                        f.write('%s(%d, %d, 1:%d) =' % (inp, imix,
-                                                        igrostart, ngro))
-                        for igroend in range(0, ngro):
-                            f.write(' ''NEinputdata/%s_%d_%d_%d.txt'', '
-                                    % (macro, imix, igrostart, igroend))
+                f.write('\n')
 
-                        f.write('/n')
-
-                else:
-
-                    f.write('%s(%d, 1:%d) =' % (inp, imix, ngro))
-                    for igro in range(0, ngro):
-                        f.write(' ''NEinputdata/%s_%d_%d.txt'', ' % (macro, imix, igro))
-
-                    f.write('/n')
-
-        f.write('/n')
+        f.write('\n\n')
+    # write namelist end
+    f.write('/')
 
 
-def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
-                asciifmt=False, files=None):
+def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
     """
-    Generate FRENETIC NE module input HDF5 file.
+    Generate FRENETIC NE module input (HDF5 file or many txt).
 
     Parameters
     ----------
-    datapath: string
-        path of the directory with the files
+    core : obj
+        Core object created with Core class
+    NG : int
+        Number of energy groups
+    unimap : dict
+        Dictionary mapping in which list each universe is located in
+        core.NEMaterialData.data dict
+    verbose : bool, optional
+        Set to ``True`` in order to print also capture, nubar and scattering
+        production data. Default is ``False``
+    inf : bool, optional
+        Set to ``False`` to get B1 Serpent calculation mode for the
+        multi-group constants. Default is ``True``
+    txtfmt : bool, optional
+        Set to ``True`` to print data also in .txt format. Default is ``False``
+
     Returns
     -------
+    ``None``
     """
-    fname, Tc, Tf = parsetemp(datapath, files)   # call method to read useful lists
-
     # --- define list of output filenames
     outnames = ["DIFFCOEF", "EFISS", "NUSF", "XS_FISS", "XS_SCATT", "XSTOT",
                 "CHIT", "XS_REM"]
@@ -174,85 +192,16 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
         infkeys.extend(infverb)
         b1keys.extend(b1verb)
 
-    if steady is False:
-        infkin_keys = ['infChit', 'infChip', 'infChid', 'infInvv']
-        b1kin_keys = ['b1Chit', 'b1Chip', 'b1Chid', 'b1Invv']
-        kin_out = ["CHIT", "CHIP", "CHID", "INVVEL"]
+    datakeys = infkeys if inf is True else b1keys
+    datakeys = dict(zip(datakeys, outnames))
 
     # -- create or overwrite hdf5 file (repro script)
-    h5name = "NE_inp.hdf5"
+    h5name = "NE_data.h5"
     fh5 = __wopen(h5name)
-    # if unidict not provided, I/O with user required
-    flagIO = 0
-    if unidict is None:
-        flagIO = 1
-        unidictkeys = []
 
-    # --- store _res files in temperature-wise dict
-    resdict = {}  # define dict to store output
-    NU = []  # define list of universe number in each file
-    grid = []  # define list of group number in each file
-    for idx, f in enumerate(fname):  # loop over Serpent files
-        print(idx)
-        # define current filename
-        suffT = "_".join(["Tf", str(Tf[idx]), "Tc", str(Tc[idx])])
-        name = "_".join([f, suffT, "res.m"])  # concatenate name,temp and suff
-        fnameT = os.path.join(datapath, name)  # concatenate filename and path
-
-        # try to parse Serpent output with serpentTools
-        try:
-            res = st.read(fnameT)  # read results from Serpent
-            # maybe Tf and Tc swapped
-
-        except OSError():
-            suffT2 = "_".join(["Tc", str(Tc[idx]), "Tf", str(Tf[idx])])
-            name = "_".join([f, suffT2, "res.m"])  # join name,temp and suff
-            fnameT = os.path.join(datapath, name)  # join filename and path
-
-            try:
-                res = st.read(fnameT)
-
-            except OSError():
-                print("File does not exist!")
-
-        # store in temp dict lists of ResObject
-        if (Tf[idx], Tc[idx]) in resdict:
-            resdict[(Tf[idx], Tc[idx])].append(res)  # append in list
-        else:
-            resdict[(Tf[idx], Tc[idx])] = []  # initialise as list
-            resdict[(Tf[idx], Tc[idx])].append(res)  # append in list
-
-        # store all universe keys for later print to the user
-        unidictkeys = set()
-        if flagIO == 1:
-            for key in sorted(res.universes):
-                unidictkeys.add(key[0])
-
-        # store number of groups and universes
-        uni = (sorted(res.universes)[0]).universe  # get first universe
-        data = res.getUniv(uni, 0)
-        grid.append(tuple(data.groups))  # list to remove duplicates later
-        NU.append(len(res.universes))
-
-    # --- check energy grid consistency
-    grid = list(set(grid))
-    if len(grid) > 1:
-        raise OSError("Check MACRO_E in Serpent! Energy grid not the same")
-
-    NG = len(grid[0])-1  # define number of groups
-
-    # --- ask for user input to define unidict
-    if flagIO == 1:
-        print("Please enter the id numbers for the following Serpent" +
-              " universes:", list(unidictkeys))
-        unidictval = []
-        for i in range(0, len(unidictkeys)):
-            elem = int(input())
-            unidictval.append(elem)  # adding the element
-        unidict = dict(zip(unidictkeys, unidictval))
-    # print dict to the user
-    print(unidict)
-
+    NZ = len(core.NEAxialConfig.mycuts)-1
+    temps = core.NEMaterialData.temp
+    Tf, Tc = zip(*temps)
     # --- define temperature matrix to be filled with data
     n, m = len(set(Tf))+2, len(set(Tc))+1  # temp matrix dimensions
     frendata = np.zeros((n, m))
@@ -264,7 +213,7 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
     lstTc.sort()
     frendata[1, 1:] = lstTc
 
-    if asciifmt is True:
+    if txtfmt is True:
         # ---- write steady data to txt files
         # create directory
         if os.path.isdir("NEinputdata"):
@@ -280,127 +229,316 @@ def writeNEdata(datapath, steady=False, verbose=False, inf=True, unidict=None,
             os.mkdir("NEinputdata")
 
     # define tuple of couples of temperatures
-    TfTc = list(zip(Tf, Tc))
-    TfTc.sort(key=lambda t: t[0])
-    # delete repetitions from fname list
-    fname = list(dict.fromkeys(fname))
+    temps.sort(key=lambda t: t[0])
 
-    # file loop
-    for ifile in range(0, len(fname)):
-        # data loop
-        for idx, out in enumerate(outnames):
-            # universe loop
-            for iUni in range(0, NU[ifile]):
-                # group loop
-                for iGro in range(0, NG):
-
-                    # temperature loop (fill temperature matrix)
-                    for itup, tup in enumerate(TfTc):
-                        # select file
-                        res = resdict[tup][ifile]
-                        # take universe
-                        uni = sorted(res.universes)[iUni]
-
-                        if uni[0] not in unidict.keys():
-                            continue
-
-                        uniname, burnup, step, days = uni
-                        unitup = (uniname, burnup, step, days)
-
-                        if itup == len(TfTc)-1:
-                            # define filename
-                            imix = unidict[uni[0]]
-                            # FIXME: save only selected universes
-                            txtname = "_".join([out, str(imix), str(iGro+1)])
-
-                        # store value in proper position in temp matrix
-                        row = np.where(frendata[:, 0] == tup[0])
-                        col = np.where(frendata[1, :] == tup[1])
-
-                        # select inf or b1 results
-                        if inf is True:
-                            val = res.getUniv(*unitup).infExp[infkeys[idx]]
-                            # scattering has double group index
-                            if infkeys[idx].startswith('infS'):
-                                # departure group
-                                for iGroDep in range(0, NG):
-
-                                    # edit name to include info on dep group
-                                    txtname2 = "_".join([txtname,
-                                                         str(iGroDep+1)])
-                                    frendata[row, col] = val[iGroDep+(iGro+1)
-                                                             * (iGro > 0)]
-
-                                    # write data if all T tuples spanned
-                                    if itup == len(TfTc)-1:
-                                        # write output
-                                        if asciifmt is True:
-                                            # write txt file
-                                            mysavetxt(txtname2, frendata)
-
-                                        # save in h5 file
-                                        fh5.create_dataset(txtname2,
-                                                           data=np.array(
-                                                               frendata,
-                                                               dtype=np.float))
-
-                            else:
-                                frendata[row, col] = val[iGro]
-                                # write data if all T tuples have been spanned
-                                if itup == len(TfTc)-1:
-                                    # write output
-                                    if asciifmt is True:
+    # loop over kind of rod
+    zcount = 0
+    for hextype, hexname in core.NEassemblytypes.items():
+        zold = zcount+0
+        for data, dataname in datakeys.items():  # loop over data
+            zcount = zold
+            homogdata = {}
+            where = {}
+            # temperature couples loop
+            for itup, tup in enumerate(temps):
+                # spatially homogenise data
+                homogdata[tup] = AxHomogenise(core, data, hexname, NG, tup,
+                                              unimap)
+                # store value in proper position in temp matrix
+                row = np.where(frendata[:, 0] == tup[0])
+                col = np.where(frendata[1, :] == tup[1])
+                where[tup] = (row, col)
+            # -- split homogdata in regions and groups
+            for z in range(0, NZ):  # loop over cuts
+                zcount = zcount + 1  # new axial region
+                for g in range(0, NG):  # loop over energy groups
+                    txt = "%s_%d_%d" % (dataname, zcount, g+1)
+                    for itup, tup in enumerate(temps):  # loop again over temps
+                        r, c = where[tup]
+                        # check if matrix
+                        if 'infS' in data or 'b1S' in data:
+                            for gdep in range(0, NG):  # loop over departure g
+                                # edit name to include info on dep group
+                                txtname = "_".join([txt, str(gdep+1)])
+                                gc = gdep+(g+1)*(g > 0)
+                                frendata[r, c] = homogdata[tup][z, gc]
+                                # write output if all T tuples spanned
+                                if itup == len(temps)-1:
+                                    if txtfmt is True:
                                         # write txt file
                                         mysavetxt(txtname, frendata)
-
                                     # save in h5 file
-                                    fh5.create_dataset(txtname,
-                                                       data=np.array(
-                                                           frendata,
-                                                           dtype=np.float))
+                                    tmp = np.array(frendata, dtype=np.float)
+                                    fh5.create_dataset(txtname, data=tmp)
 
-                        else:  # if inf is False
-                            val = res.getUniv(*unitup).b1Exp[b1keys[idx]]
-                            if b1keys[idx].startswith('b1S'):
-                                # departure group
-                                for iGroDep in range(0, NG):
-                                    # edit name to include info on dep group
-                                    txtname2 = "_".join([txtname,
-                                                         str(iGroDep+1)])
-                                    frendata[row, col] = val[iGroDep+(iGro+1)
-                                                             * (iGro > 0)]
+                        else:
+                            frendata[r, c] = homogdata[tup][z, g]
+                            # write data if all T tuples have been spanned
+                            if itup == len(temps)-1:
+                                if txtfmt is True:
+                                    # write txt file
+                                    mysavetxt(txtname, frendata)
+                                # save in h5 file
+                                tmp = np.array(frendata, dtype=np.float)
+                                fh5.create_dataset(txt, data=tmp)
 
-                                    # write data if all T tuples spanned
-                                    if itup == len(TfTc)-1:
-                                        # write output
-                                        if asciifmt is True:
-                                            # write txt file
-                                            mysavetxt(txtname2, frendata)
 
-                                        # save in h5 file
-                                        fh5.create_dataset(txtname2,
-                                                           data=np.array(
-                                                               frendata,
-                                                               dtype=np.float))
+def writeConfig(core, NZ, Ntypes):
+    """
+    Write config.inp file.
 
-                            else:  # no scattering data
-                                frendata[row, col] = val[iGro]
-                                # write data if all T tuples have been spanned
-                                if itup == len(TfTc)-1:
-                                    # write output
-                                    if asciifmt is True:
-                                        # write txt file
-                                        mysavetxt(txtname, frendata)
+    Parameters
+    ----------
+    core : obj
+        Core object created with Core class.
+    NZ : int
+        Number of axial cuts
+    Ntypes : int
+        Number of assembly types
 
-                                    # save in h5 file
-                                    fh5.create_dataset(txtname,
-                                                       data=np.array(
-                                                            frendata,
-                                                            dtype=np.float))
+    Returns
+    -------
+    ``None``
+
+    """
+    types = np.zeros((core.NAss, ), dtype=int)
+    NAssTypes = len(core.NEassemblytypes)
+    compositions = np.reshape(np.arange(1, NZ*NAssTypes+1), (NAssTypes, NZ))
+    f = io.open('config.inp', 'w', newline='\n')
+    for t in core.NEtime:  # loop over time
+        # loop over cut
+        for iz, z in enumerate(range(0, NZ)):
+            f.write('%1.6e ' % t)  # write time instant for each cut
+            # write the type of assembly according to FRENETIC numeration
+            for n in range(1, core.NAss+1):  # loop over all assemblies
+                whichtype = core.getassemblytype(n, time=t, flagfren=True,
+                                                 whichconf="NEconfig")
+                types[n-1] = compositions[whichtype-1, iz]
+            # define region number for each assembly
+            typestr = types.astype(str)
+            f.write('%s' % ' '.join(typestr))
+            f.write('\n')
+
+
+def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
+    """
+    Make input.dat file.
+
+    Parameters
+    ----------
+    core : obj
+        Core object created with Core class
+    whereMACINP : str, optional
+        File path where the 'macro.nml' should be located
+    whereNH5INP : str, optional
+        File path where the 'NE_data.h5' should be located
+    template : str, optional
+        File path where the template file is located. Default is ``None``.
+        In this case, the default template is used
+
+    Returns
+    -------
+    ``None``
+    """
+    if whereMACINP is None:
+        whereMACINP = 'macro.nml'
+
+    if whereNH5INP is None:
+        whereNH5INP = 'NE_data.h5'
+
+    NZ = len(core.NEAxialConfig.mycuts)-1
+
+    geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,
+                '$MESHZ0': core.NEAxialConfig.mycuts, '$SPLITZ': [10]*NZ}
+
+    if template is None:
+        path = os.path.abspath(inpNE.__file__)
+        path = os.path.join(path.split("InpNE.py")[0], "template_NEinput.dat")
+    else:
+        path = template
+
+    with open(path) as tmp:  # open reference file
+        f = io.open("input.dat", 'w', newline='\n')
+        # with open() as f:  # open new file
+        for line in tmp:  # loop over lines in reference file
+            for key, val in geomdata.items():  # loop over dict keys
+                if key in line:
+                    if key in ['$MESHZ0', '$SPLITZ']:
+                        val = [str(v) for v in val]
+                        val = "%s \n" % ",".join(val)
+                        line = line.replace(key, val)
+                    else:
+                        line = line.replace(key, str(val))
+            # write to file
+            f.write(line)
+
+
+def AxHomogeniseData(flux, data, hz, htot):
+    """
+    Axially homogenise multi-group data over a set of axial nodes.
+
+    Parameters
+    ----------
+    flux : ndarray
+        Flux over the hz regions
+    data : ndarray
+        Data over the hz regions
+    hz : ndarray
+        Fine axial discretisation
+    htot : ndarray
+        Total height of the sub-interval
+
+    Returns
+    -------
+    homogdata : float
+        Axially homogenised data
+
+    """
+    flux = flux*hz/htot
+    # homogenise over deltaz preserving reaction rate
+    homogdata = np.dot(flux, data)/sum(flux)
+
+    return homogdata
+
+
+def AxHomogenise(core, what, which, NG, temp, unidict):
+    """
+    Axially homogenise multi-group parameters.
+
+    Parameters
+    ----------
+    core : obj
+        Core object created with Core class.
+    what : str
+        Data name to be homogenised
+    which : int
+        Type of NE assembly
+    NG : int
+        Number of energy groups
+    temps : list
+        List of tuples with T fuel and T coolant used to evaluate NE data
+    unidict : dict
+        Dictionary mapping in which list each universe is located in
+        core.NEMaterialData.data dict
+
+    Returns
+    -------
+    homdata : ndarray
+        2D array with homogenised data. The dimension is (number of axial
+        cuts, number of energy groups).
+
+    """
+    if isinstance(which, int):
+        # parse key from dict
+        which = core.NEassemblytype[which]
+
+    # get cuts coordinates and fine regions
+    coarsecuts = np.asarray(core.NEAxialConfig.mycuts)
+    reg = np.asarray(core.NEAxialConfig.cuts[which].reg)
+    uppz = np.asarray(core.NEAxialConfig.cuts[which].upz)
+    lowz = np.asarray(core.NEAxialConfig.cuts[which].loz)
+    # get deltaz
+    dzCoarse = coarsecuts[1::]-coarsecuts[0:-1]
+    dzFine = uppz-lowz
+
+    changeuniv = np.zeros((len(dzCoarse), ), dtype=int)
+    fineincoarse = np.zeros((len(dzCoarse), ), dtype=int)
+    izf = 0
+    for izc in range(1, len(coarsecuts)):
+        fineincoarse[izc-1] = 1
+        while uppz[izf] < coarsecuts[izc]:
+            izf = izf+1
+            # update, fine cut included in coarse
+            fineincoarse[izc-1] = fineincoarse[izc-1]+1
+        if uppz[izf] == coarsecuts[izc]:
+            izf = izf+1
+            changeuniv[izc-1] = 1
+
+    # define scattering matrices keys (used later on)
+    scattmat = [*['infS%d' % d for d in range(0, 8)],
+                *['infSp%d' % d for d in range(0, 8)]]
+
+    # homogenise in each group
+    N = NG*NG if what in scattmat else NG
+    homdata = np.zeros((len(fineincoarse), N))
+
+    for g in range(0, NG):  # loop over energy groups
+        idx = 0
+        for izf in range(0, len(fineincoarse)):  # loop over axial cuts
+            iduniv = reg[idx:idx+fineincoarse[izf]]
+            # get fine dz for fine regions inside coarse
+            dzTot = dzFine[idx:idx+fineincoarse[izf]]
+            dz = dzFine[idx:idx+fineincoarse[izf]]+0
+            # correct value with difference between coarse and last fine
+            dz[-1] = coarsecuts[izf+1]-lowz[idx+fineincoarse[izf]-1]
+
+            if changeuniv[izf] == 1:
+                dz[0] = uppz[idx]-coarsecuts[izf]
+                idx = idx+fineincoarse[izf]
+            else:
+                if izf > 0:
+                    dz[0] = uppz[idx]-coarsecuts[izf]
+
+                if changeuniv[izf] == 0 and fineincoarse[izf] == 1:
+                    dz[0] = dzCoarse[izf]
+
+                idx = idx+fineincoarse[izf]-1
+
+            # --- get flux and data for homogenisation
+            flx = np.zeros((len(iduniv), ))
+            if what in scattmat:
+                # matrix for scattering matrix
+                data = np.zeros((NG, len(iduniv)))
+            else:
+                data = np.zeros((len(iduniv), ))
+
+            for i, u in enumerate(iduniv):  # loop over universes in dz
+                idf = unidict[u]  # get file position in list
+                file = core.NEMaterialData.data[temp][idf]  # get serpent data
+                flx[i] = file.getUniv(u, 0, 0, 0).infExp['infFlx'][g]
+
+                if what in scattmat:
+                    # reshape in matrix
+                    smat = np.reshape(file.getUniv(u, 0, 0, 0).infExp[what],
+                                      (NG, NG))
+                    # keep data
+                    data[:, i] = smat[:, g]
+                else:
+                    data[i] = file.getUniv(u, 0, 0, 0).infExp[what][g]
+
+            # axially homogenise required data
+            if what in scattmat:
+                tmp = np.zeros((NG, ))
+                for gg in range(0, NG):
+                    # homogenise scattering matrix over each sub-group
+                    tmp[gg] = AxHomogeniseData(flx, data[gg, :], dz, dzTot)
+                homdata[izf, g*NG:g*NG+NG] = tmp
+            else:
+                homdata[izf, g] = AxHomogeniseData(flx, data, dz, dzTot)
+
+    return homdata
 
 
 def mysavetxt(fname, x, fmt="%.6e", delimiter=' '):
-    """Write file in txt format."""
+    """
+    Write file in txt format.
+
+    Parameters
+    ----------
+    fname : str
+        File name.
+    x : ndarray
+        Data to be written in txt.
+    fmt : str, optional
+        Data output format. The default is "%.6e".
+    delimiter : str, optional
+        Delimiter between data. The default is ' '.
+
+    Returns
+    -------
+    None.
+
+    """
     fname = fname+".txt"  # add file extension
     fname = os.path.join("NEinputdata", fname)
     with open(fname, 'w') as f:

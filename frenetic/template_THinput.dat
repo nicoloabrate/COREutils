@@ -1,0 +1,76 @@
+&COREDATA
+ISPLENUM	= 0,
+
+/
+
+&NUMERICS
+ISTISC = 0,
+DTTISC = 1.0d0,
+TOLLTOSTEADY = 5.0d-04,
+METHOD = $NHEX*0,	      !=0 implicit method
+
+IQFUN = $NHEX*-1,	      !heating flag (0=square wave in time and space, -1=external function for Q(x,t))
+XQBEG = $NHEX*1.0d0, 	  !heated zone beginning
+!XQEND = 637*0.3429d0, 	!heated zone end
+XQEND = $NHEX*1.6d0, 	  !heated zone end
+DXQ0 = $NHEX*0.01d0, 	  !if constant heating, this is the value of power density (W/m)
+Q0 = $NHEX*1.0d0, 	    !if constant heating, this is the value of power density (W/m)
+TQBEG = $NHEX*0.0d0, 	  !heating start time
+TQEND = $NHEX*500.d0, 	!heating end time
+RADPRO_DEF = 0,         ! 0=Axial 1D; 1=Radial 1D; 2=Radial+Axial 2D
+RADELEM = 59,           ! Number of radial elements for 1D model
+
+SOTTORIL = 0.05d0 	    !under-relaxation parameter
+THRESHOLD	= 1.00d-5 	  !relative error threshold !VM suggerisce -1E-09
+
+URTFLU = 1.0d0          !under-relaxation parameter for coolant temperatures passed to TISC
+URTPIN = 1.0d0          !under-relaxation parameter for pin temperatures passed to TISC
+
+/
+
+&IBCONDITIONS
+ISMOOTH = $NHEX*0,      !if INTIAL=0 --> 0=values from below, 1=step between TEMINI and TEMINL smoothed through a sin wave
+INTIAL  = $NHEX*-5,     !>0 --> BC values from below, <0 --> BC values from input files ("press.dat", "temp.dat", "mdot.dat")
+
+!+/-1=TEMINL, PREINL, PREOUT
+!+/-2=TEMINL, PREINL, MDTINL (MDTINL never from input file)
+!-5=TEMINL, PREOUT, MDTINL (all from input files)
+
+TEMINL = $NHEX*673.0, 	  !inlet coolant temperature
+TEMOUT = $NHEX*673.0, 	  !outlet coolant temperature
+PREINL = $NHEX*6.3d5, 	  !inlet coolant pressure
+PREOUT = $NHEX*2.2d5, 	  !outlet coolant pressure
+MDTINL = $NHEX*0.0d0	    !total inlet mass flow rate
+TEMINI = $NHEX*673.15d0, 	!initial coolant temperature
+/
+
+&COUPLING
+ICOUPL = 1, ![] Coupling type flag (-1=Tdowncomer=Tin)
+ITHIMB = 0, ![] BIB coupling model (1=Beta, 0=Alpha)
+
+/
+
+&SENSOR
+!ITIMEPROF = 110*0,1*1,446*0,1*1,79*0,	![] Flag to turn on profile saving at time=timeprof for channel i
+NTIMEPROF	= 31,	![] Number of spatial profiles (length of vector TIMEPROF)
+![s] Times at which the spatial profiles are saved
+TIMEPROF = 0.0d0,10.0d0,20.d0,30.0d0,40.0d0,50.0d0,60.0d0,70.0d0,80.0d0,90.0d0,100.0d0,
+ 	  			 110.0d0,120.0d0,130.d0,140.0d0,150.0d0,160.0d0,170.0d0,180.0d0,190.0d0,200.0d0,
+ 	  			 210.0d0,220.0d0,230.0d0,240.d0,250.0d0,260.0d0,270.0d0,280.0d0,290.0d0,300.0d0,
+
+![] Flag to turn on profile saving at time=timeprof for channel i
+ITIMEPROF	= 15*1,280*1,
+!NTIMEPROF = 1,	        ![] Number of spatial profiles (length of vector TIMEPROF)
+!TIMEPROF	= 0.00d+00,	  ![s] Times at which the spatial profiles are saved
+ISENS = $NHEX*1,	      ![] Flag to turn on inlet/outlet saving for channel i
+![m] z at which the variables (v, p, T, Tp, Tpc, Tps) are saved
+NLAYER = 11,
+ZLAYER = 0.0000,0.5000,1.0000,1.1000,1.2000,1.3000,1.4000,1.5000,1.6000,1.7,2.6,
+/
+
+&SENSOR_RAD
+IRADPROF	= 7*1,288*0,	![] Channels for saving radial T profile
+IAXNODR = 80, 	        ![] Nod to save radial T profile
+TRADPROF	= 0, 	        ![] Time for saving radial T profile
+/
+!4444

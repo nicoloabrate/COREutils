@@ -75,7 +75,10 @@ class UnfoldCore:
         coremap[coremap == '*'] = '0'
 
         # convert from string ndarray to ndarray of integers
-        coremap = coremap.astype(np.int)
+        try:
+            coremap = coremap.astype(np.int)
+        except ValueError:
+            raise('Check all entries in NE.txt file match with assemblynames')
         coremap0 = coremap+0  # input
         # check negative entries
         if np.sum(coremap == -1) > 0:
