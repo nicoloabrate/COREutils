@@ -11,8 +11,12 @@ import os
 from shutil import rmtree
 import numpy as np
 import h5py as h5
-import coreutils.frenetic.InpNE as inpNE
-
+from . import templates
+try:
+    import importlib.resources as pkg_resources
+except ImportError:
+    # Try backported to PY<37 `importlib_resources`.
+    import importlib_resources as pkg_resources
 
 # TODO: implementare gestione proprieta' fotoni (con GFN e DV)
 # TODO: quale coppia di temperature considero per i param. cinetici?
@@ -105,30 +109,30 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
         f.write('!Universe %d belongs to %s\n' % (imix+1, u))
 
         # write kinetic and spectrum parameters
-        f.write('CHIT0(%d, 1:%d) = ' % (imix+1, NG))
+        f.write('CHIT0(%d,1:%d) = ' % (imix+1, NG))
         for igro in range(0, NG):
             f.write('%1.6e, ' % chit[imixF, igro])
 
         for igro in range(0, NG):
-            f.write('\nCHID0(%d, %d, 1:%d) = %d*%1.6e' % (imix+1, igro+1,
-                                                          NP, NP,
-                                                          chid[imixF,
-                                                               igro]))
+            f.write('\nCHID0(%d,%d,1:%d) = %d*%1.6e,' % (imix+1, igro+1,
+                                                         NP, NP,
+                                                         chid[imixF, igro]))
         f.write('\n')
         imixF = imixF+1
-        f.write('BETA0(%d, 1:%d) = ' % (imix+1, NP))
+        f.write('BETA0(%d,1:%d) = ' % (imix+1, NP))
         for iprec in range(0, NP):
             f.write('%1.6e,' % (beta0[iprec]))
 
-        f.write('\n\n')
+        f.write('\n')
+        f.write('\n')
         # write macroscopic NE multi-group data
         for inp, macro in zip(inpnames, macronames):
 
             if macro == "XS_SCATT":
 
                 for igrostart in range(0, NG):
-                    f.write('%s(%d, %d, 1:%d) =' % (inp, imix+1,
-                                                    igrostart+1, NG))
+                    f.write('%s(%d,%d,1:%d) =' % (inp, imix+1, igrostart+1,
+                                                  NG))
                     for igroend in range(0, NG):
                         f.write(" '%s_%d_%d_%d', "
                                 % (macro, imix+1, igrostart+1, igroend+1))
@@ -137,14 +141,13 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
 
             else:
 
-                f.write('%s(%d, %d, 1:%d) =' % (inp, imix+1, igro+1, NG))
+                f.write('%s(%d,1:%d) =' % (inp, imix+1, NG))
                 for igro in range(0, NG):
                     triple = (macro, imix+1, igro+1)
                     f.write(" '%s_%d_%d', " % triple)
 
                 f.write('\n')
 
-        f.write('\n\n')
     # write namelist end
     f.write('/')
 
@@ -253,16 +256,18 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                 zcount = zcount + 1  # new axial region
                 for g in range(0, NG):  # loop over energy groups
                     txt = "%s_%d_%d" % (dataname, zcount, g+1)
-                    for itup, tup in enumerate(temps):  # loop again over temps
-                        r, c = where[tup]
-                        # check if matrix
-                        if 'infS' in data or 'b1S' in data:
-                            for gdep in range(0, NG):  # loop over departure g
-                                # edit name to include info on dep group
-                                txtname = "_".join([txt, str(gdep+1)])
-                                gc = gdep+(g+1)*(g > 0)
+                    # check if matrix
+                    if 'infS' in data or 'b1S' in data:
+                        for gdep in range(0, NG):  # loop over departure g
+                            # edit name to include info on dep group
+                            txtname = "_".join([txt, str(gdep+1)])
+                            gc = gdep+NG*g
+
+                            for itup, tup in enumerate(temps):
+                                # select matrix entry
+                                r, c = where[tup]
                                 frendata[r, c] = homogdata[tup][z, gc]
-                                # write output if all T tuples spanned
+                                # write output if last tuple is reached
                                 if itup == len(temps)-1:
                                     if txtfmt is True:
                                         # write txt file
@@ -271,7 +276,10 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                                     tmp = np.array(frendata, dtype=np.float)
                                     fh5.create_dataset(txtname, data=tmp)
 
-                        else:
+                    else:
+                        for itup, tup in enumerate(temps):  # loop over temps
+                            # select matrix entry
+                            r, c = where[tup]
                             frendata[r, c] = homogdata[tup][z, g]
                             # write data if all T tuples have been spanned
                             if itup == len(temps)-1:
@@ -341,36 +349,42 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
     ``None``
     """
     if whereMACINP is None:
-        whereMACINP = 'macro.nml'
+        whereMACINP = "'macro.nml'"
 
     if whereNH5INP is None:
-        whereNH5INP = 'NE_data.h5'
+        whereNH5INP = "'NE_data.h5'"
 
     NZ = len(core.NEAxialConfig.mycuts)-1
+    nConfig = len(core.NEtime)
+    nRun = 2 if nConfig > 1 else 1
 
     geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,
-                '$MESHZ0': core.NEAxialConfig.mycuts, '$SPLITZ': [10]*NZ}
+                '$MESHZ0': core.NEAxialConfig.mycuts, '$SPLITZ': [10]*NZ,
+                '$NCONFIG': nConfig, '$NRUN': nRun}
 
     if template is None:
-        path = os.path.abspath(inpNE.__file__)
-        path = os.path.join(path.split("InpNE.py")[0], "template_NEinput.dat")
+        tmp = pkg_resources.read_text(templates, 'template_NEinput.dat')
+        tmp = tmp.splitlines()
     else:
-        path = template
+        with open(template, 'r') as f:
+            temp_contents = f.read()
+            tmp = temp_contents. splitlines()
 
-    with open(path) as tmp:  # open reference file
-        f = io.open("input.dat", 'w', newline='\n')
-        # with open() as f:  # open new file
-        for line in tmp:  # loop over lines in reference file
-            for key, val in geomdata.items():  # loop over dict keys
-                if key in line:
-                    if key in ['$MESHZ0', '$SPLITZ']:
-                        val = [str(v) for v in val]
-                        val = "%s \n" % ",".join(val)
-                        line = line.replace(key, val)
-                    else:
-                        line = line.replace(key, str(val))
-            # write to file
-            f.write(line)
+    f = io.open("input.dat", 'w', newline='\n')
+
+    # with open() as f:  # open new file
+    for line in tmp:  # loop over lines in reference file
+        for key, val in geomdata.items():  # loop over dict keys
+            if key in line:
+                if key in ['$MESHZ0', '$SPLITZ']:
+                    val = [str(v) for v in val]
+                    val = "%s" % ",".join(val)
+                    line = line.replace(key, val)
+                else:
+                    line = line.replace(key, str(val))
+        # write to file
+        f.write(line)
+        f.write('\n')
 
 
 def AxHomogeniseData(flux, data, hz, htot):

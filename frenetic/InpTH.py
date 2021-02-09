@@ -7,8 +7,12 @@ Description: Set of methods for generating FRENETIC input files.
 
 """
 import io
-import os
-import coreutils.frenetic.InpTH as InpTH
+from . import templates
+try:
+    import importlib.resources as pkg_resources
+except ImportError:
+    # Try backported to PY<37 `importlib_resources`.
+    import importlib_resources as pkg_resources
 
 
 def writeCZdata(core):
@@ -24,8 +28,8 @@ def writeCZdata(core):
     -------
     ``None``
     """
-    # generate filecool.txt
-    f = io.open('filecool.txt', 'w', newline='\n')
+    # generate filecool.dat
+    f = io.open('filecool.dat', 'w', newline='\n')
     for nchan, chan in core.CZassemblytypes.items():
         which = core.getassemblylist(nchan, flagfren=True,
                                      whichconf="CZconfig")
@@ -35,12 +39,12 @@ def writeCZdata(core):
             which = ','.join(which)
             f.write("%s,\n" % which)
 
-    # generate mdot.txt
-    f = io.open('mdot.txt', 'w', newline='\n')
+    # generate mdot.dat
+    f = io.open('mdot.dat', 'w', newline='\n')
     f.write("%d, \n" % len(core.CZtime))
     for t in core.CZtime:
         # loop over each assembly
-        mflow = []
+        mflow = ["%.6e" % t]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
             whichtype = core.getassemblytype(n, flagfren=True,
@@ -52,11 +56,11 @@ def writeCZdata(core):
         f.write("%s \n" % ",".join(mflow))
 
     # generate temp.dat
-    f = io.open('temp.txt', 'w', newline='\n')
+    f = io.open('temp.dat', 'w', newline='\n')
     f.write("%d, \n" % len(core.CZtime))
     for t in core.CZtime:
         # loop over each assembly
-        temp = []
+        temp = ["%.6e" % t]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
             whichtype = core.getassemblytype(n, flagfren=True,
@@ -68,11 +72,11 @@ def writeCZdata(core):
         f.write("%s \n" % ",".join(temp))
 
     # generate press.dat
-    f = io.open('press.txt', 'w', newline='\n')
+    f = io.open('press.dat', 'w', newline='\n')
     f.write("%d, \n" % len(core.CZtime))
     for t in core.CZtime:
         # loop over each assembly
-        press = []
+        press = ["%.6e" % t]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
             whichtype = core.getassemblytype(n, flagfren=True,
@@ -100,24 +104,25 @@ def makeTHinput(core, template=None):
     -------
     ``None``
     """
-
     geomdata = {'$NHEX': core.NAss}
 
     if template is None:
-        path = os.path.abspath(InpTH.__file__)
-        path = os.path.join(path.split("InpTH.py")[0], "template_THinput.dat")
+        tmp = pkg_resources.read_text(templates, 'template_THinput.dat')
+        tmp = tmp.splitlines()
     else:
-        path = template
+        with open(template, 'r') as f:
+            temp_contents = f.read()
+            tmp = temp_contents. splitlines()
 
-    with open(path) as tmp:  # open reference file
-        f = io.open("input.dat", 'w', newline='\n')
-        # with open() as f:  # open new file
-        for line in tmp:  # loop over lines in reference file
-            for key, val in geomdata.items():  # loop over dict keys
-                if key in line:
-                    line = line.replace(key, str(val))
+    f = io.open("input.dat", 'w', newline='\n')
+
+    for line in tmp:  # loop over lines in reference file
+        for key, val in geomdata.items():  # loop over dict keys
+            if key in line:
+                line = line.replace(key, str(val))
             # write to file
             f.write(line)
+            f.write('\n')
 
 
 def writeTHdata(core, template=None):
@@ -136,12 +141,6 @@ def writeTHdata(core, template=None):
     -------
     ``None``
     """
-    if template is None:
-        path = os.path.abspath(InpTH.__file__)
-        path = os.path.join(path.split("InpTH.py")[0], "template_HA_01_01.dat")
-    else:
-        path = template
-
     for nchan, chan in core.THassemblytypes.items():
         # loop over time
         for nt, t in enumerate(core.THtime):
@@ -153,13 +152,21 @@ def writeTHdata(core, template=None):
             # --- print one file per each TH channel type
             newline = "IHA = %s, !int id number for HAs of this type" % which
             # open reference file
-            with open(path) as tmp:
-                # open new file
-                f = io.open('HA_%02d_%02d.dat' % (nchan, nt+1), 'w',
-                            newline='\n')
-                # loop over lines in reference file
-                for line in tmp:
-                    if "IHA" in line:
-                        line = line.replace(line, newline)
-                    # write to file
-                    f.write(line)
+            if template is None:
+                tmp = pkg_resources.read_text(templates, 'template_HA_01_01.dat')
+                tmp = tmp.splitlines()
+            else:
+                with open(template, 'r') as f:
+                    temp_contents = f.read()
+                    tmp = temp_contents. splitlines()
+
+            # open new file
+            f = io.open('HA_%02d_%02d.dat' % (nchan, nt+1), 'w',
+                        newline='\n')
+            # loop over lines in reference file
+            for line in tmp:
+                if "IHA" in line:
+                    line = line.replace(line, newline)
+                # write to file
+                f.write(line)
+                f.write('\n')

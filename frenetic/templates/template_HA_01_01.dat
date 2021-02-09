@@ -1,5 +1,6 @@
 &COMMONS
 IHA = 1, ![] - integer number of the HAs of this type
+
 /
 
 &NEUTRONIC

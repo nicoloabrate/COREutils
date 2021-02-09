@@ -36,8 +36,12 @@ def parse(inp):
 
     # parse .json file
     with open(inp) as f:
+
         try:
             inp = json.load(f)
+        except json.JSONDecodeError as err:
+            print(err.args[0])
+            raise OSError(err.args[0]+' in %s' % inp)
         except FileNotFoundError:
             raise OSError("File %s is missing!" % inp)
 
@@ -61,9 +65,6 @@ def parse(inp):
 
             if inp['NE']['shape'] != inp['TH']['shape']:
                 raise OSError('NE and TH shape must be equal! Check .json!')
-
-    else:
-        raise OSError('Something is wrong with the input .json file!')
 
     return NEargs, THargs
 

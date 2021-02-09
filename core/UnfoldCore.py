@@ -78,7 +78,7 @@ class UnfoldCore:
         try:
             coremap = coremap.astype(np.int)
         except ValueError:
-            raise('Check all entries in NE.txt file match with assemblynames')
+            raise OSError('Check input .txt entries match with assemblynames')
         coremap0 = coremap+0  # input
         # check negative entries
         if np.sum(coremap == -1) > 0:

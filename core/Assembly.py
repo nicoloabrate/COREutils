@@ -187,6 +187,7 @@ class AxialCuts:
                     all(lo[i] >= lo[i+1] for i in range(len(lo) - 1)))
 
         if checkupz is False or checkloz is False:
-            raise OSError('Axial coordinates are not monotonic!')
+            raise OSError('Axial coordinates are not monotonic!' +
+                          ' Check cuts or translation dz.')
 
         self.upz, self.loz, self.reg = up, lo, r

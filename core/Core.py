@@ -239,9 +239,13 @@ class Core:
             # check core configuration
             if config is not None:
                 for time in config.keys():
-                    t = float(time)
-                    # increment time list
-                    self.NEtime.append(t)
+                    if time != '0':
+                        t = float(time)
+                        # increment time list
+                        self.NEtime.append(t)
+                    else:
+                        # set initial condition
+                        t = 0
 
                     # check operation
                     if "translate" in config[time]:
@@ -258,9 +262,12 @@ class Core:
             if THdata is not None and "replace" in THdata.keys():
                 # loop over assembly types
                 for k, v in THdata["replace"].items():
-                    THcore = self.replace(THassemblynames[k], v, THfren,
-                                          THcore)
-
+                    try:
+                        THcore = self.replace(THassemblynames[k], v, THfren,
+                                              THcore)
+                    except KeyError:
+                        raise OSError("%s not present in TH assembly types!"
+                                      % k)
             # TH configuration
             self.THtime = [0]
             self.THconfig = {}
@@ -270,8 +277,12 @@ class Core:
             if isinstance(CZreplace, dict):
                 # loop over assembly types
                 for k, v in CZreplace.items():
-                    CZcore = self.replace(CZassemblynames[k], v, THfren,
-                                          CZcore)
+                    try:
+                        CZcore = self.replace(CZassemblynames[k], v, THfren,
+                                              CZcore)
+                    except KeyError:
+                        raise OSError("%s not present in CZ assembly types!"
+                                      % k)
             else:
                 if CZreplace is not None:
                     raise OSError("'replace' in TH must be of type dict!")
@@ -497,33 +508,38 @@ class Core:
                 now = self.NEtime[nt-1]
 
             for dz, which in zip(transconfig['dz'], transconfig['which']):
-                for assbly in which:
-                    atype = self.getassemblytype(assbly, flagfren=flagfren,
-                                                 time=now,
-                                                 whichconf="NEconfig")
-                    what = self.NEassemblytypes[atype]
-                    newname = "%st%sz%d" % (what, time, dz)
-                    # define new cuts, if any
-                    if newname not in self.NEAxialConfig.cuts.keys():
-                        cuts = deepcopy(self.NEAxialConfig.cuts[what])
-                        cuts.upz[0:-1] = [z+dz for z in cuts.upz[0:-1]]
-                        cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]
-                        nass = len(self.NEassemblytypes.keys())
-                        self.NEassemblytypes[nass + 1] = newname
-                        upz, loz, reg = cuts.upz, cuts.loz, cuts.reg
-                        self.NEAxialConfig.cuts[newname] = AxialCuts(upz, loz,
-                                                                     reg)
+                # repeat configuration if dz = 0
+                if dz != 0:
+                    for assbly in which:
+                        atype = self.getassemblytype(assbly, flagfren=flagfren,
+                                                     time=now,
+                                                     whichconf="NEconfig")
+                        what = self.NEassemblytypes[atype]
+                        newname = "%st%sz%d" % (what, time, dz)
+                        # define new cuts, if any
+                        if newname not in self.NEAxialConfig.cuts.keys():
+                            cuts = deepcopy(self.NEAxialConfig.cuts[what])
+                            cuts.upz[0:-1] = [z+dz for z in cuts.upz[0:-1]]
+                            cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]
+                            nass = len(self.NEassemblytypes.keys())
+                            self.NEassemblytypes[nass + 1] = newname
+                            upz, loz, reg = cuts.upz, cuts.loz, cuts.reg
+                            self.NEAxialConfig.cuts[newname] = AxialCuts(upz, loz,
+                                                                         reg)
 
-                    # replace assembly
-                    if newcore is None:
-                        # take previous time-step configuration
-                        newcore = self.replace(nass+1, assbly,
-                                               flagfren=flagfren,
-                                               core=self.NEconfig[now])
-                    else:
-                        # take "newcore"
-                        newcore = self.replace(nass+1, assbly, flagfren,
-                                               newcore)
+                        # replace assembly
+                        if newcore is None:
+                            # take previous time-step configuration
+                            newcore = self.replace(nass+1, assbly,
+                                                   flagfren=flagfren,
+                                                   core=self.NEconfig[now])
+                        else:
+                            # take "newcore"
+                            newcore = self.replace(nass+1, assbly, flagfren,
+                                                   newcore)
+
+                else:
+                    newcore = self.NEconfig[now]
 
             self.NEconfig[float(time)] = newcore
 
@@ -657,11 +673,11 @@ class Core:
 
         """
         if whichconf == "NEconfig":
-            asstypes = self.NEconfig[time].flatten(order='F')
+            asstypes = self.NEconfig[time].flatten(order='C')
         elif whichconf == "THconfig":
-            asstypes = self.THconfig[time].flatten(order='F')
+            asstypes = self.THconfig[time].flatten(order='C')
         elif whichconf == "CZconfig":
-            asstypes = self.CZconfig[time].flatten(order='F')
+            asstypes = self.CZconfig[time].flatten(order='C')
         else:
             raise OSError("Unknown core config!")
 

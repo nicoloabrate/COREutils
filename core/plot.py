@@ -382,7 +382,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         if mycuts is True:
             for myz in core.NEAxialConfig.mycuts:
                 plt.hlines(myz*scale, (x-L/2)*scale, (x+L/2)*scale,
-                           linestyles='dashed', linewidth=1, ec='k')
+                           linestyles='dashed', linewidth=1, edgecolor='k')
 
     ax.axis('equal')
     plt.axis('off')
