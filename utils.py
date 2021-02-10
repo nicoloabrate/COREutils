@@ -110,6 +110,11 @@ def __parseNE(NEinp):
     else:
         raise OSError("Core assembly names are missing!")
 
+    if 'assemblylabel' in NEinp.keys():
+        assemblylabel = NEinp['assemblylabel']
+    else:
+        assemblylabel = None
+
     if 'rotation' in NEinp.keys():
         rotation = NEinp['rotation']
     else:
@@ -153,8 +158,8 @@ def __parseNE(NEinp):
     else:
         NEdata = None
 
-    NEargs = [geinp, rotation, pitch, shape, assemblynames, replace, cuts,
-              config, fren, regionslegendplot, NEdata]
+    NEargs = [geinp, rotation, pitch, shape, assemblynames, assemblylabel,
+              replace, cuts, config, fren, regionslegendplot, NEdata]
 
     return NEargs
 

@@ -75,6 +75,7 @@ class Core:
 
     def __init__(self, inpjson):
 
+        isNE, isTH = False, False
         # -- parse input file
         if ".json" in inpjson:
 
@@ -82,9 +83,9 @@ class Core:
 
             # check if NEargs is not empty
             if NEargs is not None:
-                [NEinp, NErotation, pitch, shape, NEassemblynames,
-                 NEreplace, cuts, config, NEfren, NEregionslegendplot,
-                 NEdata] = NEargs
+                [NEinp, NErotation, pitch, shape, NEassemblynames, 
+                 NEassemblylabel, NEreplace, cuts, config, NEfren, 
+                 NEregionslegendplot, NEdata] = NEargs
                 isNE = True
 
             # check if THargs is not empty
@@ -97,6 +98,11 @@ class Core:
 
         else:
             raise OSError("Input file must be in .json format!")
+
+        if isNE is False:
+            print('NE input not available, writing TH input only!')
+        if isTH is False:
+            print('TH input not available, writing NE input only!')
 
         # initialise assembly radial geometry object
         self.AssemblyGeom = AssemblyGeometry(pitch, shape)  # module indep.
@@ -116,6 +122,11 @@ class Core:
             self.NEassemblytypes = OrderedDict(dict(zip(assnum,
                                                         NEassemblynames)))
 
+            if NEassemblylabel is not None:
+                self.NEassemblylabel = OrderedDict(dict(zip(assnum,
+                                                    NEassemblylabel)))
+            else:
+                self.NEassemblylabel = self.NEassemblytypes
             # define NE core with assembly types
             tmp = UnfoldCore(NEinp, NErotation, NEassemblynames)
             NEcore = tmp.coremap

@@ -211,8 +211,14 @@ def makecommoninput(core, template=None):
     # join strings
     NL = ','.join(NL)
 
+    try:
+        NDIFF = len(core.THassemblytypes)
+    except AttributeError:
+        NDIFF = len(core.NEassemblytypes)
+        print('Warning: NDIFF variable set equal to the number of NE assemblies')
+
     geomdata = {'$NH': core.NAss, '$NR': NR, '$NL': NL,
-                '$NDIFF': len(core.THassemblytypes)}
+                '$NDIFF': NDIFF}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_common_input.dat')

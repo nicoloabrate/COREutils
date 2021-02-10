@@ -17,8 +17,6 @@ freefem/utils.py
 frenetic/InpGen.py
 frenetic/InpNE.py
 frenetic/InpTH.py
-frenetic/NEInpGen.py
 frenetic/ParseFrenOut.py
-frenetic/THInpGen.py
 frenetic/__init__.py
-frenetic/devel.py
+frenetic/templates/__init__.py

@@ -6,6 +6,7 @@ File: plot.py
 Description: Class for plotting reactor data, physical quantities and geometry.
 """
 import numpy as np
+from collections import OrderedDict
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
@@ -19,7 +20,7 @@ from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
                    dictname=None, figname=None, fren=False, which=None,
                    asstype=False, usetex=False, fill=True, xlabel=None,
-                   ylabel=None, title=None, scale=1, **kwargs):
+                   ylabel=None, title=None, scale=1, legend=False, **kwargs):
     """
     Plot core geometry on the x-y plane.
 
@@ -52,6 +53,9 @@ def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
         Plot title. The default is ``None``.
     scale : float, optional
         Geometry scaling factor. The default is 1.
+    legend : bool, optional
+        Legend flag. If ``True``, the legend is plotted. The default is 
+        ``False``.        
     **kwargs :
         KeyWord optional arguments for plotting.
 
@@ -161,10 +165,13 @@ def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
         coord = (x*scale, y*scale)
         # select color
         col = asscol[typelabel[key-1, 0]]
+        # get type
+        atype = core.getassemblytype(key, time=time)
         # define assembly patch
         asspatch = RegularPolygon(coord, core.AssemblyGeom.numedges, L*scale,
                                   orientation=orientation, color=col,
-                                  fill=fill, **kwargs)
+                                  fill=fill, label=core.NEassemblylabel[atype], 
+                                  **kwargs)
         ax.add_patch(asspatch)
 
     # add labels on top of the polygons
@@ -207,6 +214,14 @@ def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
 
     plt.title(title)
 
+    # add legend, if any
+    if legend is True:
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = OrderedDict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), 
+                   bbox_to_anchor=(0.85, 1), loc='best',
+                   framealpha=1)
+
     # save figure
     if figname is not None:
         fig.savefig(figname, bbox_inches='tight', dpi=250)
@@ -214,7 +229,8 @@ def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
 
 def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                   figname=None, fren=False, asstype=False, usetex=False,
-                  fill=True, mycuts=False, title=None, scale=1, **kwargs):
+                  fill=True, mycuts=False, title=None, scale=1, floating=False,
+                  legend=False, **kwargs):
     """
     Plot core geometry on the x-z or y-z plane for NEutronics configuration.
 
@@ -251,6 +267,13 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         Plot title. The default is ``None``.
     scale : float, optional
         Geometry scaling factor. The default is 1.
+    floating : bool, optional
+        Floating object flag. If ``True``, the assemblies are plotted without
+        taking into account their position inside the core. 
+        The default is ``False``.
+    legend : bool, optional
+        Legend flag. If ``True``, the legend is plotted. The default is 
+        ``False``.
     **kwargs :
         KeyWord optional arguments for plotting.
 
@@ -334,26 +357,42 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         tmp = list((core.serpcentermap).keys())
         which = [tmp[k] for k in which]
 
+    idx = 0
+    labels = []
+    xlo, xup = np.inf, 0
+    ylo, yup = np.inf, 0
     for key, coord in (core.Map.serpcentermap).items():
         # check key is in which list
         if key not in which:
             continue
-        x, y = coord
+        if floating is False:
+            x, y = coord
+        else:
+            idx = idx + 2*L
+            x, y = idx, None
+        
         # parse axial coordinates
         asstype = core.NEassemblytypes[core.getassemblytype(key, time=time)]
         loz = np.asarray(core.NEAxialConfig.cuts[asstype].loz)
         upz = np.asarray(core.NEAxialConfig.cuts[asstype].upz)
         reg = np.asarray(core.NEAxialConfig.cuts[asstype].reg)
         deltaz = upz-loz
-
         for iz, dz in enumerate(deltaz):
             # scale coordinate
             coord = ((x-L/2)*scale, loz[iz]*scale)
+            # update ax limits
+            xlo = coord[0] if coord[0] < xlo else xlo 
+            ylo = coord[1] if coord[1] < ylo else ylo 
+            xup = coord[0] if coord[0] > xup else xup 
+            yup = coord[1] if coord[1] > yup else yup 
             # select color
             reglabel = core.NEregionslegendplot[reg[iz]]
             col = asscol[reglabel]
+            if reglabel not in labels:
+                labels.append(reglabel)
             # define assembly patch
-            asspatch = Rectangle(coord, L, dz, color=col, fill=fill, **kwargs)
+            asspatch = Rectangle(coord, L, dz, color=col, fill=fill,
+                                 label=reglabel, **kwargs)
             ax.add_patch(asspatch)
 
             if dictname is None:
@@ -385,8 +424,19 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                            linestyles='dashed', linewidth=1, edgecolor='k')
 
     ax.axis('equal')
+    # recompute the ax.dataLim
+    plt.xlim(xlo, xup)
+    plt.ylim(ylo, yup)
     plt.axis('off')
     plt.title(title)
+    plt.tight_layout()
+    # add legend, if any
+    if legend is True:
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = OrderedDict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), 
+                   bbox_to_anchor=(0.8, 1), loc='best',
+                   framealpha=1)
 
     # save figure
     if figname is not None:
