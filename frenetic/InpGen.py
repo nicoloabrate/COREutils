@@ -225,7 +225,8 @@ def makecommoninput(core, template=None):
         print('Warning: NDIFF variable set equal to the number of NE assemblies')
 
     data = {'$NH': core.NAss, '$NR': NR, '$NL': NL, '$NDIFF': NDIFF, 
-            '$TEND': core.TimeEnd, '$ISNETH': isNETH}
+            '$TEND': core.TimeEnd, '$ISNETH': isNETH, 
+            '$PITCH': core.AssemblyGeom.pitch/100}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_common_input.dat')
@@ -240,7 +241,7 @@ def makecommoninput(core, template=None):
     for line in tmp:  # loop over lines in reference file
         for key, val in data.items():  # loop over dict keys
             if key in line:
-                if key == '$TEND':
+                if key in ['$TEND', '$PITCH']:
                    val = ff(val, 'double')
                 else:
                    val = str(val)

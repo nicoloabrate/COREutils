@@ -10,7 +10,7 @@ HOSTNAME	= 127.0.0.1, !host name of the pc where TISC is running
 &COREGEO
 NCHAN	= $NH,	                      !# of exagonal channels
 NDIFF	= $NDIFF,
-HEXPITCH = 0.1685d+00,            ![m] lattice pitch of hexagonal mesh
+HEXPITCH = $PITCH,               ![m] lattice pitch of hexagonal mesh
 LEXAG	= $NH*0.0912d0,             ![m] side length of hexagon
 NR = $NR,	                        ![] # of rows in a sextant
 NL = $NL,             	          ![] # of hexagons in each row of a sextant (including the central hexagon)
