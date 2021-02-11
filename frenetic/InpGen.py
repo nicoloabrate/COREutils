@@ -213,7 +213,7 @@ def makecommoninput(core, template=None):
     NL = ','.join(NL)
 
     # check if coupled calculation is possible
-    if any([i in core.__dict__.keys() for i in ['THconfig', 'NEconfig']]):
+    if all([i in core.__dict__.keys() for i in ['THconfig', 'NEconfig']]):
         isNETH = 2
     else:
         isNETH = 0

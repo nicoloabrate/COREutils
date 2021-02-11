@@ -435,7 +435,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         handles, labels = plt.gca().get_legend_handles_labels()
         by_label = OrderedDict(zip(labels, handles))
         plt.legend(by_label.values(), by_label.keys(), 
-                   bbox_to_anchor=(0.8, 1), loc='best',
+                   bbox_to_anchor=(0.8, 1), loc='upper left',
                    framealpha=1)
 
     # save figure

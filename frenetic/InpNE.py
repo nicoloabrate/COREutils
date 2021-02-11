@@ -73,18 +73,18 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
     f.write('NDHP = %d \n' % 1)
     f.write('NGRP = %d \n' % 0)
     f.write('NPRP = %d \n' % 0)
-    f.write('/ \n \n')
+    f.write('/\n\n')
     f.write('&MACROXS\n')
     f.write('IRHO = 0,\n')
     f.write('VELOC0(1:%d) = ' % NG)
 
     for igro in range(0, NG):
-        f.write('%s, ' % ff(vel[igro], 'double'))
+        f.write('%s,' % ff(vel[igro], 'double'))
 
     f.write('\nLAMBDA0(1:%d) = ' % NP)
 
     for iprec in range(0, NP):
-        f.write('%s, ' % ff(lambda0[iprec], 'double'))
+        f.write('%s,' % ff(lambda0[iprec], 'double'))
 
     f.write(' \nlambdadhp0(1:1) = 1.000000d+00,\n')
     f.write('betadhp0(1:1) = 0.000000d+00,\n')
@@ -93,7 +93,7 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
     f.write('ISIGF(1:%d) = %d*2,\n' % (nmix, nmix))
     f.write('TEMPFUEL0 =	 %s,\n' % ff(Tf, 'double'))
     f.write('TEMPCOOL0 =	 %s,\n' % ff(Tc, 'double'))
-    f.write('ISIGS(1:%d) = %d*2,\n\n' % (nmix, nmix))
+    f.write('ISIGS(1:%d) = %d*2,\n' % (nmix, nmix))
 
     for imix in range(0, nmix):
 
@@ -107,12 +107,12 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
             imixF = 0
 
         # write universe number and name
-        f.write('!Universe %d belongs to %s\n' % (imix+1, u))
+        f.write('\n!Universe %d belongs to %s\n' % (imix+1, u))
 
         # write kinetic and spectrum parameters
         f.write('CHIT0(%d,1:%d) = ' % (imix+1, NG))
         for igro in range(0, NG):
-            f.write('%s, ' % ff(chit[imixF, igro], 'double'))
+            f.write('%s,' % ff(chit[imixF, igro], 'double'))
 
         for igro in range(0, NG):
             v = chid[imixF, igro]
@@ -150,7 +150,7 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
                 f.write('\n')
 
     # write namelist end
-    f.write('/')
+    f.write('/\n')
 
 
 def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
