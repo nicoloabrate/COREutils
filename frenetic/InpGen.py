@@ -13,6 +13,7 @@ import numpy as np
 from shutil import move, copyfile
 from os.path import join
 from . import templates
+from ..utils import fortranformatter as ff
 from .InpTH import writeTHdata, writeCZdata, makeTHinput
 from .InpNE import writeConfig, makeNEinput, writemacro, writeNEdata
 try:
@@ -30,10 +31,12 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
     ----------
     core : obj
         Core object created with Core class.
+    json : str
+        Name of the ``.json`` input file.
     casename : str, optional
         File path where the case directory is located. Default is ``None``.
         In this case, the name of the FRENETIC case is 'case1'.
-    template : dict, optional
+    templates : dict, optional
         File path where the template files are located. Default is ``None``.
         In this case, the default template is used.
     txtfmt : bool, optional
@@ -52,9 +55,6 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
         json = "%s.json" % json
 
     casepath = mkdir(casename)
-    # pwd = os.path.abspath(inpTH.__file__)
-    # pwd = pwd.split("InpTH.py")[0]
-    # copy global input (.json)
     copyfile('%s' % json, join(casepath, '%s' % json))
 
     templateTH, templateCZ, templateCI, templateNE = None, None, None, None
@@ -193,7 +193,8 @@ def makecommoninput(core, template=None):
     template : str, optional
         File path where the template file is located. Default is ``None``.
         In this case, the default template is used.
-
+    tEnd : float, optional
+        Final time instant for FRENETIC simulation. Default is ``None``.
     Returns
     -------
     ``None``
@@ -211,14 +212,20 @@ def makecommoninput(core, template=None):
     # join strings
     NL = ','.join(NL)
 
+    # check if coupled calculation is possible
+    if any([i in core.__dict__.keys() for i in ['THconfig', 'NEconfig']]):
+        isNETH = 2
+    else:
+        isNETH = 0
+
     try:
         NDIFF = len(core.THassemblytypes)
     except AttributeError:
         NDIFF = len(core.NEassemblytypes)
         print('Warning: NDIFF variable set equal to the number of NE assemblies')
 
-    geomdata = {'$NH': core.NAss, '$NR': NR, '$NL': NL,
-                '$NDIFF': NDIFF}
+    data = {'$NH': core.NAss, '$NR': NR, '$NL': NL, '$NDIFF': NDIFF, 
+            '$TEND': core.TimeEnd, '$ISNETH': isNETH}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_common_input.dat')
@@ -231,9 +238,14 @@ def makecommoninput(core, template=None):
     f = io.open('common_input.dat', 'w', newline='\n')
 
     for line in tmp:  # loop over lines in reference file
-        for key, val in geomdata.items():  # loop over dict keys
+        for key, val in data.items():  # loop over dict keys
             if key in line:
-                line = line.replace(key, str(val))
+                if key == '$TEND':
+                   val = ff(val, 'double')
+                else:
+                   val = str(val)
+                
+                line = line.replace(key, val)
         # write to file
         f.write(line)
         f.write('\n')

@@ -1,7 +1,7 @@
 &CONTROL
 IRUN = $NRUN,		            !run type (0=initialisation; 1=static; 2=transient)
-NCONF	= $NCONFIG,		          !number of system configurations during transient
-POWER	= 300.00000D+06,	![W] total thermal power (if ISYST.EQ.0)
+NCONF	= $NCONFIG,		        !number of system configurations during transient
+POWER	= $POW,	            ![W] total thermal power (if ISYST.EQ.0)
 !path with NE_data.h5 file
 NH5INP = $NH5INP,
 !file which contains the macroscopic cross sections input
@@ -72,12 +72,12 @@ RLXTMP=0.1,               !Relaxation factor for received temperature distributi
 /
 
 &OUTPUT0
-NPROF = 50,               !number of times at which phase space dependent output is requested
+NPROF = $NPROF,               !number of times at which phase space dependent output is requested
 /
 
 &OUTPUT
 !Times at which phase space dependent output is requested
-TPROF = 0.0d0, 10.0d0, 20.0d0, 30.0d0, 40.0d0, 50.0d0, 100.0d0, 150.0d0, 200.0d0, 300.0d0,
+TPROF = $TPROF,
 IOFLUXDP = 0,     !
 IOFLUXAP = 0,     !
 IOPRECUP = 0,     !

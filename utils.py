@@ -26,6 +26,8 @@ def parse(inp):
 
     Returns
     -------
+    CIargs : list
+        List of CI module arguments.
     NEargs : list
         List of NE module arguments.
     THargs : list
@@ -52,21 +54,69 @@ def parse(inp):
     if isinstance(inp, dict):
 
         # check NE/PH and TH namelists
+        if 'CI' in inp.keys():
+            CIargs = __parseCI(inp['CI'])
+        else:
+            raise OSError('CI input part is missing in .json file!')
+
         if 'NE' in inp.keys():
             NEargs = __parseNE(inp['NE'])
 
         if 'TH' in inp.keys():
             THargs = __parseTH(inp['TH'])
 
-        # input sanity check
-        if THargs is not None and NEargs is not None:
-            if inp['NE']['pitch'] != inp['TH']['pitch']:
-                raise OSError('NE and TH pitch must be equal! Check .json!')
+    return CIargs, NEargs, THargs
 
-            if inp['NE']['shape'] != inp['TH']['shape']:
-                raise OSError('NE and TH shape must be equal! Check .json!')
 
-    return NEargs, THargs
+def __parseCI(CIinp):
+    """
+    Parse CI input from .json dict.
+
+    Parameters
+    ----------
+    CIinp : dict
+        CI input.
+
+    Raises
+    ------
+    OSError
+        Missing mandatory arguments.
+
+    Returns
+    -------
+    NEargs : list
+        List of arguments.
+
+    """
+    # check mandatory arguments
+    if 'tEnd' in CIinp.keys():
+        tEnd = CIinp['tEnd']
+    else:
+        raise OSError("No final simulation time is provided in CI!")
+
+    if 'nProf' in CIinp.keys():
+        nProf = CIinp['nProf']
+    else:
+        raise OSError("No number of time profiles is provided in CI!")
+
+    if 'pitch' in CIinp.keys():
+        pitch = CIinp['pitch']
+    else:
+        raise OSError("Core pitch is missing in CI!")
+
+    if 'shape' in CIinp.keys():
+        shape = CIinp['shape']
+    else:
+        raise OSError("Assembly shape is missing in CI!")
+
+    if 'power' in CIinp.keys():
+        power = CIinp['power']
+    else:
+        power = None
+
+    CIargs = [tEnd, nProf, pitch, shape, power]
+
+    return CIargs
 
 
 def __parseNE(NEinp):
@@ -94,16 +144,6 @@ def __parseNE(NEinp):
         geinp = NEinp['filename']
     else:
         raise OSError("No core geometry input file is provided!")
-
-    if 'pitch' in NEinp.keys():
-        pitch = NEinp['pitch']
-    else:
-        raise OSError("Core pitch is missing!")
-
-    if 'shape' in NEinp.keys():
-        shape = NEinp['shape']
-    else:
-        raise OSError("Assembly shape is missing!")
 
     if 'assemblynames' in NEinp.keys():
         assemblynames = NEinp['assemblynames']
@@ -158,7 +198,7 @@ def __parseNE(NEinp):
     else:
         NEdata = None
 
-    NEargs = [geinp, rotation, pitch, shape, assemblynames, assemblylabel,
+    NEargs = [geinp, rotation, assemblynames, assemblylabel,
               replace, cuts, config, fren, regionslegendplot, NEdata]
 
     return NEargs
@@ -194,16 +234,6 @@ def __parseTH(THinp):
 
         else:
             raise OSError("No core cooling zones input file is provided!")
-
-    if 'pitch' in THinp.keys():
-        pitch = THinp['pitch']
-    else:
-        raise OSError("Core pitch is missing!")
-
-    if 'shape' in THinp.keys():
-        shape = THinp['shape']
-    else:
-        raise OSError("Assembly shape is missing!")
 
     if 'rotation' in THinp.keys():
         rotation = THinp['rotation']
@@ -255,7 +285,7 @@ def __parseTH(THinp):
     else:
         bcs = None
 
-    THargs = [geinp, rotation, pitch, shape, cznames, replace, fren,
+    THargs = [geinp, rotation, cznames, replace, fren,
               bcs, mflow, temperatures, pressures, THdata]
 
     return THargs
@@ -299,3 +329,28 @@ def uncformat(data, std, fmtn=".5e", fmts=None):
         outapp(fmt.format(d, s))
 
     return out
+
+
+def fortranformatter(value, type):
+    """
+    Convert python format to Fortran-wise format.
+
+    Parameters
+    ----------
+    value : int or float
+        Value to be converted.
+    type : str
+        Value output type.
+
+    Returns
+    -------
+    str
+        Output string.
+
+    """
+    if type == 'int':
+        return "%d" % int(value)
+    elif type == 'float':
+        return ("%.10e" % value)
+    elif type == 'double':
+        return ("%.10e" % value).replace('e', 'd')

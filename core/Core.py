@@ -79,11 +79,13 @@ class Core:
         # -- parse input file
         if ".json" in inpjson:
 
-            NEargs, THargs = parse(inpjson)
+            CIargs, NEargs, THargs = parse(inpjson)
+
+            tEnd, nProf, pitch, shape, power = CIargs
 
             # check if NEargs is not empty
             if NEargs is not None:
-                [NEinp, NErotation, pitch, shape, NEassemblynames, 
+                [NEinp, NErotation, NEassemblynames, 
                  NEassemblylabel, NEreplace, cuts, config, NEfren, 
                  NEregionslegendplot, NEdata] = NEargs
                 isNE = True
@@ -91,7 +93,7 @@ class Core:
             # check if THargs is not empty
             if THargs is not None:
                 # pitch and shape may be overwritten but they are equal
-                [CZinp, THrotation, pitch, shape, CZassemblynames,
+                [CZinp, THrotation, CZassemblynames,
                  CZreplace, THfren, bcs, mflow, temperatures, pressures,
                  THdata] = THargs
                 isTH = True
@@ -106,6 +108,20 @@ class Core:
 
         # initialise assembly radial geometry object
         self.AssemblyGeom = AssemblyGeometry(pitch, shape)  # module indep.
+       
+        # assign power, if any
+        if power is not None:
+            self.power = power
+        # assign time information
+        self.TimeEnd = tEnd 
+
+        if isinstance(nProf, (float, int)):
+            dt = np.ceil(tEnd/nProf)
+            self.TimeProf = np.arange(0, tEnd, dt)
+        elif isinstance(nProf, list) and len(nProf) > 1:
+            self.TimeProf = nProf
+        else:
+            raise OSError('nProf in .json file must be list, float or int!')
 
         if isNE:
             # store legend plot

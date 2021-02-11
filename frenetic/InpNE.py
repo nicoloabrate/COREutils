@@ -12,6 +12,7 @@ from shutil import rmtree
 import numpy as np
 import h5py as h5
 from . import templates
+from ..utils import fortranformatter as ff
 try:
     import importlib.resources as pkg_resources
 except ImportError:
@@ -78,20 +79,20 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
     f.write('VELOC0(1:%d) = ' % NG)
 
     for igro in range(0, NG):
-        f.write('%1.6e, ' % vel[igro])
+        f.write('%s, ' % ff(vel[igro], 'double'))
 
     f.write('\nLAMBDA0(1:%d) = ' % NP)
 
     for iprec in range(0, NP):
-        f.write('%1.6e, ' % lambda0[iprec])
+        f.write('%s, ' % ff(lambda0[iprec], 'double'))
 
-    f.write(' \nlambdadhp0(1:1) = 1.000000e+00,\n')
-    f.write('betadhp0(1:1) = 0.000000e+00,\n')
+    f.write(' \nlambdadhp0(1:1) = 1.000000d+00,\n')
+    f.write('betadhp0(1:1) = 0.000000d+00,\n')
     f.write('IDIFF(1:%d) = %d*2,\n' % (nmix, nmix))
     f.write('ISIGT(1:%d) = %d*2,\n' % (nmix, nmix))
     f.write('ISIGF(1:%d) = %d*2,\n' % (nmix, nmix))
-    f.write('TEMPFUEL0 =	 %1.6e,\n' % Tf)
-    f.write('TEMPCOOL0 =	 %1.6e,\n' % Tc)
+    f.write('TEMPFUEL0 =	 %s,\n' % ff(Tf, 'double'))
+    f.write('TEMPCOOL0 =	 %s,\n' % ff(Tc, 'double'))
     f.write('ISIGS(1:%d) = %d*2,\n\n' % (nmix, nmix))
 
     for imix in range(0, nmix):
@@ -111,17 +112,17 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
         # write kinetic and spectrum parameters
         f.write('CHIT0(%d,1:%d) = ' % (imix+1, NG))
         for igro in range(0, NG):
-            f.write('%1.6e, ' % chit[imixF, igro])
+            f.write('%s, ' % ff(chit[imixF, igro], 'double'))
 
         for igro in range(0, NG):
-            f.write('\nCHID0(%d,%d,1:%d) = %d*%1.6e,' % (imix+1, igro+1,
-                                                         NP, NP,
-                                                         chid[imixF, igro]))
+            v = chid[imixF, igro]
+            f.write('\nCHID0(%d,%d,1:%d) = %d*%s,' % (imix+1, igro+1, NP, NP, 
+                                                      ff(v, 'double')))
         f.write('\n')
         imixF = imixF+1
         f.write('BETA0(%d,1:%d) = ' % (imix+1, NP))
         for iprec in range(0, NP):
-            f.write('%1.6e,' % (beta0[iprec]))
+            f.write('%s,' % ff(beta0[iprec], 'double'))
 
         f.write('\n')
         f.write('\n')
@@ -316,7 +317,7 @@ def writeConfig(core, NZ, Ntypes):
     for t in core.NEtime:  # loop over time
         # loop over cut
         for iz, z in enumerate(range(0, NZ)):
-            f.write('%1.6e ' % t)  # write time instant for each cut
+            f.write('%s ' % ff(t, 'double'))  # write time instant for each cut
             # write the type of assembly according to FRENETIC numeration
             for n in range(1, core.NAss+1):  # loop over all assemblies
                 whichtype = core.getassemblytype(n, time=t, flagfren=True,
@@ -360,7 +361,8 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
 
     geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,
                 '$MESHZ0': core.NEAxialConfig.mycuts, '$SPLITZ': [10]*NZ,
-                '$NCONFIG': nConfig, '$NRUN': nRun}
+                '$NCONFIG': nConfig, '$NRUN': nRun, '$POW': core.power,
+                '$NPROF': len(core.TimeProf), '$TPROF': core.TimeProf}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_NEinput.dat')
@@ -371,17 +373,23 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
             tmp = temp_contents. splitlines()
 
     f = io.open("input.dat", 'w', newline='\n')
-
-    # with open() as f:  # open new file
     for line in tmp:  # loop over lines in reference file
         for key, val in geomdata.items():  # loop over dict keys
             if key in line:
                 if key in ['$MESHZ0', '$SPLITZ']:
                     val = [str(v) for v in val]
                     val = "%s" % ",".join(val)
-                    line = line.replace(key, val)
+                elif key == '$TPROF':
+                    tProf = [ff(t, 'double') for t in val]
+                    val = ','.join(tProf)
+                elif key == '$POW':
+                    val = ff(val, 'double')
                 else:
-                    line = line.replace(key, str(val))
+                    val = str(val)
+
+                # write to file
+                line = line.replace(key, val)
+
         # write to file
         f.write(line)
         f.write('\n')

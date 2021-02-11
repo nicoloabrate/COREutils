@@ -8,6 +8,7 @@ Description: Set of methods for generating FRENETIC input files.
 """
 import io
 from . import templates
+from ..utils import fortranformatter as ff
 try:
     import importlib.resources as pkg_resources
 except ImportError:
@@ -44,14 +45,14 @@ def writeCZdata(core):
     f.write("%d, \n" % len(core.CZtime))
     for t in core.CZtime:
         # loop over each assembly
-        mflow = ["%.6e" % t]
+        mflow = ["%s" % ff(t, 'double')]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
             whichtype = core.getassemblytype(n, flagfren=True,
                                              whichconf="CZconfig")
             whichtype = core.CZassemblytypes[whichtype]
             val = core.CZMaterialData.massflowrates[whichtype]
-            mflow.append("%.6e" % val)
+            mflow.append("%s" % ff(val, 'double'))
         # write to file
         f.write("%s \n" % ",".join(mflow))
 
@@ -60,14 +61,14 @@ def writeCZdata(core):
     f.write("%d, \n" % len(core.CZtime))
     for t in core.CZtime:
         # loop over each assembly
-        temp = ["%.6e" % t]
+        temp = ["%s" % ff(t, 'double')]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
             whichtype = core.getassemblytype(n, flagfren=True,
                                              whichconf="CZconfig")
             whichtype = core.CZassemblytypes[whichtype]
             val = core.CZMaterialData.temperatures[whichtype]
-            temp.append("%.6e" % val)
+            temp.append("%s" % ff(val, 'double'))
         # write to file
         f.write("%s \n" % ",".join(temp))
 
@@ -76,14 +77,14 @@ def writeCZdata(core):
     f.write("%d, \n" % len(core.CZtime))
     for t in core.CZtime:
         # loop over each assembly
-        press = ["%.6e" % t]
+        press = ["%s" % ff(t, 'double')]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
             whichtype = core.getassemblytype(n, flagfren=True,
                                              whichconf="CZconfig")
             whichtype = core.CZassemblytypes[whichtype]
             val = core.CZMaterialData.pressures[whichtype]
-            press.append("%.6e" % val)
+            press.append("%s" % ff(val, 'double'))
         # write to file
         f.write("%s \n" % ",".join(press))
 
@@ -104,7 +105,8 @@ def makeTHinput(core, template=None):
     -------
     ``None``
     """
-    geomdata = {'$NHEX': core.NAss}
+    geomdata = {'$NHEX': core.NAss, '$NPROF': len(core.TimeProf),
+                '$TPROF': core.TimeProf}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_THinput.dat')
@@ -119,10 +121,15 @@ def makeTHinput(core, template=None):
     for line in tmp:  # loop over lines in reference file
         for key, val in geomdata.items():  # loop over dict keys
             if key in line:
-                line = line.replace(key, str(val))
-            # write to file
-            f.write(line)
-            f.write('\n')
+                if key == '$TPROF':
+                    tProf = [ff(t, 'double') for t in val]
+                    val = ','.join(tProf)
+                else:
+                    val = str(val)
+                line = line.replace(key, val)
+        # write to file
+        f.write(line)
+        f.write('\n')
 
 
 def writeTHdata(core, template=None):

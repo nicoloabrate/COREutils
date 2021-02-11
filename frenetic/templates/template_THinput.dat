@@ -52,11 +52,9 @@ ITHIMB = 0, ![] BIB coupling model (1=Beta, 0=Alpha)
 
 &SENSOR
 !ITIMEPROF = 110*0,1*1,446*0,1*1,79*0,	![] Flag to turn on profile saving at time=timeprof for channel i
-NTIMEPROF	= 31,	![] Number of spatial profiles (length of vector TIMEPROF)
+NTIMEPROF	= $NPROF,	![] Number of spatial profiles (length of vector TIMEPROF)
 ![s] Times at which the spatial profiles are saved
-TIMEPROF = 0.0d0,10.0d0,20.d0,30.0d0,40.0d0,50.0d0,60.0d0,70.0d0,80.0d0,90.0d0,100.0d0,
- 	  			 110.0d0,120.0d0,130.d0,140.0d0,150.0d0,160.0d0,170.0d0,180.0d0,190.0d0,200.0d0,
- 	  			 210.0d0,220.0d0,230.0d0,240.d0,250.0d0,260.0d0,270.0d0,280.0d0,290.0d0,300.0d0,
+TIMEPROF = $TPROF,
 
 ![] Flag to turn on profile saving at time=timeprof for channel i
 ITIMEPROF	= 15*1,280*1,
