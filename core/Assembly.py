@@ -6,7 +6,7 @@ File: Assembly.py
 Description: This file contains classes for some typical assembly geometries
 in a nuclear fission reactor.
 """
-
+import numpy as np
 
 class AssemblyGeometry:
     """
@@ -129,7 +129,16 @@ class AxialConfig:
             for r1, u1, l1 in cuts:
                 rap(r1), uap(u1), lap(l1)
             self.cuts[asstype] = AxialCuts(up, lo, r)
-
+        self.AxNodes = np.zeros((sum(splitz), ))
+        # assign axial nodes coordinates
+        idx = 0
+        for iz in range(0, len(self.mycuts[1:])):
+            dz = (self.mycuts[iz+1]-self.mycuts[iz])/splitz[iz]
+            tmp = np.arange(self.mycuts[iz]+dz/2, self.mycuts[iz+1], dz)
+            ns = len(tmp)
+            self.AxNodes[idx:idx+ns] = tmp
+            idx = idx+ns
+        
 
 class AxialCuts:
     """

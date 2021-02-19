@@ -23,7 +23,7 @@ from matplotlib import rc
 # parametri, poi magari ci sara' il parsing dei file di input)
 
 
-class ParseFrenOut:
+class PostProcess:
     """
     Class to read profiles computed by FRENETIC.
     """
@@ -342,7 +342,256 @@ class ParseFrenOut:
         if figname is not None:
             fig.savefig(figname, bbox_inches='tight', dpi=500)
 
+    def RadialMap(self, core, what= time=0, label=False, dictname=None, figname=None,
+                  fren=False, which=None, what=None, asstype=False, usetex=False,
+                  fill=True, axes=None, cmap='Spectral_r', thresh=None,
+                  cbarLabel=None, xlabel=None, ylabel=None, loglog=None,
+                  logx=None, logy=None, title=None, scale=1, fmt="%.2f",
+                  numbers=False, **kwargs):
+        """
+        Plot FRENETIC output on the x-y plane.
+    
+        Parameters
+        ----------
+        label : TYPE, optional
+            DESCRIPTION. The default is False.
+        dictname : TYPE, optional
+            DESCRIPTION. The default is None.
+        figname : TYPE, optional
+            DESCRIPTION. The default is None.
+        fren : TYPE, optional
+            DESCRIPTION. The default is False.
+        which : TYPE, optional
+            DESCRIPTION. The default is None.
+        what : TYPE, optional
+            DESCRIPTION. The default is None.
+        usetex : TYPE, optional
+            DESCRIPTION. The default is False.
+        fill : TYPE, optional
+            DESCRIPTION. The default is True.
+        axes : TYPE, optional
+            DESCRIPTION. The default is None.
+        cmap : TYPE, optional
+            DESCRIPTION. The default is 'Spectral_r'.
+        thresh : TYPE, optional
+            DESCRIPTION. The default is None.
+        cbarLabel : TYPE, optional
+            DESCRIPTION. The default is None.
+        xlabel : TYPE, optional
+            DESCRIPTION. The default is None.
+        ylabel : TYPE, optional
+            DESCRIPTION. The default is None.
+        loglog : TYPE, optional
+            DESCRIPTION. The default is None.
+        logx : TYPE, optional
+            DESCRIPTION. The default is None.
+        logy : TYPE, optional
+            DESCRIPTION. The default is None.
+        title : TYPE, optional
+            DESCRIPTION. The default is None.
+        scale : TYPE, optional
+            DESCRIPTION. The default is 1.
+        fmt : TYPE, optional
+            DESCRIPTION. The default is "%.2f".
+        **kwargs : TYPE
+            DESCRIPTION.
+    
+        Raises
+        ------
+        IndexError
+            DESCRIPTION.
+        TypeError
+            DESCRIPTION.
+    
+        Returns
+        -------
+        None.
+    
+        """
+        # set default font and TeX interpreter
+        rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
+        rc('text', usetex=usetex)
+    
+        Nass = core.Map.type.size
+        # array of assembly type
+        typelabel = np.reshape(core.Config[time], (Nass, 1))
+        maxtype = int(max(typelabel))
+        coretype = range(0, maxtype+1)  # define
+    
+        kwargs.setdefault("ec", "k")
+        kwargs.setdefault("linewidth", 0.5)
+        kwargs.setdefault("lw", 0.5)
+        kwargs.setdefault("alpha", 1)
+        fontsize = kwargs.get("fontsize", 4)
+        # delete size from kwargs to use it in pathces
+        if 'fontsize' in kwargs:
+            del kwargs['fontsize']
+    
+        else:  # cont. <- if type(fill) is bool
+    
+            orientation = 0
+    
+            patches = []
+            patchesapp = patches.append
+            errbar = False
+            # check data type is correct
+            if type(what) is dict:
+                # check keys
+                if 'tallies' in what.keys():
+                    tallies = what['tallies']
+    
+                if 'errors' in what.keys():
+                    errors = what['errors']
+                    errbar = True
+    
+            elif type(what) is np.ndarray:
+                tallies = what
+                # check on data shape
+                try:
+                    # associate tallies to Serpent assemblies numeration
+                    Nx, Ny = tallies.shape
+                    assnum = np.arange(1, Nx*Ny+1)
+                    # flattening sq. or hex. lattice by rows
+                    tallies = dict(zip(assnum, tallies.flatten('C')))
+                except ValueError:
+                    # TODO (possible enhancement: plot ND array slicing)
+                    raise IndexError('Only 2D arrays are currently supported!')
+    
+            else:
+                raise TypeError('Data must be dict or numpy array!')
+    
+            # TODO: place these lines somewhere where tallies is array for automatic formatting
+            # peak = np.max(np.max(tallies))
+            # if abs(peak) > 999:
+            #     fmt = ".2e"
+            # else:
+            #     fmt = ".2f"
+    
+        # open figure
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+    
+        # check which variable
+        if which is None:
+            which = (core.Map.serpcentermap).keys()
+    
+        elif which is not None:
+            if fren is True:
+                which = [core.Map.fren2serp[k] for k in which]
+            # FIXME!
+            # else:
+            #     tmp = list((core.serpcentermap).keys())
+            #     which = [tmp[k] for k in which]
+    
+        for key, coord in (core.Map.serpcentermap).items():
+    
+            # check key is in which list
+            if key not in which:
+                continue
+    
+            x, y = coord
+            # scale coordinate
+            coord = (x*scale, y*scale)
 
+            # define assembly patch
+            asspatch = RegularPolygon(coord, core.AssemblyGeom.numedges, L*scale,
+                                      orientation=orientation, **kwargs)
+            patchesapp(asspatch)
+            # define value to be plotted
+            #if fren is False:  # Serpent numeration
+            # FIXME: per ora "valuesapp(tallies[key])" viene messo sotto per evitare che sia tutto disordinato
+            #valuesapp(tallies[key])
+            #else:  # Frenetic numeration
+               # keyF = core.serp2fren[key]
+               # valuesapp(tallies[keyF])
+    
+        # plot physics, if any
+        if physics is True:
+            # values = np.asarray(values)
+            patches = np.asarray(patches, dtype=object)
+            if which is None:
+                coord = np.array(list(core.Map.serpcentermap.values()))
+            else:
+                coord, values = [], []
+                for k in which:
+                    coord.append(core.Map.serpcentermap[k])
+                    values.append(tallies[k])
+    
+                coord = np.asarray(coord)
+                values = np.asarray(values)
+    
+            normalizer = normalizerFactory(values, None, False, coord[:, 0]*scale,
+                                           coord[:, 1]*scale)
+            pc = PatchCollection(patches, cmap=cmap, **kwargs)
+            formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
+                       xlabel=xlabel or "X [cm]",
+                       ylabel=ylabel or "Y [cm]", title=title)
+            pc.set_array(values)
+            pc.set_norm(normalizer)
+            ax.add_collection(pc)
+            addColorbar(ax, pc, cbarLabel=cbarLabel)
+    
+        # add labels on top of the polygons
+        for key, coord in (core.Map.serpcentermap).items():
+            # check key is in "which" list
+            if key not in which:
+                continue
+    
+            x, y = coord
+            # plot text inside assemblies
+            if dictname is None:
+                if label is True:  # plot assembly number
+                    if physics is False:
+                        if fren is True:  # FRENETIC numeration
+                            txt = str(core.Map.serp2fren[key])  # translate keys
+                        else:
+                            txt = str(key)
+    
+                    else:
+                        # define value to be plotted
+                        if numbers is False:
+                            if fren is False:  # Serpent numeration
+                                txt = fmt % tallies[key]
+    
+                            else:  # Frenetic numeration
+                                txt = fmt % tallies[key]  # core.serp2fren[key]
+    
+                            if errbar is True:
+                                txt = "%s \n %.2f%%" % (txt, errors[key]*100)
+                        else:
+                            if fren is True:  # FRENETIC numeration
+                                txt = str(core.Map.serp2fren[key])  # translate keys
+                            else:
+                                txt = str(key)
+    
+                    plt.text(x*scale, y*scale, txt, ha='center',
+                             va='center', size=fontsize)
+    
+            else:
+                if asstype is True:  # plot assembly type
+                    txt = dictname[typelabel[key-1, 0]]
+                    plt.text(x*scale, y*scale, txt, ha='center', va='center',
+                             size=fontsize)
+    
+                # FIXME: must be a better way to do this avoiding asstype, maybe.
+                # change "dictname" because maybe we want tuples to have overlappings (phytra fig)
+                # write other labels
+                else:
+                    atype = core.getassemblytype(key, time=time)
+                    x, y = core.Map.serpcentermap[key]
+                    txt = dictname[atype]
+                    plt.text(x*scale, y*scale, txt, ha='center',
+                             va='center', size=fontsize)
+    
+        ax.axis('equal')
+        if xlabel is None and ylabel is None:
+            plt.axis('off')
+    
+        # save figure
+        if figname is not None:
+            fig.savefig(figname, bbox_inches='tight', dpi=250)
+    
+    
     @staticmethod
     def __loadtxt(fname):
         """
@@ -439,3 +688,4 @@ class ParseFrenOut:
                 raise OSError("File extension is wrong. Only HDF5 can be parsed")
 
         return fname
+
