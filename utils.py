@@ -114,7 +114,13 @@ def __parseCI(CIinp):
     else:
         power = None
 
-    CIargs = [tEnd, nProf, pitch, shape, power]
+    if 'trans' in CIinp.keys():
+        trans = CIinp['trans']
+    else:
+        trans = True
+
+
+    CIargs = [tEnd, nProf, pitch, shape, power, trans]
 
     return CIargs
 
@@ -183,6 +189,11 @@ def __parseNE(NEinp):
     else:
         cuts = None
 
+    if 'splitz' in NEinp.keys():
+        splitz = NEinp['splitz']
+    else:
+        splitz = 10
+
     if 'fren' in NEinp.keys():
         fren = NEinp['fren']
     else:
@@ -199,7 +210,7 @@ def __parseNE(NEinp):
         NEdata = None
 
     NEargs = [geinp, rotation, assemblynames, assemblylabel,
-              replace, cuts, config, fren, regionslegendplot, NEdata]
+              replace, cuts, splitz, config, fren, regionslegendplot, NEdata]
 
     return NEargs
 

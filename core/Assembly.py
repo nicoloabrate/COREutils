@@ -101,7 +101,7 @@ class AxialConfig:
 
     """
 
-    def __init__(self, cuts):
+    def __init__(self, cuts, splitz):
         """
         Define geometrical quantities for a squared assembly
 
@@ -117,6 +117,7 @@ class AxialConfig:
         """
         # homogenisation cuts
         self.mycuts = cuts['mycuts']
+        self.splitz = splitz 
         # cuts defining different material regions
         xscuts = cuts['xscuts']
         # initialise dict

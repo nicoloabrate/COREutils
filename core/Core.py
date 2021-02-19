@@ -81,12 +81,12 @@ class Core:
 
             CIargs, NEargs, THargs = parse(inpjson)
 
-            tEnd, nProf, pitch, shape, power = CIargs
+            tEnd, nProf, pitch, shape, power, trans = CIargs
 
             # check if NEargs is not empty
             if NEargs is not None:
                 [NEinp, NErotation, NEassemblynames, 
-                 NEassemblylabel, NEreplace, cuts, config, NEfren, 
+                 NEassemblylabel, NEreplace, cuts, splitz, config, NEfren, 
                  NEregionslegendplot, NEdata] = NEargs
                 isNE = True
 
@@ -114,10 +114,11 @@ class Core:
             self.power = power
         # assign time information
         self.TimeEnd = tEnd 
+        self.trans = trans
 
         if isinstance(nProf, (float, int)):
-            dt = np.ceil(tEnd/nProf)
-            self.TimeProf = np.arange(0, tEnd, dt)
+            dt = tEnd/nProf
+            self.TimeProf = np.arange(0, tEnd+dt, dt)
         elif isinstance(nProf, list) and len(nProf) > 1:
             self.TimeProf = nProf
         else:
@@ -227,7 +228,7 @@ class Core:
             # --- Axial geometry
             if cuts is not None:
                 # initial axial configuration
-                self.NEAxialConfig = AxialConfig(cuts)
+                self.NEAxialConfig = AxialConfig(cuts, splitz)
                 for k in self.NEAxialConfig.cuts.keys():
                     univ.extend(self.NEAxialConfig.cuts[k].reg)
             # squeeze repetitions

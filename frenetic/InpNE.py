@@ -355,12 +355,19 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
     if whereNH5INP is None:
         whereNH5INP = "'NE_data.h5'"
 
+    tmp = core.NEAxialConfig.splitz
     NZ = len(core.NEAxialConfig.mycuts)-1
+    if isinstance(tmp, (int)):
+        splitz = [tmp]*NZ 
+    elif isinstance(tmp, (list)):
+        splitz = tmp if len(tmp) > 1 else tmp[0]*NZ 
+            
     nConfig = len(core.NEtime)
-    nRun = 2 if nConfig > 1 else 1
+    nRun = 2 if core.trans is True else 1
 
     geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,
-                '$MESHZ0': core.NEAxialConfig.mycuts, '$SPLITZ': [10]*NZ,
+                '$MESHZ0': core.NEAxialConfig.mycuts, 
+                '$SPLITZ': splitz,
                 '$NCONFIG': nConfig, '$NRUN': nRun, '$POW': core.power,
                 '$NPROF': len(core.TimeProf), '$TPROF': core.TimeProf}
 

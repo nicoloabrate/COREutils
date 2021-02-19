@@ -230,7 +230,7 @@ class ParseFrenOut:
             pass
 
     def get(self, path, which, hexa=None, time=None, z=None, pre=None,
-            gro=None, grp=None):
+            gro=None, grp=None, oldfmt=False):
         """
         Get profile from output.
 
@@ -262,7 +262,10 @@ class ParseFrenOut:
 
                 if which in v:
                     dictkey = k
-                    fname = "%s.out" % dictkey
+                    if oldfmt is True:
+                        fname = '%s.out' % dictkey
+                    else:
+                        fname = 'output.h5'
                     idx = v.index(which)+skip
                     notfound = False
 
@@ -271,23 +274,26 @@ class ParseFrenOut:
 
         # read file content
         datapath = os.path.join(path, fname)
-        if isintegral:
+        if oldfmt is True:
             profile = np.loadtxt(datapath, comments="#", usecols=(0, idx))
 
         else:
             fh5 = h5.File(datapath, "r")
-            # parse specified time, assembly, axial node, group, prec. fam.
-            dims = ParseFrenOut.distrout_dim
-            dimlst = []
-
-            for d in dims:
-                x = dimdict[d]
-                if x is None:
-                    x = 0 if x == 'ntim' else slice(None)
-
-                dimlst.append(x)
-
-            profile = fh5[dictkey][which][dimlst]
+            if isintegral:
+                profile = fh5['integralParameters'][dictkey][0, idx]
+            else:
+                # parse specified time, assembly, axial node, group, prec. fam.
+                dims = ParseFrenOut.distrout_dim
+                dimlst = []
+    
+                for d in dims:
+                    x = dimdict[d]
+                    if x is None:
+                        x = 0 if x == 'ntim' else slice(None)
+    
+                    dimlst.append(x)
+    
+                profile = fh5[dictkey][which][dimlst]
 
         return profile
 

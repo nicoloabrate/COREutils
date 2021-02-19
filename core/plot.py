@@ -204,9 +204,13 @@ def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
             else:
                 atype = core.getassemblytype(key, time=time)
                 x, y = core.Map.serpcentermap[key]
-                txt = dictname[atype]
-                plt.text(x*scale, y*scale, txt, ha='center',
-                         va='center', size=fontsize)
+                try:
+                    assk = str(core.Map.serp2fren[key]) if fren is True else key
+                    txt = dictname[int(assk)]
+                    plt.text(x*scale, y*scale, txt, ha='center',
+                             va='center', size=fontsize)
+                except KeyError:
+                    continue
 
     ax.axis('equal')
     if xlabel is None and ylabel is None:
@@ -425,8 +429,8 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
 
     ax.axis('equal')
     # recompute the ax.dataLim
-    plt.xlim(xlo, xup)
-    plt.ylim(ylo, yup)
+    # plt.xlim(xlo, xup)
+    # plt.ylim(ylo, yup)
     plt.axis('off')
     plt.title(title)
     plt.tight_layout()
