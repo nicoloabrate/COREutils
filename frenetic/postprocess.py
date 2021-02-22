@@ -8,19 +8,16 @@ Description: Class to read data from FRENETIC output files.
 
 import os
 import re
-import time as t
 import h5py as h5
 import numpy as np
+from numbers import Real
+from numpy.linalg import norm
+from numpy.ma import masked_less_equal
 import matplotlib.pyplot as plt
-
-from os.path import isfile, join
+from matplotlib.patches import RegularPolygon
+from matplotlib.collections import PatchCollection
+from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 from matplotlib import rc
-
-# TODO:
-# per conti parametrici, si scrive una classe del tipo IOwrapper che salvi in matrici (poi
-# salvate in hdf5, se necessario) di output e parametri. Questo script dovra' leggere
-# in maniera automatica file da piu' cartelle con nomi simili (per ora i nomi contengono i
-# parametri, poi magari ci sara' il parsing dei file di input)
 
 
 class PostProcess:
@@ -28,8 +25,6 @@ class PostProcess:
     Class to read profiles computed by FRENETIC.
     """
 
-    # leggili dall'input!
-    (nelz, ntim, ngro, ngrp, nhex, npre) = (1, 1, 1, 1, 1, 1)
     # default keys for integral parameters (namelist)
     intout = {'errint': ['NC error', 'LE flux', 'LE shape', 'distortion',
                          'NC iterations', 'DTF iterations', 'DTR steps'],
@@ -134,12 +129,12 @@ class PostProcess:
         -------
         None.
         """
-        self.integralParameters = ParseFrenOut.intout
-        self.distributions = ParseFrenOut.distrout
-        self.integralParameters_measure = ParseFrenOut.intout_uom
-        self.distributions_descr = ParseFrenOut.distrout_attr
-        self.distributions_measure = ParseFrenOut.distrout_uom
-
+        self.integralParameters = PostProcess.intout
+        self.distributions = PostProcess.distrout
+        self.integralParameters_measure = PostProcess.intout_uom
+        self.distributions_descr = PostProcess.distrout_attr
+        self.distributions_measure = PostProcess.distrout_uom
+        self.output_path = path
         # parse number of groups and precursors
         macroxs0 = ['NGRO', 'NPRE', 'NGRP', 'NPRP']
         macroname = os.path.join(path, 'macro.nml')
@@ -197,7 +192,7 @@ class PostProcess:
         except ValueError:
             pass
 
-    def get(self, path, which, hexa=None, time=None, z=None, pre=None,
+    def get(self, which, hexa=None, time=None, z=None, pre=None,
             gro=None, grp=None, oldfmt=False, core=None):
         """
         Get profile from output.
@@ -213,18 +208,38 @@ class PostProcess:
         -------
         None
         """
-        if hexa is not None:
-            # make FRENETIC numeration consistent with python indexing
-            hexa = [h-1 for h in hexa]  
-
-        dimdict = {'ntim': time, 'nelz': z, 'nhex': hexa, 'ngro': gro, 'ngrp':
-                   grp, 'nprec': pre}
-
         if which in self.distributions:
             isintegral = False
             dictkey = "distributions"
             fname = 'output.h5'
             idx = self.distributions.index(which)
+
+            if hexa is not None:
+                # make FRENETIC numeration consistent with python indexing
+                hexa = [h-1 for h in hexa]
+
+            if z is not None and time is not None and core is None:
+                raise OSError('Core object is needed to plot this kind of data!')
+
+            if z is not None:
+                nodes = core.NEAxialConfig.AxNodes
+                if isinstance(z, (list, np.ndarray)):
+                    idz = [np.argmin(abs(zi-nodes)) for zi in z]
+                else:
+                    idz = np.argmin(abs(z-nodes))
+            else:
+                idz = None
+
+            if time is not None:
+                times = core.TimeProf
+                if isinstance(time, (list, np.ndarray)):
+                    idt = [np.argmin(abs(t-times)) for t in time]
+                else:
+                    idt = np.argmin(abs(time-times))
+            else:
+                idt = None
+            dimdict = {'ntim': idt, 'nelz': idz, 'nhex': hexa, 'ngro': gro,
+                       'ngrp': grp, 'nprec': pre}
 
         else:  # integral data
             isintegral = True
@@ -245,7 +260,7 @@ class PostProcess:
                 raise OSError('%s not found in data!' % which)
 
         # read file content
-        datapath = os.path.join(path, fname)
+        datapath = os.path.join(self.output_path, fname)
         if oldfmt is True:
             profile = np.loadtxt(datapath, comments="#", usecols=(0, idx))
 
@@ -255,19 +270,19 @@ class PostProcess:
                 profile = fh5['integralParameters'][dictkey][:, [0, idx]]
             else:
                 # parse specified time, assembly, axial node, group, prec. fam.
-                idx = ParseFrenOut.distrout.index(which)
-                dims = ParseFrenOut.distrout_dim[idx]
+                idx = PostProcess.distrout.index(which)
+                dims = PostProcess.distrout_dim[idx]
                 dimlst = []
-    
+
                 for d in dims:
                     x = dimdict[d]
                     if x is None:
                         x = 0 if x == 'ntim' else slice(None)
-    
+
                     dimlst.append(x)
-  
+
                 profile = np.asarray(fh5[dictkey][which])
-                profile = profile[dimlst]
+                profile = profile[np.ix_(*dimlst)]
 
         return profile
 
@@ -342,21 +357,19 @@ class PostProcess:
         if figname is not None:
             fig.savefig(figname, bbox_inches='tight', dpi=500)
 
-    def RadialMap(self, core, what= time=0, label=False, dictname=None, figname=None,
-                  fren=False, which=None, what=None, asstype=False, usetex=False,
-                  fill=True, axes=None, cmap='Spectral_r', thresh=None,
-                  cbarLabel=None, xlabel=None, ylabel=None, loglog=None,
-                  logx=None, logy=None, title=None, scale=1, fmt="%.2f",
-                  numbers=False, **kwargs):
+    def RadialMap(self, core, what, z=0, time=0, pre=0, gro=0, grp=0,
+                  label=False, figname=None, which=None,
+                  usetex=False, fill=True, axes=None, cmap='Spectral_r',
+                  thresh=None, cbarLabel=True, xlabel=None, ylabel=None,
+                  loglog=None, logx=None, logy=None, title=True,
+                  scale=1, fmt="%.2f", numbers=False, **kwargs):
         """
         Plot FRENETIC output on the x-y plane.
-    
+
         Parameters
         ----------
         label : TYPE, optional
             DESCRIPTION. The default is False.
-        dictname : TYPE, optional
-            DESCRIPTION. The default is None.
         figname : TYPE, optional
             DESCRIPTION. The default is None.
         fren : TYPE, optional
@@ -395,203 +408,162 @@ class PostProcess:
             DESCRIPTION. The default is "%.2f".
         **kwargs : TYPE
             DESCRIPTION.
-    
+
         Raises
         ------
         IndexError
             DESCRIPTION.
         TypeError
             DESCRIPTION.
-    
+
         Returns
         -------
         None.
-    
+
         """
         # set default font and TeX interpreter
-        rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
+        rc('font', **{'family': 'DejaVu Sans'})
         rc('text', usetex=usetex)
-    
-        Nass = core.Map.type.size
-        # array of assembly type
-        typelabel = np.reshape(core.Config[time], (Nass, 1))
-        maxtype = int(max(typelabel))
-        coretype = range(0, maxtype+1)  # define
-    
+        # set default parameters
         kwargs.setdefault("ec", "k")
         kwargs.setdefault("linewidth", 0.5)
         kwargs.setdefault("lw", 0.5)
         kwargs.setdefault("alpha", 1)
         fontsize = kwargs.get("fontsize", 4)
-        # delete size from kwargs to use it in pathces
+        # delete size from kwargs to use it in patches
         if 'fontsize' in kwargs:
             del kwargs['fontsize']
-    
-        else:  # cont. <- if type(fill) is bool
-    
-            orientation = 0
-    
-            patches = []
-            patchesapp = patches.append
-            errbar = False
-            # check data type is correct
-            if type(what) is dict:
-                # check keys
-                if 'tallies' in what.keys():
-                    tallies = what['tallies']
-    
-                if 'errors' in what.keys():
-                    errors = what['errors']
-                    errbar = True
-    
-            elif type(what) is np.ndarray:
-                tallies = what
-                # check on data shape
-                try:
-                    # associate tallies to Serpent assemblies numeration
-                    Nx, Ny = tallies.shape
-                    assnum = np.arange(1, Nx*Ny+1)
-                    # flattening sq. or hex. lattice by rows
-                    tallies = dict(zip(assnum, tallies.flatten('C')))
-                except ValueError:
-                    # TODO (possible enhancement: plot ND array slicing)
-                    raise IndexError('Only 2D arrays are currently supported!')
-    
-            else:
-                raise TypeError('Data must be dict or numpy array!')
-    
-            # TODO: place these lines somewhere where tallies is array for automatic formatting
-            # peak = np.max(np.max(tallies))
-            # if abs(peak) > 999:
-            #     fmt = ".2e"
-            # else:
-            #     fmt = ".2f"
-    
+
+        orientation = 0
+        L = core.AssemblyGeom.edge
+
+        # check which variable
+        amap = core.Map
+        if which is None:
+            which = list(amap.serpcentermap.keys())
+            which = [amap.serp2fren[k] for k in which]
+
+        # check data type
+        if isinstance(what, dict):  # comparison with FRENETIC and other vals.
+            tallies = np.zeros((core.NAss, len(what.keys())))
+            for i, k in enumerate(what.keys()):
+                v2 = what[k]
+                v1 = self.get(k, hexa=which, time=time,
+                              z=z, pre=pre, gro=gro, grp=grp,
+                              core=core)
+                tmp = np.true_divide(norm(v1-v2), norm(v1))
+                tmp[tmp == np.inf] = 0
+                tmp = np.nan_to_num(tmp)
+                tallies[:, i] = tmp*100
+
+        elif isinstance(what, list):  # list of output
+            tallies = np.zeros((core.NAss, len(what)))
+            for i, w in enumerate(what):
+                tallies[:, i] = self.get(w, hexa=which, time=time,
+                                         z=z, pre=pre, gro=gro, grp=grp,
+                                         core=core)
+
+        elif isinstance(what, str):  # single output
+            tallies = self.get(what, hexa=which, time=time, z=z,
+                               pre=pre, gro=gro, grp=grp, core=core)
+        else:
+            raise TypeError('Data must be dict or numpy array!')
+
+        if thresh is None:
+            thresh = -np.inf
+        elif not isinstance(thresh, (Real, int, np.float)):
+            raise TypeError(
+                "thresh should be real, not {}".format(type(thresh)))
         # open figure
         fig = plt.figure()
         ax = fig.add_subplot(111)
-    
-        # check which variable
-        if which is None:
-            which = (core.Map.serpcentermap).keys()
-    
-        elif which is not None:
-            if fren is True:
-                which = [core.Map.fren2serp[k] for k in which]
-            # FIXME!
-            # else:
-            #     tmp = list((core.serpcentermap).keys())
-            #     which = [tmp[k] for k in which]
-    
-        for key, coord in (core.Map.serpcentermap).items():
-    
-            # check key is in which list
-            if key not in which:
-                continue
-    
-            x, y = coord
-            # scale coordinate
-            coord = (x*scale, y*scale)
 
-            # define assembly patch
-            asspatch = RegularPolygon(coord, core.AssemblyGeom.numedges, L*scale,
-                                      orientation=orientation, **kwargs)
-            patchesapp(asspatch)
-            # define value to be plotted
-            #if fren is False:  # Serpent numeration
-            # FIXME: per ora "valuesapp(tallies[key])" viene messo sotto per evitare che sia tutto disordinato
-            #valuesapp(tallies[key])
-            #else:  # Frenetic numeration
-               # keyF = core.serp2fren[key]
-               # valuesapp(tallies[keyF])
-    
-        # plot physics, if any
-        if physics is True:
-            # values = np.asarray(values)
-            patches = np.asarray(patches, dtype=object)
-            if which is None:
-                coord = np.array(list(core.Map.serpcentermap.values()))
-            else:
-                coord, values = [], []
-                for k in which:
-                    coord.append(core.Map.serpcentermap[k])
-                    values.append(tallies[k])
-    
-                coord = np.asarray(coord)
-                values = np.asarray(values)
-    
-            normalizer = normalizerFactory(values, None, False, coord[:, 0]*scale,
-                                           coord[:, 1]*scale)
-            pc = PatchCollection(patches, cmap=cmap, **kwargs)
-            formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
-                       xlabel=xlabel or "X [cm]",
-                       ylabel=ylabel or "Y [cm]", title=title)
-            pc.set_array(values)
-            pc.set_norm(normalizer)
-            ax.add_collection(pc)
-            addColorbar(ax, pc, cbarLabel=cbarLabel)
-    
-        # add labels on top of the polygons
-        for key, coord in (core.Map.serpcentermap).items():
-            # check key is in "which" list
-            if key not in which:
+        patches, coord, values = [], [], []
+        patchesapp = patches.append
+        coordapp = coord.append
+        valuesapp = values.append
+        for key, xy in amap.serpcentermap.items():
+
+            # check key is in which list
+            k = amap.serp2fren[key]
+            if k not in which or tallies[k-1] <= thresh:
                 continue
-    
-            x, y = coord
-            # plot text inside assemblies
-            if dictname is None:
-                if label is True:  # plot assembly number
-                    if physics is False:
-                        if fren is True:  # FRENETIC numeration
-                            txt = str(core.Map.serp2fren[key])  # translate keys
-                        else:
-                            txt = str(key)
-    
-                    else:
-                        # define value to be plotted
-                        if numbers is False:
-                            if fren is False:  # Serpent numeration
-                                txt = fmt % tallies[key]
-    
-                            else:  # Frenetic numeration
-                                txt = fmt % tallies[key]  # core.serp2fren[key]
-    
-                            if errbar is True:
-                                txt = "%s \n %.2f%%" % (txt, errors[key]*100)
-                        else:
-                            if fren is True:  # FRENETIC numeration
-                                txt = str(core.Map.serp2fren[key])  # translate keys
-                            else:
-                                txt = str(key)
-    
-                    plt.text(x*scale, y*scale, txt, ha='center',
-                             va='center', size=fontsize)
-    
-            else:
-                if asstype is True:  # plot assembly type
-                    txt = dictname[typelabel[key-1, 0]]
-                    plt.text(x*scale, y*scale, txt, ha='center', va='center',
-                             size=fontsize)
-    
-                # FIXME: must be a better way to do this avoiding asstype, maybe.
-                # change "dictname" because maybe we want tuples to have overlappings (phytra fig)
-                # write other labels
+
+            coordapp(xy)
+            valuesapp(tallies[k-1])
+            x, y = xy
+            # scale coordinate
+            xy = (x*scale, y*scale)
+            # define assembly patch
+            asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges,
+                                      L*scale, orientation=orientation,
+                                      **kwargs)
+            patchesapp(asspatch)
+
+        coord = np.asarray(coord)
+        values = np.asarray(values)
+
+        # plot physics
+        patches = np.asarray(patches, dtype=object)
+
+        normalizer = normalizerFactory(values, None, False,
+                                       coord[:, 0]*scale,
+                                       coord[:, 1]*scale)
+        pc = PatchCollection(patches, cmap=cmap, **kwargs)
+
+        if title is True:
+            nodes = core.NEAxialConfig.AxNodes
+            idz = np.argmin(abs(z-nodes))
+
+            times = core.TimeProf
+            idt = np.argmin(abs(time-times))
+
+            title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], times[idt])
+
+        if cbarLabel is True:
+            idx = self.distributions.index(what)
+            dist = self.distributions_descr[idx]
+            uom = self.distributions_measure[idx]
+            uom = uom.replace('**', '^')
+            changes = ['-1', '-2', '-3']
+            for c in changes:
+                uom = uom.replace(c, '{%s}' % c)
+            uom = uom.replace('*', '~')
+            # uom = '$%s$' % uom if usetex is True else uom
+            cbarLabel = r'%s $%s$' % (dist, uom)
+
+        formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
+                   xlabel=xlabel or "X [cm]",
+                   ylabel=ylabel or "Y [cm]", title=title)
+        pc.set_array(values)
+        pc.set_norm(normalizer)
+        ax.add_collection(pc)
+        addColorbar(ax, pc, cbarLabel=cbarLabel)
+
+        # add labels on top of the polygons
+        if label is True:
+            fmt = "%.1e" if abs(np.max(np.max(tallies))) > 999 else "%.1f"
+            for key, coord in (core.Map.serpcentermap).items():
+                # check key is in "which" list
+                k = core.Map.serp2fren[key]
+                if k not in which or tallies[k-1] <= thresh:
+                    continue
                 else:
-                    atype = core.getassemblytype(key, time=time)
-                    x, y = core.Map.serpcentermap[key]
-                    txt = dictname[atype]
+                    x, y = coord
+                    # plot text inside assemblies
+                    txt = fmt % tallies[amap.serp2fren[key]-1]
+                    # rc('text', usetex=False)
                     plt.text(x*scale, y*scale, txt, ha='center',
                              va='center', size=fontsize)
-    
+
         ax.axis('equal')
         if xlabel is None and ylabel is None:
             plt.axis('off')
-    
+
         # save figure
         if figname is not None:
             fig.savefig(figname, bbox_inches='tight', dpi=250)
-    
-    
+
     @staticmethod
     def __loadtxt(fname):
         """
@@ -688,4 +660,3 @@ class PostProcess:
                 raise OSError("File extension is wrong. Only HDF5 can be parsed")
 
         return fname
-

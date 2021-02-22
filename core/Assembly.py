@@ -117,7 +117,7 @@ class AxialConfig:
         """
         # homogenisation cuts
         self.mycuts = cuts['mycuts']
-        self.splitz = splitz 
+        self.splitz = splitz
         # cuts defining different material regions
         xscuts = cuts['xscuts']
         # initialise dict
@@ -130,6 +130,7 @@ class AxialConfig:
                 rap(r1), uap(u1), lap(l1)
             self.cuts[asstype] = AxialCuts(up, lo, r)
         self.AxNodes = np.zeros((sum(splitz), ))
+        self.dz = np.zeros((sum(splitz), ))
         # assign axial nodes coordinates
         idx = 0
         for iz in range(0, len(self.mycuts[1:])):
@@ -137,8 +138,9 @@ class AxialConfig:
             tmp = np.arange(self.mycuts[iz]+dz/2, self.mycuts[iz+1], dz)
             ns = len(tmp)
             self.AxNodes[idx:idx+ns] = tmp
+            self.dz[idx:idx+ns] = dz
             idx = idx+ns
-        
+
 
 class AxialCuts:
     """

@@ -85,8 +85,8 @@ class Core:
 
             # check if NEargs is not empty
             if NEargs is not None:
-                [NEinp, NErotation, NEassemblynames, 
-                 NEassemblylabel, NEreplace, cuts, splitz, config, NEfren, 
+                [NEinp, NErotation, NEassemblynames,
+                 NEassemblylabel, NEreplace, cuts, splitz, config, NEfren,
                  NEregionslegendplot, NEdata] = NEargs
                 isNE = True
 
@@ -108,12 +108,12 @@ class Core:
 
         # initialise assembly radial geometry object
         self.AssemblyGeom = AssemblyGeometry(pitch, shape)  # module indep.
-       
+
         # assign power, if any
         if power is not None:
             self.power = power
         # assign time information
-        self.TimeEnd = tEnd 
+        self.TimeEnd = tEnd
         self.trans = trans
 
         if isinstance(nProf, (float, int)):
@@ -278,11 +278,11 @@ class Core:
                     # check operation
                     if "translate" in config[time]:
                         self.translate(config[time]["translate"], time,
-                                       flagfren=NEfren)
+                                       isfren=NEfren)
 
                     if "perturb" in config[time]:
                         self.perturb(config[time]["perturb"], time,
-                                     flagfren=NEfren)
+                                     isfren=NEfren)
 
         # --- define TH core geometry and data
         if isTH:
@@ -330,9 +330,9 @@ class Core:
                     t = float(time)
                     # increment time list
                     self.CZtime.append(t)
-                    self.perturbBC(bcs[time], time, flagfren=THfren)
+                    self.perturbBC(bcs[time], time, isfren=THfren)
 
-    def getassemblytype(self, assemblynumber, time=0, flagfren=False,
+    def getassemblytype(self, assemblynumber, time=0, isfren=False,
                         whichconf="NEconfig"):
         """
         Get type of a certain assembly.
@@ -341,7 +341,7 @@ class Core:
         ----------
         assemblynumber : int
             Number of the assembly of interest
-        flagfren : bool, optional
+        isfren : bool, optional
             Flag for FRENETIC numeration. The default is False.
 
         Returns
@@ -350,7 +350,7 @@ class Core:
             Type of assembly.
 
         """
-        if flagfren is True:
+        if isfren is True:
             # translate FRENETIC numeration to Serpent
             index = self.Map.fren2serp[assemblynumber]-1  # -1 for py indexing
         else:
@@ -369,7 +369,7 @@ class Core:
 
         return which
 
-    def replace(self, newtype, asslst, flagfren=False, core=None):
+    def replace(self, newtype, asslst, isfren=False, core=None):
         """
         Replace assemblies with user-defined new or existing type.
 
@@ -379,7 +379,7 @@ class Core:
             List of new/existing types of assemblies.
         asslst : list
             List of assemblies to be replaced.
-        flagfren : bool, optional
+        isfren : bool, optional
             Flag for FRENETIC numeration. The default is ``False``.
 
         Returns
@@ -406,7 +406,7 @@ class Core:
 
         for ipos, ilst in enumerate(asslst):  # loop over lists
             # check map convention
-            if flagfren is True:
+            if isfren is True:
                 # translate FRENETIC numeration to Serpent
                 index = [self.Map.fren2serp[i]-1 for i in ilst]  # -1 for index
             else:
@@ -423,7 +423,7 @@ class Core:
 
         return newcore
 
-    def perturb(self, pertconfig, time, flagfren=False):
+    def perturb(self, pertconfig, time, isfren=False):
         """
         Replace assemblies with user-defined new or existing type.
 
@@ -433,7 +433,7 @@ class Core:
             List of new/existing types of assemblies.
         asslst : list
             List of assemblies to be replaced.
-        flagfren : bool, optional
+        isfren : bool, optional
             Flag for FRENETIC numeration. The default is ``False``.
 
         Returns
@@ -468,7 +468,7 @@ class Core:
                 for assbly in which:
                     nt = self.NEtime.index(float(time))
                     atype = self.getassemblytype(assbly, now,
-                                                 flagfren=flagfren,
+                                                 isfren=isfren,
                                                  whichconf="NEconfig")
                     what = self.NEassemblytypes[atype]
                     # take region name
@@ -493,11 +493,11 @@ class Core:
                     # replace assembly
                     if newcore is None:
                         # take previous time-step configuration
-                        newcore = self.replace(nass+1, assbly, flagfren,
+                        newcore = self.replace(nass+1, assbly, isfren,
                                                self.NEconfig[now])
                     else:
                         # take "newcore"
-                        newcore = self.replace(nass+1, assbly, flagfren,
+                        newcore = self.replace(nass+1, assbly, isfren,
                                                newcore)
 
             self.NEconfig[float(time)] = newcore
@@ -505,7 +505,7 @@ class Core:
         except KeyError:
             raise OSError('"which" and/or "dz" keys missing in "translate"!')
 
-    def translate(self, transconfig, time, flagfren=False):
+    def translate(self, transconfig, time, isfren=False):
         """
         Replace assemblies with user-defined new or existing type.
 
@@ -513,7 +513,7 @@ class Core:
         ----------
         transconfig : dict
             Dictionary with details on translation transformation
-        flagfren : bool, optional
+        isfren : bool, optional
             Flag for FRENETIC numeration. The default is ``False``.
 
         Returns
@@ -539,7 +539,7 @@ class Core:
                 # repeat configuration if dz = 0
                 if dz != 0:
                     for assbly in which:
-                        atype = self.getassemblytype(assbly, flagfren=flagfren,
+                        atype = self.getassemblytype(assbly, isfren=isfren,
                                                      time=now,
                                                      whichconf="NEconfig")
                         what = self.NEassemblytypes[atype]
@@ -559,11 +559,11 @@ class Core:
                         if newcore is None:
                             # take previous time-step configuration
                             newcore = self.replace(nass+1, assbly,
-                                                   flagfren=flagfren,
+                                                   isfren=isfren,
                                                    core=self.NEconfig[now])
                         else:
                             # take "newcore"
-                            newcore = self.replace(nass+1, assbly, flagfren,
+                            newcore = self.replace(nass+1, assbly, isfren,
                                                    newcore)
 
                 else:
@@ -574,7 +574,7 @@ class Core:
         except KeyError:
             raise OSError('"which" and/or "dz" keys missing in "translate"!')
 
-    def perturbBC(self, pertconfig, time, flagfren=False):
+    def perturbBC(self, pertconfig, time, isfren=False):
         """
         Spatially perturb cooling zone boundary conditions.
 
@@ -584,7 +584,7 @@ class Core:
             List of new/existing types of assemblies.
         asslst : list
             List of assemblies to be replaced.
-        flagfren : bool, optional
+        isfren : bool, optional
             Flag for FRENETIC numeration. The default is ``False``.
 
         Returns
@@ -619,7 +619,7 @@ class Core:
                 for assbly in which:
                     nt = self.CZtime.index(float(time))
                     atype = self.getassemblytype(assbly, now,
-                                                 flagfren=flagfren,
+                                                 isfren=isfren,
                                                  whichconf="CZconfig")
                     what = self.CZassemblytypes[atype]
                     basename = re.split(r"_t\d+.\d+_p\d+", what)[0]
@@ -635,11 +635,11 @@ class Core:
                     # replace assembly
                     if newcore is None:
                         # take previous time-step configuration
-                        newcore = self.replace(nass+1, assbly, flagfren,
+                        newcore = self.replace(nass+1, assbly, isfren,
                                                self.CZconfig[now])
                     else:
                         # take "newcore"
-                        newcore = self.replace(nass+1, assbly, flagfren,
+                        newcore = self.replace(nass+1, assbly, isfren,
                                                newcore)
             # update cooling zones
             self.CZconfig[float(time)] = newcore
@@ -681,7 +681,7 @@ class Core:
                               for elem in regions))
             f.write("\n")
 
-    def getassemblylist(self, atype, time=0, match=True, flagfren=False,
+    def getassemblylist(self, atype, time=0, match=True, isfren=False,
                         whichconf="NEconfig"):
         """
         Return assemblies belonging to a certain type.
@@ -714,7 +714,7 @@ class Core:
         else:
             matchedass = np.where(asstypes != atype)[0]+1
 
-        if flagfren is True:
+        if isfren is True:
             matchedass = [self.Map.serp2fren[m] for m in matchedass]
 
         matchedass.sort()
