@@ -221,14 +221,14 @@ class PostProcess:
             if z is not None and time is not None and core is None:
                 raise OSError('Core object is needed to plot this kind of data!')
 
+            nodes = core.NEAxialConfig.AxNodes
             if z is not None:
-                nodes = core.NEAxialConfig.AxNodes
                 if isinstance(z, (list, np.ndarray)):
                     idz = [np.argmin(abs(zi-nodes)) for zi in z]
                 else:
                     idz = np.argmin(abs(z-nodes))
             else:
-                idz = None
+                idz = np.arange(0, len(nodes)).tolist()
 
             if time is not None:
                 times = core.TimeProf

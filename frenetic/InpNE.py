@@ -320,7 +320,7 @@ def writeConfig(core, NZ, Ntypes):
             f.write('%s ' % ff(t, 'double'))  # write time instant for each cut
             # write the type of assembly according to FRENETIC numeration
             for n in range(1, core.NAss+1):  # loop over all assemblies
-                whichtype = core.getassemblytype(n, time=t, flagfren=True,
+                whichtype = core.getassemblytype(n, time=t, isfren=True,
                                                  whichconf="NEconfig")
                 types[n-1] = compositions[whichtype-1, iz]
             # define region number for each assembly

@@ -81,7 +81,8 @@ class AssemblyGeometry:
 
         """
         self.height = height  # assign height property
-        self.volume = self.area*self.height  # compute volume
+        volume = self.area*self.height  # compute volume
+        return volume
 
 
 class AxialConfig:

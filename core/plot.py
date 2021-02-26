@@ -304,7 +304,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
     # explore types of assembly to be plotted
     types = []
     for i in which:
-        t = core.getassemblytype(i, flagfren=fren, time=time)
+        t = core.getassemblytype(i, isfren=fren, time=time)
         if t not in types:
             types.append(t)
 
