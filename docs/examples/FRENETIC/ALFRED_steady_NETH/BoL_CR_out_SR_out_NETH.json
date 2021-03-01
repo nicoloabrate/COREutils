@@ -15,7 +15,7 @@
                                "External Lead"],
             "fren" : true,
             "NEdata" : {
-                          "path" : "NEdata/endfb8",
+                          "path" : "./docs/NEdata/ALFRED/endfb8",
                           "beginwith" : ["ALFRED-FC"]
                        },
             "replace" : {
