@@ -165,6 +165,7 @@ def __parseNE(NEinp):
         rotation = NEinp['rotation']
     else:
         rotation = 0
+        raise OSError('No rotation angle provided!')
 
     if 'replace' in NEinp.keys():
         replace = NEinp['replace']

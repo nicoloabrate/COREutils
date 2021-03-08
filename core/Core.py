@@ -132,7 +132,7 @@ class Core:
             if cuts is not None:
                 univ = []  # consider axial regions in "cuts"
             else:
-                univ = deepcopy(assemblynames)  # regions are assembly names
+                univ = deepcopy(NEassemblynames)  # regions are assembly names
 
             NEassemblynames = OrderedDict(dict(zip(NEassemblynames, assnum)))
             # define dict between strings and ints for assembly type
@@ -723,7 +723,8 @@ class Core:
     # TODO: add writeregionmap method to plot region id, x and y for each assembly
 
     def writecorelattice(self, flatten=False, fname="corelattice.txt",
-                         serpheader=False, string=True, whichconf="NEconfig"):
+                         serpheader=False, string=True, whichconf="NEconfig",
+                         numbers=False, fren=True):
         """
         Write core lattice to txt file.
 
@@ -736,12 +737,16 @@ class Core:
         serpheader : bool, optional
             Serpent 2 code instructions for core lattice geometry
             header. The default is ``False``.
+        numbers : bool, optional
+            Print assembly numbers instead of assembly names in the core 
+            lattice.
 
         Returns
         -------
         ``None``
 
         """
+        Nx, Ny = self.Map.Nx, self.Map.Ny
         if whichconf == "NEconfig":
             asstypes = self.NEconfig[0]
             assemblynames = self.NEassemblytypes
@@ -753,11 +758,23 @@ class Core:
             assemblynames = self.CZassemblytypes
         else:
             raise OSError("Unknown core config!")
+
+        if numbers is True:
+            # flatten typelabel matrix
+            typemap = np.reshape(asstypes, (Nx*Ny, 1))
+            if fren is True:
+                for s, f in self.Map.serp2fren.items():
+                    typemap[s-1] = s
+            else:
+                for s in self.Map.serp2fren.keys():
+                    typemap[s-1] = s
+            asstypes = np.reshape(typemap, (Nx, Ny), order='F')
+
         # define regions
         if flatten is False:
             typelabel = asstypes
         else:
-            typelabel = np.reshape(asstypes, (self.Map.Nx*self.Map.Ny, 1))
+            typelabel = np.reshape(asstypes, (Nx*Ny, 1))
 
         # determine file format
         if string is False:
@@ -786,7 +803,7 @@ class Core:
             x0, y0 = self.Map.serpcentermap[self.Map.fren2serp[1]]
             x0, y0 = str(x0), str(y0)
             # define number of assemblies along x and y directions
-            Nx, Ny = str(self.Map.Nx), str(self.Map.Ny)
+            Nx, Ny = str(Nx), str(Ny)
             # define assembly pitch
             P = str(2*self.AssemblyGeom.apothema)
             header = " ".join(("lat core ", asstype, x0, y0, Nx, Ny, P))

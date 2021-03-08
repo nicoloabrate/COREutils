@@ -264,12 +264,11 @@ class Map:
         Nxc = sum(frenmap[xc, yc+1:] != 0)
         if Nxc < Nx:
             # non-regular hexagon: add dummy elements to have same Nx and Ny
-            inf = float("inf")
-            frenmap[xc, Nxc+xc+1:Nx+xc+1] = -inf
+            frenmap[xc, Nxc+xc+1:Nx+xc+1] = -100000000000
             # find min non-zero index
             indNZy = np.argwhere(frenmap[:, np.max(x)]).min()
             # add elements along y to have Nx=Ny
-            frenmap[yc-Nx+1:indNZy, np.max(x)] = -inf
+            frenmap[yc-Nx+1:indNZy, np.max(x)] = -100000000000
             # set Ny equal to Nx (by definition)
             Ny = Nx
             # unpack non-zero coordinates of the matrix (they changed)
