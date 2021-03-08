@@ -14,7 +14,7 @@ from matplotlib import rc
 from matplotlib.patches import RegularPolygon, Rectangle
 
 
-def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
+def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False, txtcol='k',
                    dictname=None, figname=None, fren=False, which=None,
                    asstype=False, usetex=False, fill=True, xlabel=None,
                    ylabel=None, title=None, scale=1, legend=False, **kwargs):
@@ -186,13 +186,13 @@ def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
                     txt = str(key)
 
                 plt.text(x*scale, y*scale, txt, ha='center',
-                         va='center', size=fontsize)
+                         va='center', size=fontsize, color=txtcol)
 
         else:
             if asstype is True:  # plot assembly type
                 txt = dictname[typelabel[key-1, 0]]
                 plt.text(x*scale, y*scale, txt, ha='center', va='center',
-                         size=fontsize)
+                         size=fontsize, color=txtcol)
 
             # FIXME: must be a better way to do this avoiding asstype, maybe.
             # change "dictname" because maybe we want tuples to have
@@ -204,7 +204,7 @@ def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
                     assk = str(core.Map.serp2fren[key]) if fren is True else key
                     txt = dictname[int(assk)]
                     plt.text(x*scale, y*scale, txt, ha='center',
-                             va='center', size=fontsize)
+                             va='center', size=fontsize, color=txtcol)
                 except KeyError:
                     continue
 
@@ -224,7 +224,7 @@ def RadialGeomPlot(core, time=0, whichconf="NEconfig", label=False,
 
     # save figure
     if figname is not None:
-        fig.savefig(figname, bbox_inches='tight', dpi=250)
+        fig.savefig(figname, bbox_inches='tight', dpi=250, pad_inches = 0)
 
 
 def AxialGeomPlot(core, which, time=0, label=False, dictname=None,

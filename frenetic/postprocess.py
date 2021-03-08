@@ -12,7 +12,6 @@ import h5py as h5
 import numpy as np
 from numbers import Real
 from numpy.linalg import norm
-from numpy.ma import masked_less_equal
 import matplotlib.pyplot as plt
 from matplotlib.patches import RegularPolygon
 from matplotlib.collections import PatchCollection
@@ -467,7 +466,7 @@ class PostProcess:
             tallies = self.get(what, hexa=which, time=time, z=z,
                                pre=pre, gro=gro, grp=grp, core=core)
         else:
-            raise TypeError('Data must be dict or numpy array!')
+            raise TypeError('Input must be str, dict or list!')
 
         if thresh is None:
             thresh = -np.inf
@@ -660,3 +659,276 @@ class PostProcess:
                 raise OSError("File extension is wrong. Only HDF5 can be parsed")
 
         return fname
+
+
+def RadialMap(data, what, core, data2=None, myslice=None, z=0, time=0, pre=0,
+              gro=0, grp=0,
+              label=False, figname=None, which=None,
+              usetex=False, fill=True, axes=None, cmap='Spectral_r',
+              thresh=None, cbarLabel=None, xlabel=None, ylabel=None,
+              loglog=None, logx=None, logy=None, title=True,
+              scale=1, fmt="%.2f", numbers=False, **kwargs):
+    """
+    Plot FRENETIC output on the x-y plane.
+
+    Parameters
+    ----------
+    label : TYPE, optional
+        DESCRIPTION. The default is False.
+    figname : TYPE, optional
+        DESCRIPTION. The default is None.
+    fren : TYPE, optional
+        DESCRIPTION. The default is False.
+    which : TYPE, optional
+        DESCRIPTION. The default is None.
+    usetex : TYPE, optional
+        DESCRIPTION. The default is False.
+    fill : TYPE, optional
+        DESCRIPTION. The default is True.
+    axes : TYPE, optional
+        DESCRIPTION. The default is None.
+    cmap : TYPE, optional
+        DESCRIPTION. The default is 'Spectral_r'.
+    thresh : TYPE, optional
+        DESCRIPTION. The default is None.
+    cbarLabel : TYPE, optional
+        DESCRIPTION. The default is None.
+    xlabel : TYPE, optional
+        DESCRIPTION. The default is None.
+    ylabel : TYPE, optional
+        DESCRIPTION. The default is None.
+    loglog : TYPE, optional
+        DESCRIPTION. The default is None.
+    logx : TYPE, optional
+        DESCRIPTION. The default is None.
+    logy : TYPE, optional
+        DESCRIPTION. The default is None.
+    title : TYPE, optional
+        DESCRIPTION. The default is None.
+    scale : TYPE, optional
+        DESCRIPTION. The default is 1.
+    fmt : TYPE, optional
+        DESCRIPTION. The default is "%.2f".
+    **kwargs : TYPE
+        DESCRIPTION.
+
+    Raises
+    ------
+    IndexError
+        DESCRIPTION.
+    TypeError
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    # set default font and TeX interpreter
+    rc('font', **{'family': 'DejaVu Sans'})
+    rc('text', usetex=usetex)
+    # set default parameters
+    kwargs.setdefault("ec", "k")
+    kwargs.setdefault("linewidth", 0.5)
+    kwargs.setdefault("lw", 0.5)
+    kwargs.setdefault("alpha", 1)
+    fontsize = kwargs.get("fontsize", 4)
+    # delete size from kwargs to use it in patches
+    if 'fontsize' in kwargs:
+        del kwargs['fontsize']
+
+    orientation = 0
+    L = core.AssemblyGeom.edge
+
+    # check which variable
+    amap = core.Map
+    if which is None:
+        which = list(amap.serpcentermap.keys())
+        which = [amap.serp2fren[k] for k in which]
+
+    # check data type
+    if data2 is not None:
+        v1 = get(data, what, which, time=time, z=z, pre=pre,
+                 gro=gro, grp=grp, core=core, myslice=myslice).squeeze()
+        v2 = get(data2, what, which, time=time, z=z, pre=pre,
+                 gro=gro, grp=grp, core=core, myslice=myslice).squeeze()
+        tmp = np.true_divide(v1-v2, v1)
+        tmp[tmp == np.inf] = 0
+        tmp = np.nan_to_num(tmp)
+        tallies = tmp*100
+    else:
+        tallies = get(data, what, which, time=time, z=z, pre=pre,
+                      gro=gro, grp=grp, core=core, myslice=myslice).squeeze()
+
+    if thresh is None:
+        thresh = -np.inf
+    elif not isinstance(thresh, (Real, int, np.float)):
+        raise TypeError(
+            "thresh should be real, not {}".format(type(thresh)))
+    # open figure
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    patches, coord, values = [], [], []
+    patchesapp = patches.append
+    coordapp = coord.append
+    valuesapp = values.append
+
+    # check if slice
+    if len(tallies) < core.NAss:
+        # only some assemblies
+        if len(which) > len(tallies):
+            which = myslice['nhex']
+        hexdata = myslice['nhex']
+
+    for key, xy in amap.serpcentermap.items():
+
+        # check key is in which list
+        k = amap.serp2fren[key]
+        if k not in which:
+            continue
+        i = hexdata.index(k)
+        if tallies[i] <= thresh:
+            continue
+
+        coordapp(xy)
+        valuesapp(tallies[i])
+        x, y = xy
+        # scale coordinate
+        xy = (x*scale, y*scale)
+        # define assembly patch
+        asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges,
+                                  L*scale, orientation=orientation,
+                                  **kwargs)
+        patchesapp(asspatch)
+
+    coord = np.asarray(coord)
+    values = np.asarray(values)
+
+    # plot physics
+    patches = np.asarray(patches, dtype=object)
+
+    normalizer = normalizerFactory(values, None, False,
+                                   coord[:, 0]*scale,
+                                   coord[:, 1]*scale)
+    pc = PatchCollection(patches, cmap=cmap, **kwargs)
+
+    if title is True:
+        nodes = core.NEAxialConfig.AxNodes
+        idz = np.argmin(abs(z-nodes))
+
+        times = core.TimeProf
+        idt = np.argmin(abs(time-times))
+
+        title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], times[idt])
+
+    formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
+               xlabel=xlabel or "X [cm]",
+               ylabel=ylabel or "Y [cm]", title=title)
+    pc.set_array(values)
+    pc.set_norm(normalizer)
+    ax.add_collection(pc)
+    addColorbar(ax, pc, cbarLabel=cbarLabel)
+
+    # add labels on top of the polygons
+    if label is True:
+        fmt = "%.1e" if abs(np.max(np.max(tallies))) > 999 else fmt
+        for key, coord in (core.Map.serpcentermap).items():
+            # check key is in "which" list
+            k = core.Map.serp2fren[key]
+            if k not in which:
+                continue
+            else:
+                i = hexdata.index(k)
+                if tallies[i] <= thresh:
+                    continue
+                x, y = coord
+                # plot text inside assemblies
+                txt = fmt % tallies[i]
+                # rc('text', usetex=False)
+                plt.text(x*scale, y*scale, txt, ha='center',
+                         va='center', size=fontsize)
+
+    ax.axis('equal')
+    if xlabel is None and ylabel is None:
+        plt.axis('off')
+
+    # save figure
+    if figname is not None:
+        fig.savefig(figname, bbox_inches='tight', dpi=250)
+
+
+def get(data, which, hexa, time=None, z=None, pre=None,
+        gro=None, grp=None, core=None, myslice=None):
+    """
+    Get profile from output.
+
+    Parameters
+    ----------
+    path : TYPE
+        DESCRIPTION.
+    which : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None
+    """
+    idx = PostProcess.distrout.index(which)
+    dims = PostProcess.distrout_dim[idx]
+
+    if core is not None:
+        # check hexa, nelz and ntim consistency
+        Taxis = dims.index('ntim')
+        Zaxis = dims.index('nelz')
+        Haxis = dims.index('nhex')
+        masksize = list(data.shape)
+        if data.shape[Haxis] < core.NAss:
+            # map columns and hexagons
+            hexa = [myslice['nhex'].index(h) for h in hexa]
+
+    if z is not None and time is not None and core is None:
+        raise OSError('Core object is needed to plot this kind of data!')
+
+    nodes = core.NEAxialConfig.AxNodes
+    if z is not None:
+        if data.shape[Zaxis] < core.NEAxialConfig.AxNodes.shape[0]:
+            nodes = myslice['nelz']
+
+        if isinstance(z, (list, np.ndarray)):
+            idz = [np.argmin(abs(zi-nodes)) for zi in z]
+        else:
+            idz = [np.argmin(abs(z-nodes))]
+    else:
+        if data.shape[Zaxis] < core.NEAxialConfig.AxNodes.shape[0]:
+            NZ = len(myslice['nelz'])
+        else:
+            NZ = len(nodes)
+        idz = np.arange(0, NZ).tolist()
+
+    if time is not None:
+        times = core.TimeProf
+        if data.shape[Taxis] < len(times):
+            times = myslice['ntim']
+        if isinstance(time, (list, np.ndarray)):
+            idt = [np.argmin(abs(t-times)) for t in time]
+        else:
+            idt = [np.argmin(abs(time-times))]
+    else:
+        idt = None
+    dimdict = {'ntim': idt, 'nelz': idz, 'nhex': hexa, 'ngro': gro,
+               'ngrp': grp, 'nprec': pre}
+
+    # parse specified time, assembly, axial node, group, prec. fam.
+    dimlst = []
+    for d in dims:
+        x = dimdict[d]
+        if x is None:
+            x = 0 if x == 'ntim' else slice(None)
+
+        dimlst.append(x)
+
+    profile = np.asarray(data)
+    profile = profile[np.ix_(*dimlst)]
+
+    return profile
