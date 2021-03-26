@@ -117,8 +117,8 @@ class AxialConfig:
 
         """
         # homogenisation cuts
-        self.mycuts = cuts['mycuts']
-        self.splitz = splitz
+        if cuts['mycuts'] is not None:
+            self.mycuts = cuts['mycuts']
         # cuts defining different material regions
         xscuts = cuts['xscuts']
         # initialise dict
@@ -130,17 +130,21 @@ class AxialConfig:
             for r1, u1, l1 in cuts:
                 rap(r1), uap(u1), lap(l1)
             self.cuts[asstype] = AxialCuts(up, lo, r)
-        self.AxNodes = np.zeros((sum(splitz), ))
-        self.dz = np.zeros((sum(splitz), ))
-        # assign axial nodes coordinates
-        idx = 0
-        for iz in range(0, len(self.mycuts[1:])):
-            dz = (self.mycuts[iz+1]-self.mycuts[iz])/splitz[iz]
-            tmp = np.arange(self.mycuts[iz]+dz/2, self.mycuts[iz+1], dz)
-            ns = len(tmp)
-            self.AxNodes[idx:idx+ns] = tmp
-            self.dz[idx:idx+ns] = dz
-            idx = idx+ns
+
+        if splitz is not None:
+            self.splitz = splitz
+
+            self.AxNodes = np.zeros((sum(splitz), ))
+            self.dz = np.zeros((sum(splitz), ))
+            # assign axial nodes coordinates
+            idx = 0
+            for iz in range(0, len(self.mycuts[1:])):
+                dz = (self.mycuts[iz+1]-self.mycuts[iz])/splitz[iz]
+                tmp = np.arange(self.mycuts[iz]+dz/2, self.mycuts[iz+1], dz)
+                ns = len(tmp)
+                self.AxNodes[idx:idx+ns] = tmp
+                self.dz[idx:idx+ns] = dz
+                idx = idx+ns
 
 
 class AxialCuts:

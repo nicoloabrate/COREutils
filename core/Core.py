@@ -118,7 +118,7 @@ class Core:
 
         if isinstance(nProf, (float, int)):
             dt = tEnd/nProf
-            self.TimeProf = np.arange(0, tEnd+dt, dt)
+            self.TimeProf = np.arange(0, tEnd+dt, dt) if dt > 0 else 0
         elif isinstance(nProf, list) and len(nProf) > 1:
             self.TimeProf = nProf
         else:

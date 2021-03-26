@@ -97,7 +97,7 @@ class Map:
 
         # Serpent centers map
         self.serpcentermap = dict(zip(serpmap, coord))
-        # FIXME define also a dict to map the ass numbers of each type!
+        # TODO define also a dict to map the ass numbers of each type!
 
     def __findcenters(self, AssRadGeom):
         """
@@ -199,7 +199,7 @@ class Map:
         Nx, Ny = np.shape(self.type)
         # define assembly numeration (same for squared and hex.lattice)
         assnum = np.arange(1, Nx*Ny+1)  # array with assembly numbers
-        assnum = assnum.reshape(Nx, Ny)  # reshape as a matrix
+        assnum = assnum.reshape(Nx, Ny).T  # reshape as a matrix
         assnum = assnum.flatten('F')  # flattening the matrix by columns
 
         if AssRadGeom.type == "H":

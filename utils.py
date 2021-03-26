@@ -193,7 +193,7 @@ def __parseNE(NEinp):
     if 'splitz' in NEinp.keys():
         splitz = NEinp['splitz']
     else:
-        splitz = 10
+        splitz = None
 
     if 'fren' in NEinp.keys():
         fren = NEinp['fren']

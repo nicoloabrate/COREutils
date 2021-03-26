@@ -418,7 +418,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                                  ha='center', va='center', size=fontsize)
 
         # add my cuts on top of patch
-        if mycuts is True:
+        if mycuts is True and 'mycuts' in core.NEAxialConfig.__dict__.keys():
             for myz in core.NEAxialConfig.mycuts:
                 plt.hlines(myz*scale, (x-L/2)*scale, (x+L/2)*scale,
                            linestyles='dashed', linewidth=1, edgecolor='k')
