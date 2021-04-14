@@ -1,4 +1,4 @@
-% Legend: IF=MA, OF=REF, DR=REF, CR=4, SR=5, BA=5, ll=BLK, vv=*
+% Legend: IF=MA , OF=REF, DR=REF, CR=4, SR=5, BA=5, ll=BLK, vv=*
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *
@@ -11,11 +11,11 @@
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    REF  REF  BLK  BLK  BLK  BLK  BLK  BLK  *    *
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    REF  REF  REF  BLK  BLK  BLK  BLK  BLK  BLK  *    *
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    REF  REF  REF  REF  BLK  BLK  BLK  BLK  BLK  *    *    *
-*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA  MA  REF  REF  REF  BLK  BLK  BLK  BLK  BLK  *    *    *
-*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA  MA  MA  REF  REF  REF  BLK  BLK  BLK  BLK  BLK  *    *    *
-*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA  MA  MA  REF  REF  REF  REF  BLK  BLK  BLK  BLK  BLK  *    *    *
-*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA  MA  MA  MA  REF  REF  REF  REF  BLK  BLK  BLK  BLK  *    *    *    *
-*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA  MA  MA  MA  MA  MA  REF  REF  REF  REF  BLK  BLK  BLK  BLK  *    *    *    *  
+*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA   MA   REF  REF  REF  BLK  BLK  BLK  BLK  BLK  *    *    *
+*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA   MA   MA   REF  REF  REF  BLK  BLK  BLK  BLK  BLK  *    *    *
+*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA   MA   MA   REF  REF  REF  REF  BLK  BLK  BLK  BLK  BLK  *    *    *
+*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA   MA   MA   MA   REF  REF  REF  REF  BLK  BLK  BLK  BLK  *    *    *    *
+*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    MA   MA   MA   MA   MA   MA   REF  REF  REF  REF  BLK  BLK  BLK  BLK  *    *    *    *
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *
 *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *

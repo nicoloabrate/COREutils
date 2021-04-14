@@ -1,0 +1,369 @@
+{
+        "CI": {
+                "tEnd": 35,
+                "nProf": 70,
+                "pitch": 17.1,
+                "shape": "H",
+                "power": 300000000.0
+        },
+        "NE": {
+                "filename": "ALFRED_1_6_NE.txt",
+                "rotation": 60,
+                "assemblynames": [
+                        "IF",
+                        "OF",
+                        "CR",
+                        "SR",
+                        "DR",
+                        "BA",
+                        "EL"
+                ],
+                "fren": true,
+                "NEdata": {
+                        "path": "NEdata/endfb8",
+                        "beginwith": [
+                                "ALFRED-FC"
+                        ]
+                },
+                "replace": {
+                        "SR": [
+                                92,
+                                326,
+                                237,
+                                3
+                        ]
+                },
+                "cuts": {
+                        "IF": [
+                                [
+                                        "IF_BOT_REF",
+                                        0,
+                                        79
+                                ],
+                                [
+                                        "IF_BOT_PLUG",
+                                        79,
+                                        84
+                                ],
+                                [
+                                        "IF_PLEN",
+                                        84,
+                                        139
+                                ],
+                                [
+                                        "IF_BOT_INS",
+                                        139,
+                                        140
+                                ],
+                                [
+                                        "INN_FUEL",
+                                        140,
+                                        200
+                                ],
+                                [
+                                        "IF_TOP_INS",
+                                        200,
+                                        201
+                                ],
+                                [
+                                        "IF_SPRING",
+                                        201,
+                                        213
+                                ],
+                                [
+                                        "IF_TOP_PLUG",
+                                        213,
+                                        218
+                                ],
+                                [
+                                        "IF_TOP_REF",
+                                        218,
+                                        340
+                                ]
+                        ],
+                        "OF": [
+                                [
+                                        "OF_BOT_REF",
+                                        0,
+                                        79
+                                ],
+                                [
+                                        "OF_BOT_PLUG",
+                                        79,
+                                        84
+                                ],
+                                [
+                                        "OF_PLEN",
+                                        84,
+                                        139
+                                ],
+                                [
+                                        "OF_BOT_INS",
+                                        139,
+                                        140
+                                ],
+                                [
+                                        "OUT_FUEL",
+                                        140,
+                                        200
+                                ],
+                                [
+                                        "OF_TOP_INS",
+                                        200,
+                                        201
+                                ],
+                                [
+                                        "OF_SPRING",
+                                        201,
+                                        213
+                                ],
+                                [
+                                        "OF_TOP_PLUG",
+                                        213,
+                                        218
+                                ],
+                                [
+                                        "OF_TOP_REF",
+                                        218,
+                                        340
+                                ]
+                        ],
+                        "CR": [
+                                [
+                                        "CR_BOT_REF",
+                                        0,
+                                        62
+                                ],
+                                [
+                                        "CR_BOT_PLUG",
+                                        62,
+                                        67
+                                ],
+                                [
+                                        "CR_BOT_INS",
+                                        67,
+                                        68
+                                ],
+                                [
+                                        "CR_ACT",
+                                        68,
+                                        136
+                                ],
+                                [
+                                        "CR_DUMM",
+                                        136,
+                                        204
+                                ],
+                                [
+                                        "CR_SPRING",
+                                        204,
+                                        264
+                                ],
+                                [
+                                        "CR_TOP_REF",
+                                        264,
+                                        340
+                                ]
+                        ],
+                        "SR": [
+                                [
+                                        "SR_BOT_REF",
+                                        0,
+                                        207
+                                ],
+                                [
+                                        "SR_BOT_PLUG",
+                                        207,
+                                        212
+                                ],
+                                [
+                                        "SR_ACT",
+                                        212,
+                                        296
+                                ],
+                                [
+                                        "SR_TOP_INS",
+                                        296,
+                                        297
+                                ],
+                                [
+                                        "SR_SPRING",
+                                        297,
+                                        307
+                                ],
+                                [
+                                        "SR_TOP_REF",
+                                        307,
+                                        340
+                                ]
+                        ],
+                        "DR": [
+                                [
+                                        "DR_BOT_REF",
+                                        0,
+                                        79
+                                ],
+                                [
+                                        "DR_BOT_PLUG",
+                                        79,
+                                        84
+                                ],
+                                [
+                                        "DR_DUMM",
+                                        84,
+                                        201
+                                ],
+                                [
+                                        "DR_SPRING",
+                                        201,
+                                        213
+                                ],
+                                [
+                                        "DR_TOP_PLUG",
+                                        213,
+                                        218
+                                ],
+                                [
+                                        "DR_TOP_REF",
+                                        218,
+                                        340
+                                ]
+                        ],
+                        "BA": [
+                                [
+                                        "BA",
+                                        0,
+                                        340
+                                ]
+                        ],
+                        "EL": [
+                                [
+                                        "ll",
+                                        0,
+                                        340
+                                ]
+                        ]
+                },
+                "mycuts": [
+                        0,
+                        79,
+                        94,
+                        110,
+                        125,
+                        140,
+                        152,
+                        164,
+                        176,
+                        188,
+                        200,
+                        212,
+                        296,
+                        340
+                ],
+                "splitz": [
+                        4,
+                        2,
+                        2,
+                        2,
+                        2,
+                        2,
+                        2,
+                        2,
+                        2,
+                        2,
+                        1,
+                        3,
+                        2
+                ],
+                "config": {
+                        "0": {
+                                "translate": {
+                                        "which": [
+                                                [
+                                                        28,
+                                                        106,
+                                                        123,
+                                                        184,
+                                                        201,
+                                                        262,
+                                                        279,
+                                                        340,
+                                                        357,
+                                                        418,
+                                                        435,
+                                                        45
+                                                ]
+                                        ],
+                                        "dz": [
+                                                45
+                                        ]
+                                }
+                        },
+                        "5.25": {
+                                "translate": {
+                                        "which": [
+                                                [
+                                                        28
+                                                ]
+                                        ],
+                                        "dz": [
+                                                12
+                                        ]
+                                }
+                        },
+                        "13.931980515339465": {
+                                "translate": {
+                                        "which": [
+                                                [
+                                                        28
+                                                ]
+                                        ],
+                                        "dz": [
+                                                10
+                                        ]
+                                }
+                        }
+                },
+                "regionsplot": {
+                        "IF_TOP_REF": "top reflector",
+                        "IF_TOP_PLUG": "top plug",
+                        "IF_SPRING": "spring",
+                        "IF_TOP_INS": "top insulator",
+                        "INN_FUEL": "inner fuel",
+                        "IF_BOT_INS": "bottom insulator",
+                        "IF_PLEN": "plenum",
+                        "IF_BOT_PLUG": "bottom plug",
+                        "IF_BOT_REF": "bottom reflector",
+                        "OF_TOP_INS": "top insulator",
+                        "OUT_FUEL": "outer fuel",
+                        "OF_BOT_INS": "bottom insulator",
+                        "OF_TOP_REF": "top reflector",
+                        "OF_TOP_PLUG": "top plug",
+                        "OF_SPRING": "spring",
+                        "OF_PLEN": "plenum",
+                        "OF_BOT_PLUG": "bottom plug",
+                        "OF_BOT_REF": "bottom reflector",
+                        "CR_TOP_REF": "top reflector",
+                        "CR_SPRING": "spring",
+                        "CR_DUMM": "control rod dummy",
+                        "CR_ACT": "control rod",
+                        "CR_BOT_INS": "bottom insulator",
+                        "CR_BOT_PLUG": "bottom plug",
+                        "CR_BOT_REF": "bottom reflector",
+                        "DR_TOP_REF": "top reflector",
+                        "DR_TOP_PLUG": "top plug",
+                        "SR_BOT_REF": "bottom reflector",
+                        "SR_BOT_PLUG": "bottom plug",
+                        "SR_ACT": "safety rod",
+                        "SR_TOP_INS": "top insulator",
+                        "SR_SPRING": "spring",
+                        "SR_TOP_REF": "top reflector",
+                        "DR_SPRING": "spring",
+                        "DR_DUMM": "dummy element",
+                        "DR_BOT_PLUG": "bottom plug",
+                        "DR_BOT_REF": "bottom reflector",
+                        "BA": "barrel",
+                        "ll": "lead"
+                }
+        }
+}
