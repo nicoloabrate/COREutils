@@ -19,4 +19,5 @@ frenetic/InpNE.py
 frenetic/InpTH.py
 frenetic/ParseFrenOut.py
 frenetic/__init__.py
+frenetic/postprocess.py
 frenetic/templates/__init__.py

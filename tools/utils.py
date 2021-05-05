@@ -92,12 +92,14 @@ def __parseCI(CIinp):
     if 'tEnd' in CIinp.keys():
         tEnd = CIinp['tEnd']
     else:
-        raise OSError("No final simulation time is provided in CI!")
+        tEnd = 0
+        print("WARNING: No final simulation time is provided in CI!")
 
     if 'nProf' in CIinp.keys():
         nProf = CIinp['nProf']
     else:
-        raise OSError("No number of time profiles is provided in CI!")
+        nProf = 1
+        print("WARNING: No number of time profiles is provided in CI!")
 
     if 'pitch' in CIinp.keys():
         pitch = CIinp['pitch']

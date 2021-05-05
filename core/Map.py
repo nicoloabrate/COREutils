@@ -199,15 +199,17 @@ class Map:
         Nx, Ny = np.shape(self.type)
         # define assembly numeration (same for squared and hex.lattice)
         assnum = np.arange(1, Nx*Ny+1)  # array with assembly numbers
-        assnum = assnum.reshape(Nx, Ny).T  # reshape as a matrix
-        assnum = assnum.flatten('F')  # flattening the matrix by columns
-
         if AssRadGeom.type == "H":
-
+            assnum = assnum.reshape(Nx, Ny).T  # reshape as a matrix
+            assnum = assnum.flatten('F')  # flattening the matrix by columns
             # flatten the matrix by rows
             coretype = self.type.flatten('C')
             # squeeze out void assembly numbers
             assnum[coretype == 0] = 0
+        elif AssRadGeom.type == "S":
+            assnum = assnum.reshape(Nx, Ny)  # reshape as a matrix
+            assnum = assnum.flatten('F')  # flattening the matrix by columns
+
         # select non-zero elements
         sermap = assnum[assnum != 0]
 

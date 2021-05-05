@@ -217,6 +217,7 @@ def ffplot(mesh, Vh, ffdata=None, surf=False, showmesh=False,
     if figname is not None:
         fig.savefig(figname, bbox_inches='tight', dpi=250)
 
+
 def PrepareMesh(points, triangles):
     """
     Define mesh parameters for plotting.

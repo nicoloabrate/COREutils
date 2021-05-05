@@ -13,7 +13,7 @@ import numpy as np
 from copy import deepcopy
 from collections import OrderedDict
 
-from coreutils.utils import parse
+from coreutils.tools.utils import parse
 from coreutils.core.Map import Map
 from coreutils.core.UnfoldCore import UnfoldCore
 from coreutils.core.MaterialData import NEMaterialData, CZMaterialData
@@ -118,7 +118,7 @@ class Core:
 
         if isinstance(nProf, (float, int)):
             dt = tEnd/nProf
-            self.TimeProf = np.arange(0, tEnd+dt, dt) if dt > 0 else 0
+            self.TimeProf = np.arange(0, tEnd+dt, dt) if dt > 0 else [0]
         elif isinstance(nProf, list) and len(nProf) > 1:
             self.TimeProf = nProf
         else:

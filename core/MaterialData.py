@@ -171,7 +171,7 @@ class NEMaterialData:
 
                 # maybe Tf and Tc swapped
 
-            except OSError():
+            except OSError:
                 suffT2 = "_".join(["Tc", str(Tc[idx]), "Tf", str(Tf[idx])])
                 # join name,temp and suff
                 name = "_".join([f, suffT2, "res.m"])

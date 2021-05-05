@@ -13,7 +13,7 @@ import numpy as np
 from shutil import move, copyfile
 from os.path import join
 from . import templates
-from ..utils import fortranformatter as ff
+from coreutils.tools.utils import fortranformatter as ff
 from .InpTH import writeTHdata, writeCZdata, makeTHinput
 from .InpNE import writeConfig, makeNEinput, writemacro, writeNEdata
 try:
@@ -113,6 +113,8 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
         for res in core.NEMaterialData.data[temp[0]]:
             for k in res.universes.keys():
                 NG = res.universes[k]._numGroups
+                if NG is None:  # workaround for serpentTools when _numGroups is None
+                    NG = res.universes[k].infExp['infInvv'].shape[0]
                 if res.universes[k].infExp['infNubar'][0] > 0:
                     unifuel = k
                     break
@@ -146,7 +148,7 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
                    (Tf, Tc), unimap)
 
         # -- write NE_data.h5
-        writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False)
+        writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=txtfmt)
         # move NE files
         NEfiles = ['macro.nml', 'NE_data.h5']
         [move(f, join(NEpath, f)) for f in NEfiles]

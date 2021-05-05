@@ -8,7 +8,7 @@ Description: Set of methods for generating FRENETIC input files.
 """
 import io
 from . import templates
-from ..utils import fortranformatter as ff
+from coreutils.tools.utils import fortranformatter as ff
 try:
     import importlib.resources as pkg_resources
 except ImportError:

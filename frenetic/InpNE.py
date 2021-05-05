@@ -12,7 +12,7 @@ from shutil import rmtree
 import numpy as np
 import h5py as h5
 from . import templates
-from ..utils import fortranformatter as ff
+from coreutils.tools.utils import fortranformatter as ff
 try:
     import importlib.resources as pkg_resources
 except ImportError:
@@ -286,7 +286,7 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                             if itup == len(temps)-1:
                                 if txtfmt is True:
                                     # write txt file
-                                    mysavetxt(txtname, frendata)
+                                    mysavetxt(txt, frendata)
                                 # save in h5 file
                                 tmp = np.array(frendata, dtype=np.float)
                                 fh5.create_dataset(txt, data=tmp)

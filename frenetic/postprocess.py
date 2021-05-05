@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import RegularPolygon
 from matplotlib.collections import PatchCollection
 from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
+from coreutils.tools.plot import RadialMap
 from matplotlib import rc
 
 
@@ -420,28 +421,6 @@ class PostProcess:
         None.
 
         """
-        # set default font and TeX interpreter
-        rc('font', **{'family': 'DejaVu Sans'})
-        rc('text', usetex=usetex)
-        # set default parameters
-        kwargs.setdefault("ec", "k")
-        kwargs.setdefault("linewidth", 0.5)
-        kwargs.setdefault("lw", 0.5)
-        kwargs.setdefault("alpha", 1)
-        fontsize = kwargs.get("fontsize", 4)
-        # delete size from kwargs to use it in patches
-        if 'fontsize' in kwargs:
-            del kwargs['fontsize']
-
-        orientation = 0
-        L = core.AssemblyGeom.edge
-
-        # check which variable
-        amap = core.Map
-        if which is None:
-            which = list(amap.serpcentermap.keys())
-            which = [amap.serp2fren[k] for k in which]
-
         # check data type
         if isinstance(what, dict):  # comparison with FRENETIC and other vals.
             tallies = np.zeros((core.NAss, len(what.keys())))
@@ -468,48 +447,6 @@ class PostProcess:
         else:
             raise TypeError('Input must be str, dict or list!')
 
-        if thresh is None:
-            thresh = -np.inf
-        elif not isinstance(thresh, (Real, int, np.float)):
-            raise TypeError(
-                "thresh should be real, not {}".format(type(thresh)))
-        # open figure
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-
-        patches, coord, values = [], [], []
-        patchesapp = patches.append
-        coordapp = coord.append
-        valuesapp = values.append
-        for key, xy in amap.serpcentermap.items():
-
-            # check key is in which list
-            k = amap.serp2fren[key]
-            if k not in which or tallies[k-1] <= thresh:
-                continue
-
-            coordapp(xy)
-            valuesapp(tallies[k-1])
-            x, y = xy
-            # scale coordinate
-            xy = (x*scale, y*scale)
-            # define assembly patch
-            asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges,
-                                      L*scale, orientation=orientation,
-                                      **kwargs)
-            patchesapp(asspatch)
-
-        coord = np.asarray(coord)
-        values = np.asarray(values)
-
-        # plot physics
-        patches = np.asarray(patches, dtype=object)
-
-        normalizer = normalizerFactory(values, None, False,
-                                       coord[:, 0]*scale,
-                                       coord[:, 1]*scale)
-        pc = PatchCollection(patches, cmap=cmap, **kwargs)
-
         if title is True:
             nodes = core.NEAxialConfig.AxNodes
             idz = np.argmin(abs(z-nodes))
@@ -531,37 +468,14 @@ class PostProcess:
             # uom = '$%s$' % uom if usetex is True else uom
             cbarLabel = r'%s $%s$' % (dist, uom)
 
-        formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
-                   xlabel=xlabel or "X [cm]",
-                   ylabel=ylabel or "Y [cm]", title=title)
-        pc.set_array(values)
-        pc.set_norm(normalizer)
-        ax.add_collection(pc)
-        addColorbar(ax, pc, cbarLabel=cbarLabel)
-
-        # add labels on top of the polygons
-        if label is True:
-            fmt = "%.1e" if abs(np.max(np.max(tallies))) > 999 else "%.1f"
-            for key, coord in (core.Map.serpcentermap).items():
-                # check key is in "which" list
-                k = core.Map.serp2fren[key]
-                if k not in which or tallies[k-1] <= thresh:
-                    continue
-                else:
-                    x, y = coord
-                    # plot text inside assemblies
-                    txt = fmt % tallies[amap.serp2fren[key]-1]
-                    # rc('text', usetex=False)
-                    plt.text(x*scale, y*scale, txt, ha='center',
-                             va='center', size=fontsize)
-
-        ax.axis('equal')
-        if xlabel is None and ylabel is None:
-            plt.axis('off')
-
-        # save figure
-        if figname is not None:
-            fig.savefig(figname, bbox_inches='tight', dpi=250)
+        RadialMap(core, tallies=tallies, z=z, time=time, pre=pre, gro=gro,
+                  grp=grp, label=False, figname=None, which=None, fren=False,
+                  whichconf='NEconfig', asstype=False, dictname=None,
+                  legend=False, txtcol='k', usetex=False, fill=False,
+                  axes=None, cmap='Spectral_r', thresh=None,
+                  cbarLabel=cbarLabel, xlabel=None, ylabel=None,
+                  loglog=None, logx=None, logy=None, title=title,
+                  scale=1, fmt="%.2f", numbers=False, **kwargs)
 
     @staticmethod
     def __loadtxt(fname):
@@ -659,203 +573,6 @@ class PostProcess:
                 raise OSError("File extension is wrong. Only HDF5 can be parsed")
 
         return fname
-
-
-def RadialMap(data, what, core, data2=None, myslice=None, z=0, time=0, pre=0,
-              gro=0, grp=0,
-              label=False, figname=None, which=None,
-              usetex=False, fill=True, axes=None, cmap='Spectral_r',
-              thresh=None, cbarLabel=None, xlabel=None, ylabel=None,
-              loglog=None, logx=None, logy=None, title=True,
-              scale=1, fmt="%.2f", numbers=False, **kwargs):
-    """
-    Plot FRENETIC output on the x-y plane.
-
-    Parameters
-    ----------
-    label : TYPE, optional
-        DESCRIPTION. The default is False.
-    figname : TYPE, optional
-        DESCRIPTION. The default is None.
-    fren : TYPE, optional
-        DESCRIPTION. The default is False.
-    which : TYPE, optional
-        DESCRIPTION. The default is None.
-    usetex : TYPE, optional
-        DESCRIPTION. The default is False.
-    fill : TYPE, optional
-        DESCRIPTION. The default is True.
-    axes : TYPE, optional
-        DESCRIPTION. The default is None.
-    cmap : TYPE, optional
-        DESCRIPTION. The default is 'Spectral_r'.
-    thresh : TYPE, optional
-        DESCRIPTION. The default is None.
-    cbarLabel : TYPE, optional
-        DESCRIPTION. The default is None.
-    xlabel : TYPE, optional
-        DESCRIPTION. The default is None.
-    ylabel : TYPE, optional
-        DESCRIPTION. The default is None.
-    loglog : TYPE, optional
-        DESCRIPTION. The default is None.
-    logx : TYPE, optional
-        DESCRIPTION. The default is None.
-    logy : TYPE, optional
-        DESCRIPTION. The default is None.
-    title : TYPE, optional
-        DESCRIPTION. The default is None.
-    scale : TYPE, optional
-        DESCRIPTION. The default is 1.
-    fmt : TYPE, optional
-        DESCRIPTION. The default is "%.2f".
-    **kwargs : TYPE
-        DESCRIPTION.
-
-    Raises
-    ------
-    IndexError
-        DESCRIPTION.
-    TypeError
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
-    """
-    # set default font and TeX interpreter
-    rc('font', **{'family': 'DejaVu Sans'})
-    rc('text', usetex=usetex)
-    # set default parameters
-    kwargs.setdefault("ec", "k")
-    kwargs.setdefault("linewidth", 0.5)
-    kwargs.setdefault("lw", 0.5)
-    kwargs.setdefault("alpha", 1)
-    fontsize = kwargs.get("fontsize", 4)
-    # delete size from kwargs to use it in patches
-    if 'fontsize' in kwargs:
-        del kwargs['fontsize']
-
-    orientation = 0
-    L = core.AssemblyGeom.edge
-
-    # check which variable
-    amap = core.Map
-    if which is None:
-        which = list(amap.serpcentermap.keys())
-        which = [amap.serp2fren[k] for k in which]
-
-    # check data type
-    if data2 is not None:
-        v1 = get(data, what, which, time=time, z=z, pre=pre,
-                 gro=gro, grp=grp, core=core, myslice=myslice).squeeze()
-        v2 = get(data2, what, which, time=time, z=z, pre=pre,
-                 gro=gro, grp=grp, core=core, myslice=myslice).squeeze()
-        tmp = np.true_divide(v1-v2, v1)
-        tmp[tmp == np.inf] = 0
-        tmp = np.nan_to_num(tmp)
-        tallies = tmp*100
-    else:
-        tallies = get(data, what, which, time=time, z=z, pre=pre,
-                      gro=gro, grp=grp, core=core, myslice=myslice).squeeze()
-
-    if thresh is None:
-        thresh = -np.inf
-    elif not isinstance(thresh, (Real, int, np.float)):
-        raise TypeError(
-            "thresh should be real, not {}".format(type(thresh)))
-    # open figure
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    patches, coord, values = [], [], []
-    patchesapp = patches.append
-    coordapp = coord.append
-    valuesapp = values.append
-
-    # check if slice
-    if len(tallies) < core.NAss:
-        # only some assemblies
-        if len(which) > len(tallies):
-            which = myslice['nhex']
-        hexdata = myslice['nhex']
-
-    for key, xy in amap.serpcentermap.items():
-
-        # check key is in which list
-        k = amap.serp2fren[key]
-        if k not in which:
-            continue
-        i = hexdata.index(k)
-        if tallies[i] <= thresh:
-            continue
-
-        coordapp(xy)
-        valuesapp(tallies[i])
-        x, y = xy
-        # scale coordinate
-        xy = (x*scale, y*scale)
-        # define assembly patch
-        asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges,
-                                  L*scale, orientation=orientation,
-                                  **kwargs)
-        patchesapp(asspatch)
-
-    coord = np.asarray(coord)
-    values = np.asarray(values)
-
-    # plot physics
-    patches = np.asarray(patches, dtype=object)
-
-    normalizer = normalizerFactory(values, None, False,
-                                   coord[:, 0]*scale,
-                                   coord[:, 1]*scale)
-    pc = PatchCollection(patches, cmap=cmap, **kwargs)
-
-    if title is True:
-        nodes = core.NEAxialConfig.AxNodes
-        idz = np.argmin(abs(z-nodes))
-
-        times = core.TimeProf
-        idt = np.argmin(abs(time-times))
-
-        title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], times[idt])
-
-    formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
-               xlabel=xlabel or "X [cm]",
-               ylabel=ylabel or "Y [cm]", title=title)
-    pc.set_array(values)
-    pc.set_norm(normalizer)
-    ax.add_collection(pc)
-    addColorbar(ax, pc, cbarLabel=cbarLabel)
-
-    # add labels on top of the polygons
-    if label is True:
-        fmt = "%.1e" if abs(np.max(np.max(tallies))) > 999 else fmt
-        for key, coord in (core.Map.serpcentermap).items():
-            # check key is in "which" list
-            k = core.Map.serp2fren[key]
-            if k not in which:
-                continue
-            else:
-                i = hexdata.index(k)
-                if tallies[i] <= thresh:
-                    continue
-                x, y = coord
-                # plot text inside assemblies
-                txt = fmt % tallies[i]
-                # rc('text', usetex=False)
-                plt.text(x*scale, y*scale, txt, ha='center',
-                         va='center', size=fontsize)
-
-    ax.axis('equal')
-    if xlabel is None and ylabel is None:
-        plt.axis('off')
-
-    # save figure
-    if figname is not None:
-        fig.savefig(figname, bbox_inches='tight', dpi=250)
 
 
 def get(data, which, hexa, time=None, z=None, pre=None,
