@@ -553,22 +553,29 @@ class Core:
                             cuts.upz[0:-1] = [z+dz for z in cuts.upz[0:-1]]
                             cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]
                             nass = len(self.NEassemblytypes.keys())
-                            self.NEassemblytypes.update([(nass + 1, newname)])
-                            self.NEassemblylabel.update([(nass + 1, self.NEassemblylabel[atype])])
+                            if now > 0:
+                                self.NEassemblytypes.update([(nass + 1, newname)])
+                                self.NEassemblylabel.update([(nass + 1, self.NEassemblylabel[atype])])
+                            else:
+                                # change newname
+                                newname = what
                             upz, loz, reg = cuts.upz, cuts.loz, cuts.reg
                             self.NEAxialConfig.cuts[newname] = AxialCuts(upz, loz,
                                                                          reg)
 
                         # replace assembly
-                        if newcore is None:
-                            # take previous time-step configuration
-                            newcore = self.replace(nass+1, assbly,
-                                                   isfren=isfren,
-                                                   core=self.NEconfig[now])
+                        if now > 0:
+                            if newcore is None:
+                                # take previous time-step configuration
+                                newcore = self.replace(nass+1, assbly,
+                                                       isfren=isfren,
+                                                       core=self.NEconfig[now])
+                            else:
+                                # take "newcore"
+                                newcore = self.replace(nass+1, assbly, isfren,
+                                                       newcore)
                         else:
-                            # take "newcore"
-                            newcore = self.replace(nass+1, assbly, isfren,
-                                                   newcore)
+                            newcore = self.NEconfig[now]
 
                 else:
                     newcore = self.NEconfig[now]

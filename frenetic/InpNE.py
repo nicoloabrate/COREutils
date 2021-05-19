@@ -243,13 +243,18 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
     DFLmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
     MFPmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
     DFL = np.zeros((len(core.NEassemblytypes), NZ, NG, len(temps)))
-
+    TOT = np.zeros((len(core.NEassemblytypes)*NZ, NG, len(temps)))
+    FIS = np.zeros((len(core.NEassemblytypes)*NZ, NG, len(temps)))
+    DFC = np.zeros((len(core.NEassemblytypes)*NZ, NG, len(temps)))
+    SXS = np.zeros((len(core.NEassemblytypes)*NZ, NG, NG, len(temps)))
     # loop over kind of SAs
     iz, ih = 0, -1
     for hextype, hexname in core.NEassemblytypes.items():
         zold = iz+0
         # update hexagon tpye counter
         ih = ih+1
+        # create SIMMER special files for scattering matrix
+
         for data, dataname in datakeys.items():  # loop over data
             iz = zold
             homogdata = {}
@@ -279,11 +284,14 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                                 # select matrix entry
                                 r, c = where[tup]
                                 frendata[r, c] = homogdata[tup][z, gc]
+                                SXS[iz, gdep, g, itup] = homogdata[tup][z, gc]
+
                                 # write output if last tuple is reached
                                 if itup == len(temps)-1:
-                                    if txtfmt is True:
-                                        # write txt file
-                                        mysavetxt(txtname, frendata)
+                                    # SIMMER needs special files
+                                    # if txtfmt is True:
+                                    #     # write txt file
+                                    #     mysavetxt(txtname, frendata)
                                     # save in h5 file
                                     tmp = np.array(frendata, dtype=np.float)
                                     fh5.create_dataset(txtname, data=tmp)
@@ -295,8 +303,14 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                             frendata[r, c] = homogdata[tup][z, g]
                             if data in ['infDiffcoef', 'b1Diffcoef']:
                                 DFL[ih, z, g, itup] = np.sqrt(homogdata[tup][z, g])
+                                DFC[iz, g, itup] = homogdata[tup][z, g]
                             elif data in ['infRemxs', 'b1Remxs']:
                                 DFL[ih, z, g, itup] = DFL[ih, z, g, itup]/np.sqrt(homogdata[tup][z, g])
+                            elif data in ['infTot', 'b1Tot']:
+                                TOT[iz, g, itup] = homogdata[tup][z, g]
+                            elif data in ['infFiss', 'b1Fiss']:
+                                FIS[iz, g, itup] = homogdata[tup][z, g]
+
                             # write data if all T tuples have been spanned
                             if itup == len(temps)-1:
                                 if txtfmt is True:
@@ -309,6 +323,19 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                                 if data in ['infTot', 'b1Tot']:
                                     if MFPmin[ih, z] > 1/tmp[2:, 1:].min():
                                         MFPmin[ih, z] = 1/tmp[2:, 1:].min()
+
+    # generate SIMMER extra files
+    for imix in range(1, iz+1):
+        for gdep in range(0, NG):
+            for garr in range(0, NG):
+                if SXS[iz, gdep, garr] > 1E-14:
+                    with open("TMX_%d.txt".format(imix), "a") as f:
+                        f.write("%d %d %1.6e" % (gdep+1, garr+1, SXS[iz, gdep, garr]))
+
+            with open("TMX_OTHERS.txt", "a") as f:
+                f.write("%d %1.6e %1.6e %1.6e" % (g+1, DFC[iz, gdep, garr],
+                                                  TOT[iz, gdep, garr],
+                                                  FIS[iz, gdep, garr]))
 
     # loop over kind of SAs for minimum L
     datadic = {}
