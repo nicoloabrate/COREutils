@@ -150,7 +150,7 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
         # -- write NE_data.h5
         writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=txtfmt)
         # move NE files
-        NEfiles = ['macro.nml', 'NE_data.h5']
+        NEfiles = ['macro.nml', 'NE_data.h5', 'diffdata.json']
         [move(f, join(NEpath, f)) for f in NEfiles]
 
     else:

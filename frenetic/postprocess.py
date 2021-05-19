@@ -477,6 +477,28 @@ class PostProcess:
                   loglog=None, logx=None, logy=None, title=title,
                   scale=1, fmt="%.2f", numbers=False, **kwargs)
 
+    def whereMaxSpectralRad(path, core, plot=True):
+    
+        with open(os.path.join(path, 'neutronic', 'outputNE.log'), 'r') as f:
+            for l in f:
+                if '@ D3DMATI: MAXVAL(SPECTRAL NORM)' in l:
+                    # parse IK, IG
+                    num = l.split('(IK,IG)= ')[1]
+                    IK, IG = num.split()
+                    IK, IG = int(IK), int(IG)
+        nElz = len(core.NEAxialConfig.AxNodes)
+        myIK = 0
+        for iz in range(0, nElz):
+            for ih in range(1, core.NAss+1):
+                if myIK == IK:
+                    hexty = core.getassemblytype(ih, isfren=True)
+                    hexty = core.NEassemblytypes[hexty]
+                    print(ih)
+                    z = core.NEAxialConfig.AxNodes[iz]
+                    print('Max spectral norm in {} SAs at z={} cm'.format(hexty, z))
+                myIK = myIK+1
+
+
     @staticmethod
     def __loadtxt(fname):
         """

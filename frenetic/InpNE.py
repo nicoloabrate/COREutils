@@ -8,6 +8,7 @@ Description: Set of methods for generating FRENETIC input files.
 """
 import io
 import os
+import json
 from shutil import rmtree
 import numpy as np
 import h5py as h5
@@ -196,6 +197,9 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
         infkeys.extend(infverb)
         b1keys.extend(b1verb)
 
+    outnames = tuple(outnames)
+    infkeys = tuple(infkeys)
+    b1keys = tuple(b1keys)
     datakeys = infkeys if inf is True else b1keys
     datakeys = dict(zip(datakeys, outnames))
 
@@ -235,12 +239,19 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
     # define tuple of couples of temperatures
     temps.sort(key=lambda t: t[0])
 
-    # loop over kind of rod
-    zcount = 0
+    # initialised as big numbers to check minima
+    DFLmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
+    MFPmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
+    DFL = np.zeros((len(core.NEassemblytypes), NZ, NG, len(temps)))
+
+    # loop over kind of SAs
+    iz, ih = 0, -1
     for hextype, hexname in core.NEassemblytypes.items():
-        zold = zcount+0
+        zold = iz+0
+        # update hexagon tpye counter
+        ih = ih+1
         for data, dataname in datakeys.items():  # loop over data
-            zcount = zold
+            iz = zold
             homogdata = {}
             where = {}
             # temperature couples loop
@@ -254,9 +265,9 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                 where[tup] = (row, col)
             # -- split homogdata in regions and groups
             for z in range(0, NZ):  # loop over cuts
-                zcount = zcount + 1  # new axial region
+                iz = iz + 1  # new axial region
                 for g in range(0, NG):  # loop over energy groups
-                    txt = "%s_%d_%d" % (dataname, zcount, g+1)
+                    txt = "%s_%d_%d" % (dataname, iz, g+1)
                     # check if matrix
                     if 'infS' in data or 'b1S' in data:
                         for gdep in range(0, NG):  # loop over departure g
@@ -282,6 +293,10 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                             # select matrix entry
                             r, c = where[tup]
                             frendata[r, c] = homogdata[tup][z, g]
+                            if data in ['infDiffcoef', 'b1Diffcoef']:
+                                DFL[ih, z, g, itup] = np.sqrt(homogdata[tup][z, g])
+                            elif data in ['infRemxs', 'b1Remxs']:
+                                DFL[ih, z, g, itup] = DFL[ih, z, g, itup]/np.sqrt(homogdata[tup][z, g])
                             # write data if all T tuples have been spanned
                             if itup == len(temps)-1:
                                 if txtfmt is True:
@@ -290,7 +305,35 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                                 # save in h5 file
                                 tmp = np.array(frendata, dtype=np.float)
                                 fh5.create_dataset(txt, data=tmp)
+                                # check if L or MFP are minimum
+                                if data in ['infTot', 'b1Tot']:
+                                    if MFPmin[ih, z] > 1/tmp[2:, 1:].min():
+                                        MFPmin[ih, z] = 1/tmp[2:, 1:].min()
 
+    # loop over kind of SAs for minimum L
+    datadic = {}
+    datadic['MFP'] = {}
+    datadic['DFL'] = {}
+    z = np.array(core.NEAxialConfig.mycuts)
+    datadic['midz'] = ((z[1:]+z[:-1])/2).tolist()
+    dz = ((z[1:]-z[:-1]))/core.NEAxialConfig.splitz
+    ih = -1
+    for hexname in core.NEassemblytypes.values():
+        ih = ih+1
+        for iz in range(0, NZ):  # loop over cuts
+            # check if L or MFP are minimum
+            if DFLmin[ih, iz] > DFL.min():
+                DFLmin[ih, iz] = DFL.min()
+
+        for iz in range(0, NZ):  # loop over cuts
+            # check if L or MFP are minimum
+            if dz[iz] > min(DFLmin[ih, iz], MFPmin[ih, iz]):
+                print('WARNING: axial zone at {} should be refined in {} SA'.format(datadic['midz'][iz], hexname))
+        datadic['MFP'][hexname] = MFPmin[ih, :].tolist()
+        datadic['DFL'][hexname] = DFLmin[ih, :].tolist()
+
+    with open('diffdata.json', 'w') as outfile:
+        json.dump(datadic, outfile, indent=8)
 
 def writeConfig(core, NZ, Ntypes):
     """

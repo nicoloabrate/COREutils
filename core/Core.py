@@ -143,7 +143,7 @@ class Core:
                 self.NEassemblylabel = OrderedDict(dict(zip(assnum,
                                                     NEassemblylabel)))
             else:
-                self.NEassemblylabel = self.NEassemblytypes
+                self.NEassemblylabel = deepcopy(self.NEassemblytypes)
             # define NE core with assembly types
             tmp = UnfoldCore(NEinp, NErotation, NEassemblynames)
             NEcore = tmp.coremap
@@ -478,7 +478,9 @@ class Core:
                     if newname not in self.NEAxialConfig.cuts.keys():
                         cuts = deepcopy(self.NEAxialConfig.cuts[what])
                         nass = len(self.NEassemblytypes.keys())
-                        self.NEassemblytypes[nass + 1] = newname
+                        self.NEassemblytypes.update([(nass + 1, newname)])
+                        self.NEassemblylabel.update([(nass + 1, self.NEassemblylabel[atype])])
+
                         if whatass in cuts.reg:
                             cuts.reg[cuts.reg == whatass] = withass
                             upz, loz, reg = cuts.upz, cuts.loz, cuts.reg
@@ -544,13 +546,15 @@ class Core:
                                                      whichconf="NEconfig")
                         what = self.NEassemblytypes[atype]
                         newname = "%st%sz%d" % (what, time, dz)
+
                         # define new cuts, if any
                         if newname not in self.NEAxialConfig.cuts.keys():
                             cuts = deepcopy(self.NEAxialConfig.cuts[what])
                             cuts.upz[0:-1] = [z+dz for z in cuts.upz[0:-1]]
                             cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]
                             nass = len(self.NEassemblytypes.keys())
-                            self.NEassemblytypes[nass + 1] = newname
+                            self.NEassemblytypes.update([(nass + 1, newname)])
+                            self.NEassemblylabel.update([(nass + 1, self.NEassemblylabel[atype])])
                             upz, loz, reg = cuts.upz, cuts.loz, cuts.reg
                             self.NEAxialConfig.cuts[newname] = AxialCuts(upz, loz,
                                                                          reg)
