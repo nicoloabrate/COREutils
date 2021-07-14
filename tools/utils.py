@@ -101,11 +101,6 @@ def __parseCI(CIinp):
         nProf = 1
         print("WARNING: No number of time profiles is provided in CI!")
 
-    if 'pitch' in CIinp.keys():
-        pitch = CIinp['pitch']
-    else:
-        raise OSError("Core pitch is missing in CI!")
-
     if 'shape' in CIinp.keys():
         shape = CIinp['shape']
     else:
@@ -116,11 +111,18 @@ def __parseCI(CIinp):
     else:
         power = None
 
-    if 'trans' in CIinp.keys():
-        trans = CIinp['trans']
+    if shape != '1D':
+        if 'pitch' in CIinp.keys():
+            pitch = CIinp['pitch']
+        else:
+            raise OSError("Core pitch is missing in CI!")
+    
+        if 'trans' in CIinp.keys():
+            trans = CIinp['trans']
+        else:
+            trans = True
     else:
-        trans = True
-
+        pitch, trans = 1, False
 
     CIargs = [tEnd, nProf, pitch, shape, power, trans]
 

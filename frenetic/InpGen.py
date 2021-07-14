@@ -202,33 +202,41 @@ def makecommoninput(core, template=None):
     ``None``
     """
     # parse number of hexagons per row
-    NL = np.count_nonzero(core.Map.inp, axis=1)
-    NL = NL[NL != 0]
-    # parse number of rows
-    NR = len(NL)
-    # flip to be consistent with FRENETIC numeration
-    if NL[0] < NL[-1]:
-        NL = np.flipud(NL)
-    # convert in strings
-    NL = [str(i) for i in NL]
-    # join strings
-    NL = ','.join(NL)
+    try:
+        NL = np.count_nonzero(core.Map.inp, axis=1)
+        NL = NL[NL != 0]
+        # parse number of rows
+        NR = len(NL)
+        # flip to be consistent with FRENETIC numeration
+        if NL[0] < NL[-1]:
+            NL = np.flipud(NL)
+        # convert in strings
+        NL = [str(i) for i in NL]
+        # join strings
+        NL = ','.join(NL)
+        NH = core.NAss
+        PITCH = core.AssemblyGeom.pitch
+        try:
+            NDIFF = len(core.THassemblytypes)
+        except AttributeError:
+            NDIFF = len(core.NEassemblytypes)
+            print('Warning: NDIFF variable set equal to the number of NE assemblies')
 
+    except AttributeError as err:
+        if "object has no attribute 'Map'" in str(err):
+            NL, NR, NDIFF, NH = 1, 1, 1, 1
+            PITCH = 1
+        else:
+            print(err)
     # check if coupled calculation is possible
     if all([i in core.__dict__.keys() for i in ['THconfig', 'NEconfig']]):
         isNETH = 2
     else:
         isNETH = 0
 
-    try:
-        NDIFF = len(core.THassemblytypes)
-    except AttributeError:
-        NDIFF = len(core.NEassemblytypes)
-        print('Warning: NDIFF variable set equal to the number of NE assemblies')
-
-    data = {'$NH': core.NAss, '$NR': NR, '$NL': NL, '$NDIFF': NDIFF, 
-            '$TEND': core.TimeEnd, '$ISNETH': isNETH, 
-            '$PITCH': core.AssemblyGeom.pitch/100}
+    data = {'$NH': NH, '$NR': NR, '$NL': NL, '$NDIFF': NDIFF,
+            '$TEND': core.TimeEnd, '$ISNETH': isNETH,
+            '$PITCH': PITCH/100}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_common_input.dat')
