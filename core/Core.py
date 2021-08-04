@@ -118,9 +118,9 @@ class Core:
 
         if isinstance(nProf, (float, int)):
             dt = tEnd/nProf
-            self.TimeProf = np.arange(0, tEnd+dt, dt) if dt > 0 else [0]
+            self.TimeSnap = np.arange(0, tEnd+dt, dt) if dt > 0 else [0]
         elif isinstance(nProf, list) and len(nProf) > 1:
-            self.TimeProf = nProf
+            self.TimeSnap = nProf
         else:
             raise OSError('nProf in .json file must be list, float or int!')
 

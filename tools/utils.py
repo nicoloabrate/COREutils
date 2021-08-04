@@ -95,8 +95,8 @@ def __parseCI(CIinp):
         tEnd = 0
         print("WARNING: No final simulation time is provided in CI!")
 
-    if 'nProf' in CIinp.keys():
-        nProf = CIinp['nProf']
+    if 'nSnap' in CIinp.keys():
+        nProf = CIinp['nSnap']
     else:
         nProf = 1
         print("WARNING: No number of time profiles is provided in CI!")
