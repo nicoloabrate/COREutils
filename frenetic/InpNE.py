@@ -27,7 +27,7 @@ except ImportError:
 
 
 def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
-               unimap):
+               unimap, NE_1D=False):
     """
     Write the input file "macro.nml" for the NE module of FRENETIC.
 
@@ -79,12 +79,12 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
     f.write('IRHO = 0,\n')
     f.write('VELOC0(1:%d) = ' % NG)
 
-    for igro in range(0, NG):
+    for igro in range(NG):
         f.write('%s,' % ff(vel[igro], 'double'))
 
     f.write('\nLAMBDA0(1:%d) = ' % NP)
 
-    for iprec in range(0, NP):
+    for iprec in range(NP):
         f.write('%s,' % ff(lambda0[iprec], 'double'))
 
     f.write(' \nlambdadhp0(1:1) = 1.000000d+00,\n')
@@ -96,33 +96,40 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
     f.write('TEMPCOOL0 =	 %s,\n' % ff(Tc, 'double'))
     f.write('ISIGS(1:%d) = %d*2,\n' % (nmix, nmix))
 
-    for imix in range(0, nmix):
+    for imix in range(nmix):
 
         # perform operations only when the assembly is changed
-        if imix % nFrenCuts == 0:
-            asstypeN = asstypeN+1
-            u = core.NEassemblytypes[asstypeN]
-            # perform homogenisation for total and delayed spectra
-            chit = AxHomogenise(core, 'infChit', u, NG, (Tf, Tc), unimap)
-            chid = AxHomogenise(core, 'infChid', u, NG, (Tf, Tc), unimap)
+        if NE_1D:
+            u = list(core.config[0].regions.keys())
+            chit = core.config[0].regions[u[0]].getxs('Chit')[np.newaxis, :]
+            chid = core.config[0].regions[u[0]].getxs('Chid')[np.newaxis, :]
             imixF = 0
+            u = u[imix]
+        else:
+            if imix % nFrenCuts == 0:
+                asstypeN = asstypeN+1
+                u = core.NEassemblytypes[asstypeN]
+                # perform homogenisation for total and delayed spectra
+                chit = AxHomogenise(core, 'infChit', u, NG, (Tf, Tc), unimap)
+                chid = AxHomogenise(core, 'infChid', u, NG, (Tf, Tc), unimap)
+                imixF = 0
 
         # write universe number and name
         f.write('\n!Universe %d belongs to %s\n' % (imix+1, u))
 
         # write kinetic and spectrum parameters
         f.write('CHIT0(%d,1:%d) = ' % (imix+1, NG))
-        for igro in range(0, NG):
+        for igro in range(NG):
             f.write('%s,' % ff(chit[imixF, igro], 'double'))
 
-        for igro in range(0, NG):
+        for igro in range(NG):
             v = chid[imixF, igro]
             f.write('\nCHID0(%d,%d,1:%d) = %d*%s,' % (imix+1, igro+1, NP, NP, 
                                                       ff(v, 'double')))
         f.write('\n')
         imixF = imixF+1
         f.write('BETA0(%d,1:%d) = ' % (imix+1, NP))
-        for iprec in range(0, NP):
+        for iprec in range(NP):
             f.write('%s,' % ff(beta0[iprec], 'double'))
 
         f.write('\n')
@@ -132,10 +139,10 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
 
             if macro == "XS_SCATT":
 
-                for igrostart in range(0, NG):
+                for igrostart in range(NG):
                     f.write('%s(%d,%d,1:%d) =' % (inp, imix+1, igrostart+1,
                                                   NG))
-                    for igroend in range(0, NG):
+                    for igroend in range(NG):
                         f.write(" '%s_%d_%d_%d', "
                                 % (macro, imix+1, igrostart+1, igroend+1))
 
@@ -144,7 +151,7 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
             else:
 
                 f.write('%s(%d,1:%d) =' % (inp, imix+1, NG))
-                for igro in range(0, NG):
+                for igro in range(NG):
                     triple = (macro, imix+1, igro+1)
                     f.write(" '%s_%d_%d', " % triple)
 
@@ -154,7 +161,8 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
     f.write('/\n')
 
 
-def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
+def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False, 
+                NE_1D=False):
     """
     Generate FRENETIC NE module input (HDF5 file or many txt).
 
@@ -187,7 +195,8 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
                'infFiss', 'infS0', 'infTot', 'infChit', 'infRemxs']
     b1keys = ['b1Diffcoef', 'b1Kappa', 'b1Nsf', 'b1Fiss', 'b1S0', 'b1Chit',
               'b1Remxs']
-
+    slabkeys = ['Diffcoef', 'Kappa', 'NuFiss', 'Fiss', 'S0', 'Tot', 'Chit',
+                'Remxs']
     if verbose is True:
         infverb = ['infCapt', 'infNubar', 'infSp0']
         b1verb = ['b1Capt', 'b1Nubar', 'b1Sp0']
@@ -200,15 +209,19 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
     outnames = tuple(outnames)
     infkeys = tuple(infkeys)
     b1keys = tuple(b1keys)
-    datakeys = infkeys if inf is True else b1keys
-    datakeys = dict(zip(datakeys, outnames))
+    if NE_1D:
+        datakeys = slabkeys
+        datakeys = dict(zip(datakeys, outnames))        
+    else:
+        datakeys = infkeys if inf is True else b1keys
+        datakeys = dict(zip(datakeys, outnames))
 
     # -- create or overwrite hdf5 file (repro script)
     h5name = "NE_data.h5"
     fh5 = __wopen(h5name)
 
-    NZ = len(core.NEAxialConfig.mycuts)-1
-    temps = core.NEMaterialData.temp
+    NZ = core.config[0].nLayers if NE_1D else len(core.NEAxialConfig.mycuts)-1
+    temps = [(300, 300)] if NE_1D else core.NEMaterialData.temp
     Tf, Tc = zip(*temps)
     # --- define temperature matrix to be filled with data
     n, m = len(set(Tf))+2, len(set(Tc))+1  # temp matrix dimensions
@@ -240,102 +253,144 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False):
     temps.sort(key=lambda t: t[0])
 
     # initialised as big numbers to check minima
-    DFLmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
-    MFPmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
-    DFL = np.zeros((len(core.NEassemblytypes), NZ, NG, len(temps)))
-
-    # loop over kind of SAs
-    iz, ih = 0, -1
-    for hextype, hexname in core.NEassemblytypes.items():
-        zold = iz+0
-        # update hexagon tpye counter
-        ih = ih+1
+    if NE_1D:
+        regs = dict(zip(unimap.values(), unimap.keys()))
         for data, dataname in datakeys.items():  # loop over data
-            iz = zold
-            homogdata = {}
-            where = {}
-            # temperature couples loop
-            for itup, tup in enumerate(temps):
-                # spatially homogenise data
-                homogdata[tup] = AxHomogenise(core, data, hexname, NG, tup,
-                                              unimap)
-                # store value in proper position in temp matrix
-                row = np.where(frendata[:, 0] == tup[0])
-                col = np.where(frendata[1, :] == tup[1])
-                where[tup] = (row, col)
-            # -- split homogdata in regions and groups
-            for z in range(0, NZ):  # loop over cuts
-                iz = iz + 1  # new axial region
-                for g in range(0, NG):  # loop over energy groups
+            iz = 0
+            row = np.where(frendata[:, 0] == Tf[0])
+            col = np.where(frendata[1, :] == Tc[0])
+            for z in range(len(core.config[0].regions)):  # loop over cuts
+                iz += 1  # new axial region
+                if data != 'NuFiss':
+                    mydata = core.config[0].regions[regs[iz-1]].__dict__[data]
+                else:
+                    nubar = core.config[0].regions[regs[iz-1]].Nubar
+                    fiss = core.config[0].regions[regs[iz-1]].Fiss
+                    mydata = nubar*fiss
+                for g in range(NG):  # loop over energy groups
                     txt = "%s_%d_%d" % (dataname, iz, g+1)
                     # check if matrix
-                    if 'infS' in data or 'b1S' in data:
-                        for gdep in range(0, NG):  # loop over departure g
+                    if 'S0' in data:
+                        for gdep in range(NG):  # loop over departure g
                             # edit name to include info on dep group
                             txtname = "_".join([txt, str(gdep+1)])
-                            gc = gdep+NG*g
+                            frendata[row, col] = mydata[gdep, g]
+                            # write output if last tuple is reached
+                            if txtfmt is True:
+                                # write txt file
+                                mysavetxt(txtname, frendata)
+                            # save in h5 file
+                            tmp = np.array(frendata, dtype=np.float)
+                            fh5.create_dataset(txtname, data=tmp)
+                    else:
+                        frendata[row, col] = mydata[g]
+                        # write data if all T tuples have been spanned
+                        if txtfmt is True:
+                            # write txt file
+                            mysavetxt(txt, frendata)
+                        # save in h5 file
+                        tmp = np.array(frendata, dtype=np.float)
+                        fh5.create_dataset(txt, data=tmp)
+       
+    else:
+        DFLmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
+        MFPmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
+        DFL = np.zeros((len(core.NEassemblytypes), NZ, NG, len(temps)))
 
-                            for itup, tup in enumerate(temps):
+        # loop over kind of SAs
+        iz, ih = 0, -1
+        for hextype, hexname in core.NEassemblytypes.items():
+            zold = iz+0
+            # update hexagon tpye counter
+            ih = ih+1
+            for data, dataname in datakeys.items():  # loop over data
+                iz = zold
+                homogdata = {}
+                where = {}
+                # temperature couples loop
+                for itup, tup in enumerate(temps):
+                    # spatially homogenise data
+                    homogdata[tup] = AxHomogenise(core, data, hexname, NG, tup,
+                                                  unimap)
+                    # store value in proper position in temp matrix
+                    row = np.where(frendata[:, 0] == tup[0])
+                    col = np.where(frendata[1, :] == tup[1])
+                    where[tup] = (row, col)
+                # -- split homogdata in regions and groups
+                for z in range(NZ):  # loop over cuts
+                    iz = iz + 1  # new axial region
+                    for g in range(NG):  # loop over energy groups
+                        txt = "%s_%d_%d" % (dataname, iz, g+1)
+                        # check if matrix
+                        if 'infS' in data or 'b1S' in data:
+                            for gdep in range(NG):  # loop over departure g
+                                # edit name to include info on dep group
+                                txtname = "_".join([txt, str(gdep+1)])
+                                gc = gdep+NG*g
+    
+                                for itup, tup in enumerate(temps):
+                                    # select matrix entry
+                                    r, c = where[tup]
+                                    frendata[r, c] = homogdata[tup][z, gc]
+                                    # write output if last tuple is reached
+                                    if itup == len(temps)-1:
+                                        if txtfmt is True:
+                                            # write txt file
+                                            mysavetxt(txtname, frendata)
+                                        # save in h5 file
+                                        tmp = np.array(frendata, dtype=np.float)
+                                        fh5.create_dataset(txtname, data=tmp)
+    
+                        else:
+                            for itup, tup in enumerate(temps):  # loop over temps
                                 # select matrix entry
                                 r, c = where[tup]
-                                frendata[r, c] = homogdata[tup][z, gc]
-                                # write output if last tuple is reached
+                                frendata[r, c] = homogdata[tup][z, g]
+                                if data in ['infDiffcoef', 'b1Diffcoef']:
+                                    DFL[ih, z, g, itup] = np.sqrt(homogdata[tup][z, g])
+                                elif data in ['infRemxs', 'b1Remxs']:
+                                    DFL[ih, z, g, itup] = DFL[ih, z, g, itup]/np.sqrt(homogdata[tup][z, g])
+                                # write data if all T tuples have been spanned
                                 if itup == len(temps)-1:
                                     if txtfmt is True:
                                         # write txt file
-                                        mysavetxt(txtname, frendata)
+                                        mysavetxt(txt, frendata)
                                     # save in h5 file
                                     tmp = np.array(frendata, dtype=np.float)
-                                    fh5.create_dataset(txtname, data=tmp)
+                                    fh5.create_dataset(txt, data=tmp)
+                                    # check if L or MFP are minimum
+                                    if data in ['infTot', 'b1Tot']:
+                                        if MFPmin[ih, z] > 1/tmp[2:, 1:].min():
+                                            MFPmin[ih, z] = 1/tmp[2:, 1:].min()
+        fh5.close()
+        # loop over kind of SAs for minimum L
+        datadic = {}
+        datadic['MFP'] = {}
+        datadic['DFL'] = {}
+        z = np.array(core.NEAxialConfig.mycuts)
+        datadic['midz'] = ((z[1:]+z[:-1])/2).tolist()
+        dz = ((z[1:]-z[:-1]))/core.NEAxialConfig.splitz
+        ih = -1
+        for hexname in core.NEassemblytypes.values():
+            ih = ih+1
+            for iz in range(NZ):  # loop over cuts
+                # check if L or MFP are minimum
+                if DFLmin[ih, iz] > DFL.min():
+                    DFLmin[ih, iz] = DFL.min()
+    
+            for iz in range(NZ):  # loop over cuts
+                # check if L or MFP are minimum
+                if dz[iz] > min(DFLmin[ih, iz], MFPmin[ih, iz]):
+                    print('WARNING: axial zone at {} should be refined in {} SA'.format(datadic['midz'][iz], hexname))
+            datadic['MFP'][hexname] = MFPmin[ih, :].tolist()
+            datadic['DFL'][hexname] = DFLmin[ih, :].tolist()
+    
+        with open('diffdata.json', 'w') as outfile:
+            json.dump(datadic, outfile, indent=8)
 
-                    else:
-                        for itup, tup in enumerate(temps):  # loop over temps
-                            # select matrix entry
-                            r, c = where[tup]
-                            frendata[r, c] = homogdata[tup][z, g]
-                            if data in ['infDiffcoef', 'b1Diffcoef']:
-                                DFL[ih, z, g, itup] = np.sqrt(homogdata[tup][z, g])
-                            elif data in ['infRemxs', 'b1Remxs']:
-                                DFL[ih, z, g, itup] = DFL[ih, z, g, itup]/np.sqrt(homogdata[tup][z, g])
-                            # write data if all T tuples have been spanned
-                            if itup == len(temps)-1:
-                                if txtfmt is True:
-                                    # write txt file
-                                    mysavetxt(txt, frendata)
-                                # save in h5 file
-                                tmp = np.array(frendata, dtype=np.float)
-                                fh5.create_dataset(txt, data=tmp)
-                                # check if L or MFP are minimum
-                                if data in ['infTot', 'b1Tot']:
-                                    if MFPmin[ih, z] > 1/tmp[2:, 1:].min():
-                                        MFPmin[ih, z] = 1/tmp[2:, 1:].min()
 
-    # loop over kind of SAs for minimum L
-    datadic = {}
-    datadic['MFP'] = {}
-    datadic['DFL'] = {}
-    z = np.array(core.NEAxialConfig.mycuts)
-    datadic['midz'] = ((z[1:]+z[:-1])/2).tolist()
-    dz = ((z[1:]-z[:-1]))/core.NEAxialConfig.splitz
-    ih = -1
-    for hexname in core.NEassemblytypes.values():
-        ih = ih+1
-        for iz in range(0, NZ):  # loop over cuts
-            # check if L or MFP are minimum
-            if DFLmin[ih, iz] > DFL.min():
-                DFLmin[ih, iz] = DFL.min()
 
-        for iz in range(0, NZ):  # loop over cuts
-            # check if L or MFP are minimum
-            if dz[iz] > min(DFLmin[ih, iz], MFPmin[ih, iz]):
-                print('WARNING: axial zone at {} should be refined in {} SA'.format(datadic['midz'][iz], hexname))
-        datadic['MFP'][hexname] = MFPmin[ih, :].tolist()
-        datadic['DFL'][hexname] = DFLmin[ih, :].tolist()
-
-    with open('diffdata.json', 'w') as outfile:
-        json.dump(datadic, outfile, indent=8)
-
-def writeConfig(core, NZ, Ntypes):
+def writeConfig(core, NZ, Ntypes, NE_1D=False):
     """
     Write config.inp file.
 
@@ -353,23 +408,36 @@ def writeConfig(core, NZ, Ntypes):
     ``None``
 
     """
-    types = np.zeros((core.NAss, ), dtype=int)
-    NAssTypes = len(core.NEassemblytypes)
-    compositions = np.reshape(np.arange(1, NZ*NAssTypes+1), (NAssTypes, NZ))
-    f = io.open('config.inp', 'w', newline='\n')
-    for t in core.NEtime:  # loop over time
-        # loop over cut
-        for iz, z in enumerate(range(0, NZ)):
-            f.write('%s ' % ff(t, 'double'))  # write time instant for each cut
-            # write the type of assembly according to FRENETIC numeration
-            for n in range(1, core.NAss+1):  # loop over all assemblies
-                whichtype = core.getassemblytype(n, time=t, isfren=True,
-                                                 whichconf="NEconfig")
-                types[n-1] = compositions[whichtype-1, iz]
-            # define region number for each assembly
-            typestr = types.astype(str)
-            f.write('%s' % ' '.join(typestr))
-            f.write('\n')
+    if NE_1D:
+        f = io.open('config.inp', 'w', newline='\n')
+        regions = dict(zip(core.config[0].regions.keys(), range(len(core.config[0].regions))))
+        for t in core.time:  # loop over time
+            # loop over cut
+            for iz, z in enumerate(range(NZ)):
+                slab_now = core.config[t]
+                f.write('%s ' % ff(t, 'double'))  # write time instant for each cut
+                # write region number
+                idr = regions[slab_now.regionmap[iz]]+1
+                f.write('%s' % ' '.join(str(idr)))
+                f.write('\n')
+    else:
+        types = np.zeros((core.NAss, ), dtype=int)
+        NAssTypes = len(core.NEassemblytypes)
+        compositions = np.reshape(np.arange(1, NZ*NAssTypes+1), (NAssTypes, NZ))
+        f = io.open('config.inp', 'w', newline='\n')
+        for t in core.NEtime:  # loop over time
+            # loop over cut
+            for iz, z in enumerate(range(NZ)):
+                f.write('%s ' % ff(t, 'double'))  # write time instant for each cut
+                # write the type of assembly according to FRENETIC numeration
+                for n in range(1, core.NAss+1):  # loop over all assemblies
+                    whichtype = core.getassemblytype(n, time=t, isfren=True,
+                                                     whichconf="NEconfig")
+                    types[n-1] = compositions[whichtype-1, iz]
+                # define region number for each assembly
+                typestr = types.astype(str)
+                f.write('%s' % ' '.join(typestr))
+                f.write('\n')
 
 
 def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
@@ -398,21 +466,29 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
     if whereNH5INP is None:
         whereNH5INP = "'NE_data.h5'"
 
-    tmp = core.NEAxialConfig.splitz
-    NZ = len(core.NEAxialConfig.mycuts)-1
+    NE_1D = True if 'config' in core.__dict__.keys() else False
+
+    tmp = core.config[0].N.tolist() if NE_1D else core.NEAxialConfig.splitz
+    NZ = core.config[0].nLayers if NE_1D else len(core.NEAxialConfig.mycuts)-1
     if isinstance(tmp, (int)):
         splitz = [tmp]*NZ 
     elif isinstance(tmp, (list)):
         splitz = tmp if len(tmp) > 1 else tmp[0]*NZ 
             
-    nConfig = len(core.NEtime)
-    nRun = 2 if core.trans is True else 1
+    nConfig = len(core.time) if NE_1D else len(core.NEtime)
+    meshz = core.config[0].layers if NE_1D else core.NEAxialConfig.mycuts
+    power = 1 if NE_1D else core.power
+    if NE_1D:
+        nRun = 2 if nConfig > 1 else 1
+        ndim = 1
+    else:
+        nRun = 2 if core.trans is True else 1
+        ndim = 3
 
     geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,
-                '$MESHZ0': core.NEAxialConfig.mycuts, 
-                '$SPLITZ': splitz,
-                '$NCONFIG': nConfig, '$NRUN': nRun, '$POW': core.power,
-                '$NPROF': len(core.TimeProf), '$TPROF': core.TimeProf}
+                '$MESHZ0': meshz, '$NDIM': ndim, '$SPLITZ': splitz,
+                '$NCONFIG': nConfig, '$NRUN': nRun, '$POW': power,
+                '$NPROF': len(core.TimeSnap), '$TPROF': core.TimeSnap}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_NEinput.dat')
@@ -427,7 +503,11 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
         for key, val in geomdata.items():  # loop over dict keys
             if key in line:
                 if key in ['$MESHZ0', '$SPLITZ']:
-                    val = [str(v) for v in val]
+                    try:
+                        val = [str(v) for v in val]
+                    except TypeError as err:
+                        if "'int' object is not iterable" in str(err):
+                            val = str(val)
                     val = "%s" % ",".join(val)
                 elif key == '$TPROF':
                     tProf = [ff(t, 'double') for t in val]
@@ -443,6 +523,7 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
         # write to file
         f.write(line)
         f.write('\n')
+    f.close()
 
 
 def AxHomogeniseData(flux, data, hz, htot):
@@ -527,16 +608,16 @@ def AxHomogenise(core, what, which, NG, temp, unidict):
             changeuniv[izc-1] = 1
 
     # define scattering matrices keys (used later on)
-    scattmat = [*['infS%d' % d for d in range(0, 8)],
-                *['infSp%d' % d for d in range(0, 8)]]
+    scattmat = [*['infS%d' % d for d in range(8)],
+                *['infSp%d' % d for d in range(8)]]
 
     # homogenise in each group
     N = NG*NG if what in scattmat else NG
     homdata = np.zeros((len(fineincoarse), N))
 
-    for g in range(0, NG):  # loop over energy groups
+    for g in range(NG):  # loop over energy groups
         idx = 0
-        for izf in range(0, len(fineincoarse)):  # loop over axial cuts
+        for izf in range(len(fineincoarse)):  # loop over axial cuts
             iduniv = reg[idx:idx+fineincoarse[izf]]
             # get fine dz for fine regions inside coarse
             dzTot = dzFine[idx:idx+fineincoarse[izf]]
@@ -581,7 +662,7 @@ def AxHomogenise(core, what, which, NG, temp, unidict):
             # axially homogenise required data
             if what in scattmat:
                 tmp = np.zeros((NG, ))
-                for gg in range(0, NG):
+                for gg in range(NG):
                     # homogenise scattering matrix over each sub-group
                     tmp[gg] = AxHomogeniseData(flx, data[gg, :], dz, dzTot)
                 homdata[izf, g*NG:g*NG+NG] = tmp
@@ -638,8 +719,7 @@ def __wopen(h5name):
 
     """
     if os.path.isfile(h5name):
-        print("File exists. Overwriting?")
-        ans = input()
+        ans = "y"
     else:  # if file do not exist, it creates it
         ans = "create"
 

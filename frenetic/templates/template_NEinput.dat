@@ -16,7 +16,7 @@ ihdf5inp = 1,
 /
 
 &GEOMETRY
-NDIM = 3,		              !number of hexagonal-z spatial dimensions (=0,1,2,3)
+NDIM = $NDIM,		              !number of hexagonal-z spatial dimensions (=0,1,2,3)
 ALBEDOXY = +0.00000D+00,	!albedo coefficient, xy-directions
 ALBEDOZN = +0.00000D+00,	!albedo coefficient, lower z-plane
 ALBEDOZP = +0.00000D+00,	!albedo coefficient, upper z-plane

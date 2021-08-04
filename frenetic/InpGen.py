@@ -10,7 +10,7 @@ import io
 import os
 import warnings
 import numpy as np
-from shutil import move, copyfile
+from shutil import move, copyfile, SameFileError
 from os.path import join
 from . import templates
 from coreutils.tools.utils import fortranformatter as ff
@@ -55,7 +55,12 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
         json = "%s.json" % json
 
     casepath = mkdir(casename)
-    copyfile('%s' % json, join(casepath, '%s' % json))
+    try:
+        copyfile('%s' % json, join(casepath, '%s' % json))
+    except SameFileError:
+        os.remove(join(casepath, '%s' % json))
+        print('Overwriting file {}'.format(json))
+        copyfile('%s' % json, join(casepath, '%s' % json))
 
     templateTH, templateCZ, templateCI, templateNE = None, None, None, None
     if isinstance(templates, dict):
@@ -74,35 +79,54 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
     # make common input (common_input.dat)
     makecommoninput(core, templateCI)
     # move common_input
-    move('common_input.dat', join(casepath, 'common_input.dat'))
-
+    try:
+        move('common_input.dat', join(casepath, 'common_input.dat'))
+    except SameFileError:
+        os.remove(join(casepath, 'common_input.dat'))
+        print('Overwriting file {}'.format(json))
+        move('common_input.dat', join(casepath, 'common_input.dat'))
     # make NE input (config.dat, macro.nml)
-    if 'NEconfig' in core.__dict__.keys():
+    NE = True
+    if 'config' in core.__dict__.keys():
+        NE_1D = True
+        tlast = max(core.config.keys())
+    elif 'NEconfig' in core.__dict__.keys():
+        NE_1D = False
+    else:
+        NE = False
+
+    if NE:
         NEpath = mkdir("neutronic", casepath)
         # define number of axial cuts
-        nFreAxReg = len(core.NEAxialConfig.mycuts)-1
-        nAssTypes = len(core.NEAxialConfig.cuts)
+        nFreAxReg = core.config[0].nLayers if NE_1D else len(core.NEAxialConfig.mycuts)-1
+        nAssTypes = 1 if NE_1D else len(core.NEAxialConfig.cuts)  # len(core.config[tlast].regions)
         # define nmix (number of different regions)
-        nmix = nFreAxReg*nAssTypes
+        nmix = len(core.config[tlast].regions) if NE_1D else nFreAxReg*nAssTypes
 
         # --- write config.inp
-        writeConfig(core, nFreAxReg, nAssTypes)
+        writeConfig(core, nFreAxReg, nAssTypes, NE_1D=NE_1D)
 
         # --- write input.dat
         makeNEinput(core, templateNE)
 
         # move NE files
         NEfiles = ['input.dat', 'config.inp']
-        [move(f, join(NEpath, f)) for f in NEfiles]
+        for f in NEfiles:
+            try:
+                move(f, join(NEpath, f))
+            except SameFileError:
+                os.remove(join(NEpath, f))
+                print('Overwriting file {}'.format(f))
+                move(f, join(NEpath, f))
     else:
         warnings.warn('input.dat and config.inp not written!')
 
     # write NE data
-    if 'NEMaterialData' in core.__dict__.keys():
+    if 'NEMaterialData' in core.__dict__.keys() or NE_1D:
         NEpath = mkdir("neutronic", casepath)
         # -- prepare data
         # get temperatures couples
-        temp = core.NEMaterialData.temp
+        temp = [(300, 300)] if NE_1D else core.NEMaterialData.temp
         # get NG
         unifuel = None
 
@@ -110,48 +134,67 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
         # reference temperatures defined as minima
         mincouple = min(temp, key=lambda t: (t[1]+t[0]))
         Tf, Tc = mincouple
-        for res in core.NEMaterialData.data[temp[0]]:
-            for k in res.universes.keys():
-                NG = res.universes[k]._numGroups
-                if NG is None:  # workaround for serpentTools when _numGroups is None
-                    NG = res.universes[k].infExp['infInvv'].shape[0]
-                if res.universes[k].infExp['infNubar'][0] > 0:
-                    unifuel = k
+        if NE_1D:
+            regs = core.config[0].regionmap
+            vel = 1/core.config[0].regions[regs[0]].Invv
+            NG = len(vel)
+            beta0 = core.config[0].regions[regs[0]].beta
+            lambda0 = core.config[0].regions[regs[0]].__dict__['lambda']
+            NP = core.config[0].regions[regs[0]].NPF#
+            unimap = dict(zip(core.config[0].regions.keys(), range(len(core.config[0].regions))))
+        else:
+            for res in core.NEMaterialData.data[temp[0]]:
+                for k in res.universes.keys():
+                    NG = res.universes[k]._numGroups
+                    if NG is None:  # workaround for serpentTools when _numGroups is None
+                        NG = res.universes[k].infExp['infInvv'].shape[0]
+                    if res.universes[k].infExp['infNubar'][0] > 0:
+                        unifuel = k
+                        break
+    
+                if unifuel is not None:
                     break
 
+            # --- get decay constants and physical delayed fractions
+            # 0th position is total lambda
+            lambda0 = res.resdata['fwdAnaLambda'][2::2]  # ::2 to avoid rel std
+            beta0 = res.resdata['fwdAnaBetaZero'][2::2]  # ::2 to avoid rel std
+            # get number of precursors
+            NP = int(len(lambda0))
+    
+            # --- define univ dict to map where a certain universe is stored
+            unimap = {}
+            # loop over all files
+            for nf, res in enumerate(core.NEMaterialData.data[temp[0]]):
+                # loop over all universe inside each file
+                for k in res.universes.keys():
+                    unimap[k[0]] = nf
+    
+            # FIXME: homogenise over whole reactor?
             if unifuel is not None:
-                break
-
-        # --- get decay constants and physical delayed fractions
-        # 0th position is total lambda
-        lambda0 = res.resdata['fwdAnaLambda'][2::2]  # ::2 to avoid rel std
-        beta0 = res.resdata['fwdAnaBetaZero'][2::2]  # ::2 to avoid rel std
-        # get number of precursors
-        NP = int(len(lambda0))
-
-        # --- define univ dict to map where a certain universe is stored
-        unimap = {}
-        # loop over all files
-        for nf, res in enumerate(core.NEMaterialData.data[temp[0]]):
-            # loop over all universe inside each file
-            for k in res.universes.keys():
-                unimap[k[0]] = nf
-
-        # FIXME: homogenise over whole reactor?
-        if unifuel is not None:
-            vel = 1/res.universes[unifuel].infExp['infInvv']
-        else:
-            raise OSError("Fuel (fissile) region missing in universe list!")
+                vel = 1/res.universes[unifuel].infExp['infInvv']
+            else:
+                raise OSError("Fuel (fissile) region missing in universe list!")
 
         # --- write macro.nml
         writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFreAxReg,
-                   (Tf, Tc), unimap)
+                   (Tf, Tc), unimap, NE_1D=NE_1D)
 
         # -- write NE_data.h5
-        writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=txtfmt)
+        writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=txtfmt,
+                    NE_1D=NE_1D)
         # move NE files
-        NEfiles = ['macro.nml', 'NE_data.h5', 'diffdata.json']
-        [move(f, join(NEpath, f)) for f in NEfiles]
+        NEfiles = ['macro.nml', 'NE_data.h5'] # 
+        for f in NEfiles:
+            try:
+                move(f, join(NEpath, f))
+            except SameFileError:
+                os.remove(join(NEpath, f))
+                print('Overwriting file {}'.format(f))
+                move(f, join(NEpath, f))
+
+        if NE_1D is False:
+            move('diffdata.json', join(NEpath, 'diffdata.json'))
 
     else:
         warnings.warn('macro.nml and NE_data.h5 not written!')
@@ -223,7 +266,7 @@ def makecommoninput(core, template=None):
             print('Warning: NDIFF variable set equal to the number of NE assemblies')
 
     except AttributeError as err:
-        if "object has no attribute 'Map'" in str(err):
+        if "object has no attribute 'Map'" in str(err):  # assume 1D core
             NL, NR, NDIFF, NH = 1, 1, 1, 1
             PITCH = 1
         else:
