@@ -23,7 +23,7 @@ except ImportError:
     import importlib_resources as pkg_resources
 
 
-def inpgen(core, json, casename=None, templates=None, txtfmt=False):
+def inpgen(core, json, casename=None, templates=None, H5fmt=False):
     """
     Make FRENETIC NE/TH files if the required data are in core object.
 
@@ -39,7 +39,7 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
     templates : dict, optional
         File path where the template files are located. Default is ``None``.
         In this case, the default template is used.
-    txtfmt : bool, optional
+    H5fmt : bool, optional
         Set ``True`` to print NE data also in txt format. Default is ``False``.
 
     Returns
@@ -107,7 +107,7 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
         writeConfig(core, nFreAxReg, nAssTypes, NE_1D=NE_1D)
 
         # --- write input.dat
-        makeNEinput(core, templateNE)
+        makeNEinput(core, templateNE, H5fmt=H5fmt)
 
         # move NE files
         NEfiles = ['input.dat', 'config.inp']
@@ -178,10 +178,10 @@ def inpgen(core, json, casename=None, templates=None, txtfmt=False):
 
         # --- write macro.nml
         writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFreAxReg,
-                   (Tf, Tc), unimap, NE_1D=NE_1D)
+                   (Tf, Tc), unimap, NE_1D=NE_1D, H5fmt=H5fmt)
 
         # -- write NE_data.h5
-        writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=txtfmt,
+        writeNEdata(core, NG, unimap, verbose=False, inf=True, H5fmt=H5fmt,
                     NE_1D=NE_1D)
         # move NE files
         NEfiles = ['macro.nml', 'NE_data.h5'] # 

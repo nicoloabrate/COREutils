@@ -27,7 +27,7 @@ except ImportError:
 
 
 def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
-               unimap, NE_1D=False):
+               unimap, NE_1D=False, H5fmt=1):
     """
     Write the input file "macro.nml" for the NE module of FRENETIC.
 
@@ -139,29 +139,39 @@ def writemacro(core, nmix, NG, NP, vel, lambda0, beta0, nFrenCuts, temps,
 
             if macro == "XS_SCATT":
 
-                for igrostart in range(NG):
-                    f.write('%s(%d,%d,1:%d) =' % (inp, imix+1, igrostart+1,
-                                                  NG))
-                    for igroend in range(NG):
-                        f.write(" '%s_%d_%d_%d', "
-                                % (macro, imix+1, igrostart+1, igroend+1))
-
-                    f.write('\n')
+                if H5fmt == 1:
+                    for igrostart in range(NG):
+                        f.write('%s(%d,%d,1:%d) =' % (inp, imix+1, igrostart+1,
+                                                      NG))
+                        for igroend in range(NG):
+                            f.write(" '%s_%d_%d_%d', "
+                                    % (macro, imix+1, igrostart+1, igroend+1))
+                        f.write('\n')
+                elif H5fmt == 2:
+                    for igrostart in range(NG):
+                        f.write('%s(%d,%d,1:%d) =' % (inp, imix+1, igrostart+1,
+                                                      NG))
+                        for igroend in range(NG):
+                            f.write(" '{:d}/{}', ".format(imix+1, macro))
+                        f.write('\n')
 
             else:
-
-                f.write('%s(%d,1:%d) =' % (inp, imix+1, NG))
-                for igro in range(NG):
-                    triple = (macro, imix+1, igro+1)
-                    f.write(" '%s_%d_%d', " % triple)
-
-                f.write('\n')
-
+                if H5fmt == 1:
+                    f.write('%s(%d,1:%d) =' % (inp, imix+1, NG))
+                    for igro in range(NG):
+                        triple = (macro, imix+1, igro+1)
+                        f.write(" '%s_%d_%d', " % triple)
+                    f.write('\n')
+                elif H5fmt == 2:
+                    f.write('%s(%d,1:%d) =' % (inp, imix+1, NG))
+                    for igro in range(NG):
+                        f.write(" '{:d}/{}', ".format(imix+1, macro))
+                    f.write('\n')
     # write namelist end
     f.write('/\n')
 
 
-def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False, 
+def writeNEdata(core, NG, unimap, verbose=False, inf=True, H5fmt=2, 
                 NE_1D=False):
     """
     Generate FRENETIC NE module input (HDF5 file or many txt).
@@ -223,18 +233,19 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False,
     NZ = core.config[0].nLayers if NE_1D else len(core.NEAxialConfig.mycuts)-1
     temps = [(300, 300)] if NE_1D else core.NEMaterialData.temp
     Tf, Tc = zip(*temps)
-    # --- define temperature matrix to be filled with data
-    n, m = len(set(Tf))+2, len(set(Tc))+1  # temp matrix dimensions
-    frendata = np.zeros((n, m))
-    frendata[0, 0], frendata[0, 1] = n-2, m-1  # write matrix size
-    lstTf = list(set(Tf))
-    lstTf.sort()
-    frendata[2:, 0] = lstTf
-    lstTc = list(set(Tc))
-    lstTc.sort()
-    frendata[1, 1:] = lstTc
+    if H5fmt == 1:
+        # --- define temperature matrix to be filled with data
+        n, m = len(set(Tf))+2, len(set(Tc))+1  # temp matrix dimensions
+        frendata = np.zeros((n, m))
+        frendata[0, 0], frendata[0, 1] = n-2, m-1  # write matrix size
+        lstTf = list(set(Tf))
+        lstTf.sort()
+        frendata[2:, 0] = lstTf
+        lstTc = list(set(Tc))
+        lstTc.sort()
+        frendata[1, 1:] = lstTc
 
-    if txtfmt is True:
+    if H5fmt is False or H5fmt == 0:
         # ---- write steady data to txt files
         # create directory
         if os.path.isdir("NEinputdata"):
@@ -276,7 +287,7 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False,
                             txtname = "_".join([txt, str(gdep+1)])
                             frendata[row, col] = mydata[gdep, g]
                             # write output if last tuple is reached
-                            if txtfmt is True:
+                            if H5fmt is False or H5fmt == 0:
                                 # write txt file
                                 mysavetxt(txtname, frendata)
                             # save in h5 file
@@ -285,7 +296,7 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False,
                     else:
                         frendata[row, col] = mydata[g]
                         # write data if all T tuples have been spanned
-                        if txtfmt is True:
+                        if H5fmt is False or H5fmt == 0:
                             # write txt file
                             mysavetxt(txt, frendata)
                         # save in h5 file
@@ -297,71 +308,117 @@ def writeNEdata(core, NG, unimap, verbose=False, inf=True, txtfmt=False,
         MFPmin = np.ones((len(core.NEassemblytypes), NZ))*1E6
         DFL = np.zeros((len(core.NEassemblytypes), NZ, NG, len(temps)))
 
-        # loop over kind of SAs
-        iz, ih = 0, -1
-        for hextype, hexname in core.NEassemblytypes.items():
-            zold = iz+0
-            # update hexagon tpye counter
-            ih = ih+1
-            for data, dataname in datakeys.items():  # loop over data
-                iz = zold
-                homogdata = {}
-                where = {}
-                # temperature couples loop
-                for itup, tup in enumerate(temps):
-                    # spatially homogenise data
-                    homogdata[tup] = AxHomogenise(core, data, hexname, NG, tup,
-                                                  unimap)
-                    # store value in proper position in temp matrix
-                    row = np.where(frendata[:, 0] == tup[0])
-                    col = np.where(frendata[1, :] == tup[1])
-                    where[tup] = (row, col)
-                # -- split homogdata in regions and groups
-                for z in range(NZ):  # loop over cuts
-                    iz = iz + 1  # new axial region
-                    for g in range(NG):  # loop over energy groups
-                        txt = "%s_%d_%d" % (dataname, iz, g+1)
-                        # check if matrix
-                        if 'infS' in data or 'b1S' in data:
-                            for gdep in range(NG):  # loop over departure g
-                                # edit name to include info on dep group
-                                txtname = "_".join([txt, str(gdep+1)])
-                                gc = gdep+NG*g
-    
-                                for itup, tup in enumerate(temps):
+        if H5fmt == 1:
+            # loop over kind of SAs
+            iz, ih = 0, -1
+            for hextype, hexname in core.NEassemblytypes.items():
+                zold = iz+0
+                # update hexagon tpye counter
+                ih = ih+1
+                for data, dataname in datakeys.items():  # loop over data
+                    iz = zold
+                    homogdata = {}
+                    where = {}
+                    # temperature couples loop
+                    for itup, tup in enumerate(temps):
+                        # spatially homogenise data
+                        homogdata[tup] = AxHomogenise(core, data, hexname, NG, tup,
+                                                      unimap)
+                        # store value in proper position in temp matrix
+                        row = np.where(frendata[:, 0] == tup[0])
+                        col = np.where(frendata[1, :] == tup[1])
+                        where[tup] = (row, col)
+                    # -- split homogdata in regions and groups
+                    for z in range(NZ):  # loop over cuts
+                        iz = iz + 1  # new axial region
+                        for g in range(NG):  # loop over energy groups
+                            txt = "%s_%d_%d" % (dataname, iz, g+1)
+                            # check if matrix
+                            if 'infS' in data or 'b1S' in data:
+                                for gdep in range(NG):  # loop over departure g
+                                    # edit name to include info on dep group
+                                    txtname = "_".join([txt, str(gdep+1)])
+                                    gc = gdep+NG*g
+        
+                                    for itup, tup in enumerate(temps):
+                                        # select matrix entry
+                                        r, c = where[tup]
+                                        frendata[r, c] = homogdata[tup][z, gc]
+                                        # write output if last tuple is reached
+                                        if itup == len(temps)-1:
+                                            if H5fmt is False or H5fmt == 0:
+                                                # write txt file
+                                                mysavetxt(txtname, frendata)
+                                            # save in h5 file
+                                            tmp = np.array(frendata, dtype=np.float)
+                                            fh5.create_dataset(txtname, data=tmp)
+        
+                            else:
+                                for itup, tup in enumerate(temps):  # loop over temps
                                     # select matrix entry
                                     r, c = where[tup]
-                                    frendata[r, c] = homogdata[tup][z, gc]
-                                    # write output if last tuple is reached
+                                    frendata[r, c] = homogdata[tup][z, g]
+                                    if data in ['infDiffcoef', 'b1Diffcoef']:
+                                        DFL[ih, z, g, itup] = np.sqrt(homogdata[tup][z, g])
+                                    elif data in ['infRemxs', 'b1Remxs']:
+                                        DFL[ih, z, g, itup] = DFL[ih, z, g, itup]/np.sqrt(homogdata[tup][z, g])
+                                    # write data if all T tuples have been spanned
                                     if itup == len(temps)-1:
-                                        if txtfmt is True:
+                                        if H5fmt is False or H5fmt == 0:
                                             # write txt file
-                                            mysavetxt(txtname, frendata)
+                                            mysavetxt(txt, frendata)
                                         # save in h5 file
                                         tmp = np.array(frendata, dtype=np.float)
-                                        fh5.create_dataset(txtname, data=tmp)
-    
-                        else:
-                            for itup, tup in enumerate(temps):  # loop over temps
-                                # select matrix entry
-                                r, c = where[tup]
-                                frendata[r, c] = homogdata[tup][z, g]
-                                if data in ['infDiffcoef', 'b1Diffcoef']:
-                                    DFL[ih, z, g, itup] = np.sqrt(homogdata[tup][z, g])
-                                elif data in ['infRemxs', 'b1Remxs']:
-                                    DFL[ih, z, g, itup] = DFL[ih, z, g, itup]/np.sqrt(homogdata[tup][z, g])
-                                # write data if all T tuples have been spanned
-                                if itup == len(temps)-1:
-                                    if txtfmt is True:
-                                        # write txt file
-                                        mysavetxt(txt, frendata)
-                                    # save in h5 file
-                                    tmp = np.array(frendata, dtype=np.float)
-                                    fh5.create_dataset(txt, data=tmp)
-                                    # check if L or MFP are minimum
-                                    if data in ['infTot', 'b1Tot']:
-                                        if MFPmin[ih, z] > 1/tmp[2:, 1:].min():
-                                            MFPmin[ih, z] = 1/tmp[2:, 1:].min()
+                                        fh5.create_dataset(txt, data=tmp)
+                                        # check if L or MFP are minimum
+                                        if data in ['infTot', 'b1Tot']:
+                                            if MFPmin[ih, z] > 1/tmp[2:, 1:].min():
+                                                MFPmin[ih, z] = 1/tmp[2:, 1:].min()
+
+        elif H5fmt == 2:
+            # temperature couples loop
+            for itup, tup in enumerate(temps):
+                for data, dataname in datakeys.items():  # loop over data
+                    iz, ih = 0, -1
+                    for hextype, hexname in core.NEassemblytypes.items():
+                        # update hexagon tpye counter
+                        ih = ih+1 
+                        # spatially homogenise data
+                        homogdata = AxHomogenise(core, data, hexname, NG, tup, unimap)
+                        # create temperatures group
+                        tmpgrp = 'Tf_{}_Tc_{}'.format(tup[0], tup[1])
+                        if tmpgrp not in fh5.keys():
+                            fh5.create_group(tmpgrp)
+                        fh5_TfTc = fh5[tmpgrp]
+                        # loop over kind of SAs
+   
+                        # -- split homogdata in regions and groups
+                        for z in range(NZ):  # loop over cuts
+                            iz = iz + 1  # new axial region
+                            # --- create group
+                            izgrp = '{}'.format(iz)
+                            if izgrp not in fh5_TfTc.keys():
+                                fh5_TfTc.create_group(izgrp)
+                            fh5_iz = fh5_TfTc[izgrp]
+
+                            # save in h5 file
+                            if 'infS' in data or 'b1S' in data:
+                                tmp = np.array(homogdata[z, :].reshape(NG, NG), dtype=np.float)
+                            else:
+                                tmp = np.array(homogdata[z, :], dtype=np.float)
+   
+                            fh5_iz.create_dataset(dataname, data=tmp)
+
+                            # check if L or MFP are minimum
+                            if data in ['infDiffcoef', 'b1Diffcoef']:
+                                DFL[ih, z, :, itup] = np.sqrt(homogdata[z, :])
+                            elif data in ['infRemxs', 'b1Remxs']:
+                                DFL[ih, z, :, itup] = DFL[ih, z, :, itup]/np.sqrt(homogdata[z, :])
+                            
+                            if data in ['infTot', 'b1Tot']:
+                                if MFPmin[ih, z] > 1/tmp.min():
+                                    MFPmin[ih, z] = 1/tmp.min()      
+
         fh5.close()
         # loop over kind of SAs for minimum L
         datadic = {}
@@ -440,7 +497,7 @@ def writeConfig(core, NZ, Ntypes, NE_1D=False):
                 f.write('\n')
 
 
-def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
+def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2):
     """
     Make input.dat file.
 
@@ -467,6 +524,8 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
         whereNH5INP = "'NE_data.h5'"
 
     NE_1D = True if 'config' in core.__dict__.keys() else False
+    if H5fmt is False:
+        H5fmt = 1
 
     tmp = core.config[0].N.tolist() if NE_1D else core.NEAxialConfig.splitz
     NZ = core.config[0].nLayers if NE_1D else len(core.NEAxialConfig.mycuts)-1
@@ -486,7 +545,7 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None):
         ndim = 3
 
     geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,
-                '$MESHZ0': meshz, '$NDIM': ndim, '$SPLITZ': splitz,
+                '$MESHZ0': meshz, '$NDIM': ndim, '$SPLITZ': splitz, '$H5fmt': H5fmt,
                 '$NCONFIG': nConfig, '$NRUN': nRun, '$POW': power,
                 '$NPROF': len(core.TimeSnap), '$TPROF': core.TimeSnap}
 
@@ -656,6 +715,8 @@ def AxHomogenise(core, what, which, NG, temp, unidict):
                                       (NG, NG))
                     # keep data
                     data[:, i] = smat[:, g]
+                elif 'Kappa' in what:
+                    data[i] = file.getUniv(u, 0, 0, 0).infExp[what][g]*file.getUniv(u, 0, 0, 0).infExp['infFiss'][g]
                 else:
                     data[i] = file.getUniv(u, 0, 0, 0).infExp[what][g]
 

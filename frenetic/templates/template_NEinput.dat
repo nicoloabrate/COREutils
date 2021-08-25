@@ -12,7 +12,7 @@ RHOINP = 'point.inp',	  !file which contains the time dependent reactivity input
 GEOINP = 'input.dat',
 NUMINP = 'input.dat',
 OUTINP = 'input.dat',
-ihdf5inp = 1,
+ihdf5inp = $H5fmt,
 /
 
 &GEOMETRY
