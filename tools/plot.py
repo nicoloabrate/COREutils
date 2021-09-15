@@ -18,7 +18,7 @@ from matplotlib import rc, colors
 def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                   figname=None, fren=False, asstype=False, usetex=False,
                   fill=True, mycuts=False, title=None, scale=1, floating=False,
-                  legend=False, **kwargs):
+                  legend=False, seed=None, **kwargs):
     """
     Plot core geometry on the x-z or y-z plane for NEutronics configuration.
 
@@ -85,6 +85,9 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
     kwargs.setdefault("alpha", 1)
     fontsize = kwargs.get("fontsize", 4)
 
+    if seed is not None:
+        np.random.seed(1)
+
     L = core.AssemblyGeom.edge*2
     Nass = core.Map.type.size
     # array of assembly type
@@ -116,11 +119,12 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
     if len(def_colors) < NR:
         N = NR-len(def_colors)
         if N < len(css4)-len(def_colors):
-            icol = 0
-            while icol <= N:
+            icol, newc = 0, 0
+            while newc <= N:
                 if css4[icol] not in def_colors:
                     def_colors.append(css4[icol])
-                    icol = icol + 1
+                    newc += 1
+                icol += 1
         else:
             # select all css4 colours
             icol = 0
@@ -226,6 +230,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                    bbox_to_anchor=(0.8, 1), loc='upper left',
                    framealpha=1)
 
+    plt.tight_layout()
     # save figure
     if figname is not None:
         fig.savefig(figname, bbox_inches='tight', dpi=250)
@@ -236,7 +241,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
               whichconf='NEconfig', asstype=False, dictname=None,
               legend=False, txtcol='k', usetex=False, fill=True,
               axes=None, cmap='Spectral_r', thresh=None,
-              cbarLabel=True, xlabel=None, ylabel=None,
+              cbarLabel=True, xlabel=None, ylabel=None, myfontsize=4,
               loglog=None, logx=None, logy=None, title=None,
               scale=1, fmt=None, numbers=False, **kwargs):
     """
@@ -305,7 +310,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
     kwargs.setdefault("linewidth", 0.5)
     kwargs.setdefault("lw", 0.5)
     kwargs.setdefault("alpha", 1)
-    fontsize = kwargs.get("fontsize", 4)
+    fontsize = kwargs.get("fontsize", myfontsize)
     # delete size from kwargs to use it in patches
     if 'fontsize' in kwargs:
         del kwargs['fontsize']
@@ -337,13 +342,13 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
 
         if core.AssemblyGeom.type == 'H':
             def_colors = ['turquoise', 'firebrick', 'chocolate', 'gold',
-                          'lightgray', 'seagreen', 'darkgoldenrod', 'grey',
-                          'royalblue', 'yellow', 'forestgreen', 'magenta',
-                          'lime']
+                          'palegoldenrod', 'forestgreen', 'darkgoldenrod', 'grey',
+                          'royalblue', 'silver', 'darkorange', 'magenta',
+                          'lime', 'seagreen']
         else:
             def_colors = ['deepskyblue', 'white', 'limegreen', 'gold',
-                          'lightgray', 'deepskyblue', 'firebrick', 'orange',
-                          'turquoise', 'royalblue', 'yellow']
+                          'lightgray', 'deepskyblue', 'firebrick', 'darkorange',
+                          'turquoise', 'royalblue', 'silver']
 
         # check if more colors are needed and append in case
         css4 = list(colors.CSS4_COLORS.keys())
