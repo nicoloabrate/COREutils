@@ -37,7 +37,7 @@
                         "BA" : [["BA", 0, 340]],
                         "EL" : [["ll", 0, 340]]
                      },
-            "mycuts" : [0, 68, 84, 136, 140, 200, 212, 264, 296, 340],
+            "zcuts" : [0, 68, 84, 136, 140, 200, 212, 264, 296, 340],
             "config" : {
                         "5.4" : {
                                 "translate" : {
@@ -58,7 +58,7 @@
                                             }
                               }
                        },
-            "regionsplot" : {"IF_TOP_REF": "TR", "IF_TOP_PLUG": "PU", "IF_SPRING": "SP",
+            "label" : {"IF_TOP_REF": "TR", "IF_TOP_PLUG": "PU", "IF_SPRING": "SP",
                               "IF_TOP_INS" : "TI", "INN_FUEL" : "IF", "IF_BOT_INS" : "BI",
                               "IF_PLEN" : "PL", "IF_BOT_PLUG" : "PU", "IF_BOT_REF" : "BR",
                               "OF_TOP_REF": "TR", "OF_TOP_PLUG": "PU", "OF_SPRING": "SP",

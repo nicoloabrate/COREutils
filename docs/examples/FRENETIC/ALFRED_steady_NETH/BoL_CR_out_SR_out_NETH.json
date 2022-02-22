@@ -45,11 +45,11 @@
                         "BA" : [["BA", 0, 340]],
                         "EL" : [["ll", 0, 340]]
                      },
-            "mycuts" : [0, 68, 84, 136, 140, 200, 212, 264, 296, 340],
+            "zcuts" : [0, 68, 84, 136, 140, 200, 212, 264, 296, 340],
             "config" : {
                         "0" : {}
                        },
-            "regionsplot" : {"IF_TOP_REF": "top reflector", "IF_TOP_PLUG": "top plug", "IF_SPRING": "spring",
+            "label" : {"IF_TOP_REF": "top reflector", "IF_TOP_PLUG": "top plug", "IF_SPRING": "spring",
                               "IF_TOP_INS" : "top insulator", "INN_FUEL" : "inner fuel", "IF_BOT_INS" : "bottom insulator",
                               "IF_PLEN" : "plenum", "IF_BOT_PLUG" : "bottom plug", "IF_BOT_REF" : "bottom reflector",
                               "OF_TOP_INS" : "top insulator", "OUT_FUEL" : "outer fuel", "OF_BOT_INS" : "bottom insulator",
