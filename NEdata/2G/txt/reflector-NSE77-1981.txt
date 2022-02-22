@@ -1,0 +1,32 @@
+# Data taken from NSE vol. 77 (1981) !"Determination and Application of Generalized Bias Operators Using an Inverse Perturbation Approach."
+# layers thickness: 6.68, 30.22, 6.68 (reflector-NSE-77-1981, core-NSE-77-1981, reflector-NSE-77-1981)
+# Results with S8 model
+# keff: 0.992085
+# fast-to-thermal (spectral index): 1.36711 
+
+# Groups in energy decreasing order
+
+# Abs
+2.5066E-4 8.0702E-3
+
+# Fiss
+0.00 0.00
+
+# Nubar
+0.0 0.0
+
+# Chit
+1.00000000e+00 0.00000000e+00
+
+#  Kappa
+2.08077000e+02 2.08077000e+02
+
+#  S0
+1.5127E-1 0.000E+00
+5.9537E-2 6.9732E-1
+
+#  beta
+0.00025 0.00164 0.00147 0.00296 0.00086 0.00032
+
+#  lambda
+0.0124 0.0305 0.1110 0.3010 1.1400 3.0100
