@@ -9,6 +9,7 @@ Description: Set of methods for generating FRENETIC input files.
 import io
 import os
 import json
+import logging
 from shutil import rmtree
 import numpy as np
 import pandas as pd
@@ -47,7 +48,7 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
         List of tuples with T fuel and T coolant used to evaluate NE data
     unimap : dict
         Dictionary mapping in which list each universe is located in
-        core.NEMaterialData.data dict
+        core.NE.data.data dict
 
     Returns
     -------
@@ -63,25 +64,25 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
     f = io.open('macro.nml', 'w', newline='\n')
     f.write('&MACROXS0\n')
     f.write(f'NMAT = {nmix} \n')
-    f.write(f'NGRO = {core.nGro} \n')
-    f.write(f'NPRE = {core.nPre} \n')
-    f.write(f'NDHP = {core.nDhp} \n')
-    f.write(f'NGRP = {core.nGrp } \n')
-    f.write(f'NPRP = {core.nPrp } \n')
+    f.write(f'NGRO = {core.NE.nGro} \n')
+    f.write(f'NPRE = {core.NE.nPre} \n')
+    f.write(f'NDHP = {core.NE.nDhp} \n')
+    f.write(f'NGRP = {core.NE.nGrp } \n')
+    f.write(f'NPRP = {core.NE.nPrp } \n')
     f.write('/\n\n')
     f.write('&MACROXS\n')
     f.write('IRHO = 0,\n')
-    f.write(f'VELOC0(1:{core.nGro}) = ')
+    f.write(f'VELOC0(1:{core.NE.nGro}) = ')
 
-    for igro in range(core.nGro):
+    for igro in range(core.NE.nGro):
         f.write('%s,' % ff(vel[igro], 'double'))
 
-    f.write(f'\nLAMBDA0(1:{core.nPre}) = ')
+    f.write(f'\nLAMBDA0(1:{core.NE.nPre}) = ')
 
-    for iprec in range(core.nPre):
+    for iprec in range(core.NE.nPre):
         f.write('%s,' % ff(lambda0[iprec], 'double'))
 
-    if core.nDhp > 0:
+    if core.NE.nDhp > 0:
         f.write(' \nlambdadhp0(1:1) = 0.000000d+00,\n')
         f.write('betadhp0(1:1) = 0.000000d+00,\n')
     f.write(f'IDIFF(1:{nmix}) = {nmix}*2,\n')
@@ -95,16 +96,16 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
 
         # perform operations only when the assembly is changed
     
-        whichmix = core.NEregions[imix+1]
-        chit = core.NEMaterialData[(Tf, Tc)][whichmix].getxs('Chit')[np.newaxis, :]
-        chid = core.NEMaterialData[(Tf, Tc)][whichmix].getxs('Chid')[np.newaxis, :]
+        whichmix = core.NE.regions[imix+1]
+        chit = core.NE.data[(Tf, Tc)][whichmix].getxs('Chit')[np.newaxis, :]
+        chid = core.NE.data[(Tf, Tc)][whichmix].getxs('Chid')[np.newaxis, :]
         imixF = 0
         # look for root universe
         if core.dim == 2:
             u = whichmix
         else:
-            for atype in core.NEAxialConfig.config_str.keys():
-                if whichmix in core.NEAxialConfig.config_str[atype]:
+            for atype in core.NE.AxialConfig.config_str.keys():
+                if whichmix in core.NE.AxialConfig.config_str[atype]:
                     u = atype
                     break
 
@@ -117,21 +118,21 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
             f.write(f'\n!Mix n.{imix+1} is {whichmix} and belongs to {u}\n')
 
         # write kinetic and spectrum parameters
-        f.write(f'CHIT0({imix+1},1:{core.nGro}) = ')
-        for igro in range(core.nGro):
+        f.write(f'CHIT0({imix+1},1:{core.NE.nGro}) = ')
+        for igro in range(core.NE.nGro):
             f.write('%s,' % ff(chit[imixF, igro], 'double'))
 
-        for igro in range(core.nGro):
+        for igro in range(core.NE.nGro):
             if len(chid.shape) > 2:
                 v = chid[imixF, 0, igro]
             else:
                 v = chid[imixF, igro]
-            f.write('\nCHID0(%d,%d,1:%d) = %d*%s,' % (imix+1, igro+1, core.nPre, core.nPre,
+            f.write('\nCHID0(%d,%d,1:%d) = %d*%s,' % (imix+1, igro+1, core.NE.nPre, core.NE.nPre,
                                                       ff(v, 'double')))
         f.write('\n')
         imixF = imixF+1
-        f.write(f'BETA0({imix+1},1:{core.nPre}) = ')
-        for iprec in range(core.nPre):
+        f.write(f'BETA0({imix+1},1:{core.NE.nPre}) = ')
+        for iprec in range(core.NE.nPre):
             f.write('%s,' % ff(beta0[iprec], 'double'))
 
         f.write('\n')
@@ -142,28 +143,28 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
             if macro == "XS_SCATT":
 
                 if H5fmt == 1:
-                    for igrostart in range(core.nGro):
-                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.nGro}) =')
-                        for igroend in range(core.nGro):
+                    for igrostart in range(core.NE.nGro):
+                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.nGro}) =')
+                        for igroend in range(core.NE.nGro):
                             f.write(f" '{macro}_{imix+1}_{igrostart+1}_{igroend+1}', ")
                         f.write('\n')
                 elif H5fmt == 2:
-                    for igrostart in range(core.nGro):
-                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.nGro}) =')
-                        for igroend in range(core.nGro):
+                    for igrostart in range(core.NE.nGro):
+                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.nGro}) =')
+                        for igroend in range(core.NE.nGro):
                             f.write(f" '{imix+1}/{macro}', ")
                         f.write('\n')
 
             else:
                 if H5fmt == 1:
-                    f.write(f'{inp}({imix+1},1:{core.nGro}) =')
-                    for igro in range(core.nGro):
+                    f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
+                    for igro in range(core.NE.nGro):
                         triple = (macro, imix+1, igro+1)
                         f.write(" '%s_%d_%d', " % triple)
                     f.write('\n')
                 elif H5fmt == 2:
-                    f.write(f'{inp}({imix+1},1:{core.nGro}) =')
-                    for igro in range(core.nGro):
+                    f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
+                    for igro in range(core.NE.nGro):
                         f.write(f" '{imix+1}/{macro}', ")
                     f.write('\n')
     # write namelist end
@@ -214,8 +215,8 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
     fh5.create_dataset('TfTc', data=core.TfTc)
     fh5.create_dataset('Tf', data=core.Tf)
     fh5.create_dataset('Tc', data=core.Tc)
-    fh5.create_dataset('NEenergygrid', data=core.NEenergygrid)
-    fh5.create_dataset('NEegridname', data=core.NEegridname)
+    fh5.create_dataset('energygrid', data=core.NE.energygrid)
+    fh5.create_dataset('egridname', data=core.NE.egridname)
 
     temps = core.TfTc
     Tf, Tc = zip(*temps)
@@ -243,12 +244,11 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
 
     # define tuple of couples of temperatures
     temps.sort(key=lambda t: t[0])
-
-    NEdata = core.NEMaterialData
+    regmap = core.NE.regions.reverse()
+    NEdata = core.NE.data
     if H5fmt == 1:
-        ireg = 0
-        for reg in core.NEMaterialData[temps[0]].keys():
-            ireg += 1
+        for reg in core.NE.data[temps[0]].keys():
+            ireg = regmap[reg]
             # update region (hexagon) type counter
             for data, dataname in datakeys.items():  # loop over data
                 where = {}
@@ -259,14 +259,14 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                     col = np.where(frendata[1, :] == tup[1])
                     where[tup] = (row, col)
                 # -- split homogdata in regions and groups
-                for g in range(core.nGro):  # loop over energy groups
+                for g in range(core.NE.nGro):  # loop over energy groups
                     basename = f"{dataname}_{ireg}_{g+1}"
                     # check if matrix
                     if 'S' in data or 'Sp' in data:
-                        for gdep in range(core.nGro):  # loop over departure g
+                        for gdep in range(core.NE.nGro):  # loop over departure g
                             # edit name to include info on dep group
                             txtname = "_".join([basename, str(gdep+1)])
-                            gc = gdep+core.nGro*g
+                            gc = gdep+core.NE.nGro*g
                             for itup, tup in enumerate(temps):
                                 # select matrix entry
                                 r, c = where[tup]
@@ -301,9 +301,8 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
         # temperature couples loop
         for itup, tup in enumerate(temps):
             for data, dataname in datakeys.items():  # loop over data
-                ireg = 0
-                for regtype, reg in core.NEMaterialData[tup].items():
-                    ireg += 1
+                for regtype, reg in core.NE.data[tup].items():
+                    ireg = regmap[regtype]
                     # create temperatures group
                     # temporary patch
                     tmpgrp = f'Tf_{tup[0]}_Tc_{tup[1]}'
@@ -319,7 +318,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                         xsdata = nubar*fiss
                     # save in h5 file
                     if 'S0' in data:
-                        tmp = np.array(xsdata.reshape(core.nGro, core.nGro), dtype=np.float)
+                        tmp = np.array(xsdata.reshape(core.NE.nGro, core.NE.nGro), dtype=np.float)
                     else:
                         tmp = np.array(xsdata, dtype=np.float)
 
@@ -328,7 +327,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                         fh5_TfTc.create_group(irgrp)
                     fh5_ih = fh5_TfTc[irgrp]
                     fh5_ih.attrs['region'] = str(regtype)
-                    fh5_ih.attrs['label'] = str(core.NElabels[regtype])
+                    fh5_ih.attrs['label'] = str(core.NE.labels[regtype])
 
                     fh5_ih.create_dataset(dataname, data=tmp)
 
@@ -339,7 +338,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
     DFLmin = {}
     MFPmin = {}
     for itup, tup in enumerate(temps):
-        for regtype, reg in core.NEMaterialData[tup].items():
+        for regtype, reg in core.NE.data[tup].items():
             if itup == 0:
                 DFLmin[regtype] = reg.DiffLength.min()
                 MFPmin[regtype] = reg.MeanFreePath
@@ -349,14 +348,14 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                 if MFPmin[regtype] > reg.MeanFreePath:
                     MFPmin[regtype] = reg.MeanFreePath
 
-    for asstype, cuts in core.NEAxialConfig.config_str.items():
+    for asstype, cuts in core.NE.AxialConfig.config_str.items():
         for i, reg in enumerate(cuts):
-            deltaz = (core.NEzcoord[i][1]-core.NEzcoord[i][0])
-            dz = deltaz/core.NEAxialConfig.splitz[i]
+            deltaz = (core.NE.zcoord[i][1]-core.NE.zcoord[i][0])
+            dz = deltaz/core.NE.AxialConfig.splitz[i]
             L = DFLmin[reg]
             if dz > L:  # MFPmin[reg], 
-                print(f'WARNING: split in reg. {reg} for {asstype} SA'
-                      f' should be refined by a factor {dz/L}')
+                logging.info(f'WARNING: split in reg. {reg} for {asstype} SA'
+                             f' should be refined by a factor {dz/L}')
 
         with open('meanfreepath_difflength.json', 'w') as outfile:
             json.dump({"DiffLength": DFLmin, "MeanFreePath": MFPmin}, outfile, indent=8)
@@ -381,7 +380,7 @@ def writeConfig(core, NZ, Ntypes):
 
     """
     f1 = io.open('config.inp', 'w', newline='\n')
-    NAssTypes = len(core.NEassemblytypes)
+    NAssTypes = len(core.NE.assemblytypes)
 
     writer = pd.ExcelWriter("configurations.xlsx", engine='xlsxwriter')
     workbook=writer.book
@@ -395,9 +394,9 @@ def writeConfig(core, NZ, Ntypes):
         df_geom1.name = 'SA numbering according to FRENETIC'
 
     if core.dim != 2:
-        z_cuts = np.asarray(core.NEAxialConfig.zcuts)
+        z_cuts = np.asarray(core.NE.AxialConfig.zcuts)
         z_centre = (z_cuts[:-1]+z_cuts[1:])/2
-        ax_nodes = np.array([z_cuts[:-1], z_cuts[1:], core.NEAxialConfig.splitz])
+        ax_nodes = np.array([z_cuts[:-1], z_cuts[1:], core.NE.AxialConfig.splitz])
         df_geom2 = pd.DataFrame(data=ax_nodes, index=["upper z", "lower z", "splitz"],
                                 columns=np.arange(1, len(z_cuts)))
         df_geom2.name = 'Axial subdivision'
@@ -418,7 +417,7 @@ def writeConfig(core, NZ, Ntypes):
         worksheet.write_string(offset, 0, df_geom2.name)
         df_geom2.to_excel(writer, sheet_name=sheetname, startrow=startrow, startcol=0)
 
-    for t in core.NEtime:  # loop over time
+    for t in core.NE.time:  # loop over time
         # configuration dicts
         if core.dim != 1:
             rad_config[t] = core.writecorelattice(fname=None, time=t)
@@ -430,11 +429,10 @@ def writeConfig(core, NZ, Ntypes):
         config_int = np.zeros((NZ, core.NAss), dtype=int)
         config_str = np.zeros((NZ, core.NAss), dtype=object)
         for n in range(1, core.NAss+1):  # loop over all assemblies (1 assembly in 1D)
-            iType = core.getassemblytype(n, time=t, isfren=True,
-                                         whichconf="NEconfig")
-            aType = core.NEassemblytypes[iType]
-            config_int[:, n-1] = core.NEAxialConfig.config[iType]
-            config_str[:, n-1] = core.NEAxialConfig.config_str[aType]
+            iType = core.getassemblytype(n, core.NE.config[t], isfren=True)
+            aType = core.NE.assemblytypes[iType]
+            config_int[:, n-1] = core.NE.AxialConfig.config[iType]
+            config_str[:, n-1] = core.NE.AxialConfig.config_str[aType]
         
         for iz in range(NZ):
             # f1.write('%s ' % ff(t, 'double'))  # write time instant for each cut
@@ -456,7 +454,7 @@ def writeConfig(core, NZ, Ntypes):
             df_rad = pd.DataFrame.from_dict(rad_config[t])
             df_rad.name = 'Radial configuration'
         
-        sheetname = f't={t:.5e} (s)'
+        sheetname = f't={t:.15e} (s)'
         worksheet=workbook.add_worksheet(sheetname)
         writer.sheets[sheetname] = worksheet
 
@@ -505,8 +503,8 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2
     if H5fmt is False:
         H5fmt = 1
 
-    tmp = core.NEAxialConfig.splitz
-    NZ = len(core.NEAxialConfig.zcuts)-1
+    tmp = core.NE.AxialConfig.splitz
+    NZ = len(core.NE.AxialConfig.zcuts)-1
     if isinstance(tmp, (int)):
         splitz = [tmp]*NZ
     elif isinstance(tmp, (list, np.ndarray)):
@@ -515,9 +513,9 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2
         raise OSError(f'splitz in core.NEAxialsConfig.splitz cannot'
                       f'be of type {type(tmp)}')
 
-    nConfig = len(core.NEtime)
-    meshz = core.NEAxialConfig.zcuts
-    core.trans = False if max(core.NEtime) == 0 else True
+    nConfig = len(core.NE.time)
+    meshz = core.NE.AxialConfig.zcuts
+    core.trans = False if max(core.NE.time) == 0 else True
     nRun = 2 if core.trans else 1
 
     geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,

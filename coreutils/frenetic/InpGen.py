@@ -8,7 +8,7 @@ Description: Set of methods for generating FRENETIC input files.
 """
 import io
 import os
-import warnings
+import logging
 import pathlib
 import numpy as np
 from shutil import move, copyfile, SameFileError
@@ -75,10 +75,11 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
         print(f'Overwriting file {jsonname}')
         copyfile(f'{json}', join(casepath, f'{jsonname}'))
     # --- save core object to root directory
+    # core.to_h5('core')
     corefname = 'core.h5'
     grp_name = 'core'
     myh5.write(core, grp_name, corefname, chunks=True, compression=True,
-               overwrite=True, skip='NEMaterialData')
+               overwrite=True, skip=['NE.data'])
     try:
         copyfile(f'{corefname}', join(casepath, f'{corefname}'))
     except SameFileError:
@@ -112,7 +113,7 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
     
     # make NE input (config.dat, macro.nml)
     
-    if 'NEconfig' in core.__dict__.keys():
+    if hasattr(core, "NE"):
         NE = True
         isNE1D = True if core.dim == 1 else False
     else:
@@ -121,16 +122,16 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
     if NE:
         NEpath = mkdir("NE", casepath)
         # define number of axial cuts
-        nFreAxReg = len(core.NEAxialConfig.zcuts)-1
-        nAssTypes = 1 if isNE1D else len(core.NEAxialConfig.cuts)  # len(core.config[tlast].regions)
+        nFreAxReg = len(core.NE.AxialConfig.zcuts)-1
+        nAssTypes = 1 if isNE1D else len(core.NE.AxialConfig.cuts)  # len(core.config[tlast].regions)
         # define nmix (number of different regions)
-        nmix = len(core.NEregions.keys())
+        nmix = len(core.NE.regions.keys())
 
         # --- write config.inp
         writeConfig(core, nFreAxReg, nAssTypes)
 
         # --- write input.dat
-        makeNEinput(core, templateNE, H5fmt=H5fmt)
+        makeNEinput(core, template=templateNE, H5fmt=H5fmt)
 
         # move NE files
         NEfiles = ['input.dat', 'config.inp']
@@ -142,10 +143,10 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                 print('Overwriting file {}'.format(f))
                 move(f, join(NEpath, f))
     else:
-        warnings.warn('input.dat and config.inp not written!')
+        logging.warn('No NE object, so input.dat and config.inp not written!')
 
     # write NE data
-    if 'NEMaterialData' in core.__dict__.keys() or isNE1D:
+    if hasattr(core.NE, 'data') or isNE1D:
         NEpath = mkdir("NE", casepath)
         # -- prepare data
         # get temperatures couples
@@ -156,17 +157,17 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
         # reference temperatures defined as minima
         mincouple = min(temp, key=lambda t: (t[1]+t[0]))
         Tf, Tc = mincouple
-        NGRO = core.nGro
-        NPRE = core.nPre
+        NGRO = core.NE.nGro
+        NPRE = core.NE.nPre
         # --- get kinetic parameters (equal for each material)
-        mat0 = core.NEMaterialData[temp[0]][core.NEregions[1]]
+        mat0 = core.NE.data[temp[0]][core.NE.regions[1]]
         vel = 1/mat0.Invv
         beta0 = mat0.beta
         lambda0 = mat0.__dict__['lambda']
 
         # --- write macro.nml
         writemacro(core, nmix, vel, lambda0, beta0, nFreAxReg,
-                   (Tf, Tc), core.NEregions, H5fmt=H5fmt)
+                   (Tf, Tc), core.NE.regions, H5fmt=H5fmt)
 
         # -- write NE_data.h5
         writeNEdata(core, verbose=False, H5fmt=H5fmt)
@@ -183,7 +184,7 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
         move('meanfreepath_difflength.json', join(AUXpath, 'meanfreepath_difflength.json'))
 
     else:
-        warnings.warn('macro.nml and NE_data.h5 not written!')
+        logging.warn('macro.nml and NE_data.h5 not written!')
 
     # make TH input (HA_*_*.txt)
     if 'THconfig' in core.__dict__.keys():
@@ -196,7 +197,7 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
             if f.startswith("HA"):
                 move(f, join(THdatapath, f))
     else:
-        warnings.warn('HA_xx_xx.dat not written, data dir not created!')
+        logging.warn('No TH configuration, so HA_xx_xx.dat not written and data dir not created!')
 
     # make CZ input (mdot.txt, temp.txt, press.txt, filecool.txt)
     if 'CZconfig' in core.__dict__.keys():
@@ -210,7 +211,7 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                    'filecool.dat']
         [move(f, join(THpath, f)) for f in THfiles]
     else:
-        warnings.warn('mdot.dat, press.dat, temp.dat, input.dat not written!')
+        logging.warn('No CZconfig, so mdot.dat, press.dat, temp.dat, input.dat not written!')
 
 
     # plot configurations
@@ -228,20 +229,20 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                     whichSA = plotNE['whichSA']
 
         AUX_NE_plot = []
-        asslabel = core.NEassemblytypes
+        asslabel = core.NE.assemblytypes
         if core.dim != 1:
             for fmt in figfmt:
                 # --- radial map (assembly numbers)
-                figname = f'NE_rad_map.{fmt}'
+                figname = f'NE-rad-map.{fmt}'
                 AUX_NE_plot.append(figname)
-                RadialMap(core, label=True, fren=True, whichconf="NEconfig", 
+                RadialMap(core, label=True, fren=True, whichconf="NE", 
                           legend=True, asstype=True, figname=figname)
                 # --- radial configurations
-                for t in core.NEtime:
-                    figname = f'NE_rad_t{t:.5e}.{fmt}'
+                for itime, t in enumerate(core.NE.time):
+                    figname = f'NE-rad-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
                     RadialMap(core, time=t, label=True, fren=True, 
-                              whichconf="NEconfig", dictname=asslabel,
+                              whichconf="NE", dictname=asslabel,
                               legend=True, asstype=True, figname=figname)
 
         if core.dim != 1:
@@ -263,9 +264,9 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
             SAs = None
         # plot core Axial configuration
         for fmt in figfmt:
-            for t in core.NEtime:
+            for itime, t in enumerate(core.NE.time):
                 if core.dim == 1:
-                    figname = f'NEslab-t{t:.5e}.{fmt}'
+                    figname = f'NEslab-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
                     SlabPlot(core, time=t, figname=figname, )
                     plt.close()
@@ -274,39 +275,39 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                     # plot one SA per each kind at each time
                     # add one assembly per type
                     allassbly = []
-                    lst = np.unique(core.NEconfig[t].flatten())
+                    config = core.NE.config[t]
+                    lst = np.unique(config.flatten())
                     for l in lst:
                         if l != 0:
-                            a = core.getassemblylist(l, t, isfren=True,
-                                                    whichconf="NEconfig")
+                            a = core.getassemblylist(l, config, isfren=True)
                             allassbly.append(min(a))
                     allassbly.sort()
-                    figname = f'NEax-alltypes-t{t:.5e}.{fmt}'
+                    figname = f'NEax-alltypes-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
                     AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
                                 figname=figname, legend=True, floating=True)
                     plt.close()
                     # plot y=0 SAs
-                    figname = f'NEax-x0-t{t:.5e}.{fmt}'
+                    figname = f'NEax-x0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
                     AxialGeomPlot(core, x0, time=t, fren=True, zcuts=True,
                                 figname=figname, legend=True)
                     plt.close()
                     # plot x=0 SAs
-                    figname = f'NEax-y0-t{t:.5e}.{fmt}'
+                    figname = f'NEax-y0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
                     AxialGeomPlot(core, y0, time=t, fren=True, zcuts=True,
                                 figname=figname, legend=True, floating=True)
                     plt.close()
                     # plot along 1st sextant
-                    figname = f'NEax-sextI-t{t:.5e}.{fmt}'
+                    figname = f'NEax-sextI-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
                     AxialGeomPlot(core, sextI, time=t, fren=True, zcuts=True,
                                 figname=figname, legend=True, floating=True)
                     plt.close()
                     # custom plot
                     if whichSA is not None:
-                        figname = f'NEax-t{t:.5e}.{fmt}'
+                        figname = f'NEax-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                         AUX_NE_plot.append(figname)
                         AxialGeomPlot(core, SAs, time=t, fren=True, zcuts=True,
                                     figname=figname, legend=True)
@@ -362,10 +363,10 @@ def makecommoninput(core, template=None):
         NH = core.NAss
         PITCH = core.AssemblyGeom.pitch
         try:
-            NDIFF = len(core.THassemblytypes)
+            NDIFF = len(core.TH.assemblytypes)
         except AttributeError:
-            NDIFF = len(core.NEassemblytypes)
-            print('Warning: NDIFF variable set equal to the number of NE assemblies')
+            NDIFF = len(core.NE.assemblytypes)
+            logging.warn('NDIFF variable set equal to the number of NE assemblies')
 
     except AttributeError as err:
         if "object has no attribute 'Map'" in str(err):  # assume 1D core

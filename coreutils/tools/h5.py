@@ -5,13 +5,15 @@ File: h5.py
 
 Description: Utility to read/write objects from/to HDF5 files.
 """
+import re
 import os
 import h5py
-import numpy as np
+import numpy
+import logging
 from collections import OrderedDict
 from numpy import string_, ndarray, array, asarray
 from numpy import int8, int16, int32, int64, float16, float32, float64, \
-                  complex128
+                  complex128, zeros, asarray, bytes_
 
 
 class read():
@@ -24,9 +26,10 @@ class read():
 
     _float_types = (float, float16, float32, float64, complex, complex128)
     _int_types = (int, int8, int16, int32, int64)
-    _arr_types = (ndarray, list)
-    _types = (*_int_types, *_float_types, *_arr_types, str, np.bytes_,
-              h5py._hl.dataset.Dataset, dict, tuple, OrderedDict)
+    _scalar_types = (*_int_types, *_float_types, bool)
+    _iter_types = (ndarray, list, dict, tuple, OrderedDict)
+    _types = (*_scalar_types, *_iter_types, str, bytes_,
+              h5py._hl.dataset.Dataset, )
     _str2type = {i.__name__: i for i in _types}
 
     def __init__(self, h5name, metadata=True):
@@ -125,29 +128,56 @@ class read():
                 else:
                     val = read._h52dict(item, keytype=keytype)
                 return val
-
-        if type(item).__name__ in read._str2type:
+        else:
+            if "<class" in pytype:
+                tmp = re.findall("<class '(.*?)'>", pytype)[0]
+                try:
+                    pytype = eval(tmp)
+                except  NameError:
+                    pytype = None
+        # if type(item).__name__ in read._str2type:
+        if pytype in read._str2type.values():
             if isinstance(item, h5py._hl.dataset.Dataset):
-                if pytype == 'str':
+                if pytype is str:
                     if item.shape == ():
-                        val = array(item)[()].decode()
+                        val = array(item)[()] # .decode()
                     else:
                         val = []
                         for i in item:
-                            val.append(i.decode())
-                        val = np.asarray(val)
+                            val.append(i)
+                        val = asarray(val)
                 else:
-                    dt = item.dtype
-                    if len(item.shape) == 0:
-                        val = np.asarray(item).item()
+                    if pytype in read._scalar_types:
+                        val = array(item, dtype=pytype)[()]
+                    elif pytype in  read._iter_types:
+                        dt = item.dtype
+                        if len(item.shape) == 0:
+                            val = asarray(item).item()
+                        else:
+                            val = zeros(item.shape, dtype=dt)
+                            item.read_direct(val)
                     else:
-                        val = np.zeros(item.shape, dtype=dt)
-                        item.read_direct(val)
-            elif pytype == 'str':
+                        raise TypeError(f'Cannot read data {item} with type {type(item)}!')
+            elif pytype in read._scalar_types:
+                val = pytype(item)
+            elif pytype in read._iter_types:
+                dt = item.dtype
+                if len(item.shape) == 0:
+                    val = asarray(item).item()
+                else:
+                    val = zeros(item.shape, dtype=dt)
+                    item.read_direct(val)
+                    if pytype == list or pytype == tuple:
+                        val = val.to_list()
+                    elif pytype == tuple:
+                        val = tuple(map(tuple, val))
+            elif pytype is str:
                 val = item
-            elif 'bytes' in pytype:
+            elif pytype is bytes:
                 enc = item.attrs['encoding'].decode('ascii')
                 val = item.value.decode(enc)
+            elif pytype is bool:
+                val = item.value
             elif pytype == b'str':
                 try:
                     enc = item.attrs['encoding'].decode('ascii')
@@ -155,17 +185,13 @@ class read():
                     enc = 'ascii'
                     print('Warning: %s of type b''str'' read with'
                           ' ''ascii'' encoding')
-
                 val = item.value.decode(enc)
             else:
-                raise TypeError(f'Cannot read data {item}!')
+                raise TypeError(f'Cannot read data {item} with type {type(item)}!')
         elif type(item).__name__ == 'Group':
-            try:
-                val = read._h52dict(item, keytype=keytype)
-            except TypeError:
-                raise TypeError(f'Cannot read data {item}!')
+            val = read._h52dict(item, keytype=keytype)
         else:
-            raise TypeError(f'Cannot read data {item}!')
+            raise TypeError(f'Cannot read data {item} with type {type(item)}!')
         return val
 
     def _h52dict(path, keytype=None):
@@ -184,11 +210,11 @@ class read():
         """
         dic = {}
         for key, item in path.items():
-            key = read._h52py(key, pytype=keytype)
             if isinstance(item, h5py._hl.dataset.Dataset):
-                dic[key] = read._h52py(item, pytype=item.attrs['pytype'])
-                # print(key, item.attrs['pytype'], type(item[()]))
-                # ADD HERE BOTH KEYTYPE
+                pytype = item.attrs['pytype']
+                keytype = item.attrs['keytype']
+                key = read._h52py(key, pytype=keytype)
+                dic[key] = read._h52py(item, pytype=pytype, keytype=keytype)
             elif isinstance(item, h5py._hl.group.Group):
                 dic[key] = read._h52dict(item)
 
@@ -261,8 +287,7 @@ class write():
                 groupname = [groupname]
             else:
                 self.fh5.close()
-                raise OSError('Unknown type {} for groupname!'
-                              .format(groupname.type))
+                raise OSError(f'Unknown type {groupname.type} for groupname!')
         
         if len(obj) != len(groupname):
             self.fh5.close()
@@ -282,14 +307,14 @@ class write():
         for i, (ob, at, grp) in enumerate(zip(obj, attributes, groupname)):
             if isinstance(ob, (list, tuple, ndarray)):
                 write.iterable2h5(self.fh5, grp, ob, attributes=at)
-                self.fh5[grp].attrs['pytype'] = str(type(ob).__name__)
+                self.fh5[grp].attrs['pytype'] = str(type(ob))
             elif isinstance(ob, (dict)):
                 write.dict2h5(self.fh5, grp, ob, attributes=at, skip=skip)
-                self.fh5[grp].attrs['pytype'] = str(type(ob).__name__)
+                self.fh5[grp].attrs['pytype'] = str(type(ob))
             elif isinstance(ob, object):
                 # at = {'pytype': type(ob).__name__} , attributes=at
                 write.dict2h5(self.fh5, grp, ob.__dict__, skip=skip)
-                self.fh5[grp].attrs['pytype'] = str(type(ob).__name__)
+                self.fh5[grp].attrs['pytype'] = str(type(ob))
 
         self.fh5.close()
 
@@ -332,10 +357,10 @@ class write():
             fh5.create_group(grp)
 
         fh5g = fh5[grp]
-        if grptype != str:
-            fh5g.attrs['grptype'] = grptype
-        else:
-            fh5g.attrs['grptype'] = 'str'
+        # if grptype != str:
+        fh5g.attrs['grptype'] = str(grptype)
+        # else:
+        #     fh5g.attrs['grptype'] = 'str'
         if attributes:
             for k, v in attributes.items():
                 fh5g.attrs[k] = v
@@ -344,41 +369,42 @@ class write():
             fh5g.attrs['pytype'] = dt
 
         for key, item in dic.items():
-            
-            if key == skip:
+            doskip = False
+            for i, s in enumerate(skip):
+                if str(key) == s:
+                    logging.info(f"Skipping key {s}")
+                    doskip = True
+                elif str(key) in s:
+                    tmp = s.split('.')[1:][0]
+                    skip[i] = tmp
+            if doskip:
                 continue
-
-            if type(key) == str:
-                typekey = 'str'
-            else:
-                typekey = str(type(key).__name__)
+            # if type(key) == str:
+            #     typekey = 'str'
+            # else:
+            #     typekey = str(type(key).__name__)
 
             # convert items
             if isinstance(item, (int64, float64, bytes, int, float)):
-                fh5g.create_dataset(key, data=item)
-                fh5g[str(key)].attrs['pytype'] = str(type(item))
-                fh5g[str(key)].attrs['keytype'] = str(typekey)
+                fh5g.create_dataset(str(key), data=item)
             elif isinstance(item, str):
                 dt_str = h5py.special_dtype(vlen=str)
                 fh5g.create_dataset(str(key), data=item, dtype=dt_str)
-                fh5g[str(key)].attrs['pytype'] = 'str'
-                fh5g[str(key)].attrs['keytype'] = str(typekey)
             elif isinstance(item, (list, tuple, ndarray, set)):
-                write.iterable2h5(fh5[grp], key, item)
+                write.iterable2h5(fh5[grp], key, item, skip=skip)
             elif isinstance(item, dict):
                 if type(item) != dict: # any subclass of dict
                     item = dict(item)
-                write.dict2h5(fh5[grp], key, item, attributes=attributes)
-                fh5g[str(key)].attrs['pytype'] = str(type(item).__name__)
-                fh5g[str(key)].attrs['keytype'] = str(typekey)
+                write.dict2h5(fh5[grp], key, item, attributes=attributes, skip=skip)
             elif isinstance(item, object):
-                write.dict2h5(fh5[grp], key, item)
-                fh5g[str(key)].attrs['pytype'] = str(type(item).__name__)
-                fh5g[str(key)].attrs['keytype'] = str(typekey)
+                write.dict2h5(fh5[grp], key, item, skip=skip)
             else:
                 raise ValueError('Cannot save {} type!'.format(type(item)))
+            # --- assign key and value types
+            fh5g[str(key)].attrs['pytype'] = str(type(item))
+            fh5g[str(key)].attrs['keytype'] = str(type(key))
 
-    def iterable2h5(fh5, dataname, iterable, attrs=None, grp=None):
+    def iterable2h5(fh5, dataname, iterable, attrs=None, grp=None, skip=None):
 
         if isinstance(iterable, (list, tuple)):
             iterable = asarray(iterable)
@@ -388,19 +414,26 @@ class write():
             fh5 = fh5[grp]
 
         ittype = iterable.dtype
-        datanametype = type(dataname)
-        if datanametype == str:
-            datanametype = 'str'
-        dataname = str(dataname)
+        datanametype = str(type(dataname))
+        if type(dataname) != str:
+            dataname = str(dataname)
+
+        for i, s in enumerate(skip):
+            if dataname == s:
+                return None
+            elif dataname in s:
+                tmp = s.split('.')[1:][0]
+                skip[i] = tmp
+
         if isinstance(iterable, ndarray):
             if 'U' in str(ittype):  # string array
                 iterable = iterable.astype(dtype='O')
                 dt_str = h5py.special_dtype(vlen=str)
                 fh5.create_dataset(dataname, data=iterable, dtype=dt_str)
-                fh5[dataname].attrs['pytype'] = 'str'
+                fh5[dataname].attrs['pytype'] = str(type(iterable))
                 fh5[dataname].attrs['keytype'] = str(datanametype)
             elif 'object' in str(ittype):
-                fh5[grp].attrs.create('pytype', type(iterable).__name__)
+                fh5[grp].attrs.create('pytype', type(iterable))
                 for i, obj in enumerate(iterable):
                     write.dict2h5(fh5[grp], i, obj.__dict__)
             elif ittype in [*read._int_types, *read._float_types]:
