@@ -76,7 +76,7 @@ class UnfoldCore:
 
         # convert from string ndarray to ndarray of integers
         try:
-            coremap = coremap.astype(np.int)
+            coremap = coremap.astype(np.int64)
         except ValueError:
             raise OSError('Check input .txt entries match with assemblynames')
         coremap0 = coremap+0  # input
