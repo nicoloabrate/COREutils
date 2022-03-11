@@ -304,7 +304,7 @@ font.serif:      DejaVu Serif # , Bitstream Vera Serif, Computer Modern Roman, N
 ## For more information on LaTeX properties, see
 ## https://matplotlib.org/tutorials/text/usetex.html
 text.usetex: False
-text.latex.preamble:  r'\usepackage{libertinus} \usepackage{libertinust1math}'
+text.latex.preamble:  \usepackage{libertinus}usepackage{libertinust1math}
 
 ## The following settings allow you to select the fonts in math mode.
 #mathtext.fontset: dejavusans  # Should be 'dejavusans' (default),
