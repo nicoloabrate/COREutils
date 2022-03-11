@@ -65,7 +65,7 @@ class Map:
 
         """
         if inpdict is None:
-            self._init()
+            self._init(geinp, rotangle, AssRadGeom, regionsdict, inp)
         else:
             self._from_dict(inpdict)
 

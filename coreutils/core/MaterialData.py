@@ -636,13 +636,15 @@ class NEMaterial():
 
         """
         if what == 'density':
-            densdata = ['Capt', 'Fiss', *list(map(lambda z: "S"+str(z), range(0, 8))),
-                        *list(map(lambda z: "Sp"+str(z), range(0, 8)))]
+            densdata = ['Capt', 'Fiss', *list(map(lambda z: "S"+str(z), range(self.L))),
+                        *list(map(lambda z: "Sp"+str(z), range(self.L)))]
+            if howmuch < 0:
+                raise OSError('Cannot apply negative density perturbations!')
             for xs in densdata:
                 self.__dict__[xs][:] = self.__dict__[xs][:]*howmuch
         else:
             depgro = depgro-1 if depgro is not None else depgro
-            for g in range(0, self.nE):
+            for g in range(self.nE):
                 # no perturbation
                 if howmuch[g] == 0:
                     continue
@@ -674,7 +676,7 @@ class NEMaterial():
                         delta = 1/(3*mydic[what][g])-self.Transpxs[g]
                     elif what == 'S0':
                         # change higher moments, if any
-                        for ll in range(self.L):
+                        for ll in range(self.L): # FIXME
                             R = (mydic[what][g]/mydic[what][g]-delta)
                             key = 'S%d' % ll
                             mydic[key][depgro][g] = mydic[key][depgro][g]*R
@@ -742,27 +744,14 @@ class NEMaterial():
             self.Invv = 1/(v*100)  # s/cm
 
         # --- compute mean of scattering cosine
-        if 'Diffcoef' not in datavail or 'Transpxs' not in datavail:
-            if 'S1' in datavail:
-                sTOT1 = self.S1.sum(axis=0) if len(self.S1.shape) > 1 else self.S1
-                self.mu0 = 0*self.Tot if np.isnan((sTOT1/sTOT).sum()) \
-                    else sTOT1/sTOT
-            elif 'Diffcoef' in datavail:
-                tmp = 1/(3*self.Diffcoef)
-                self.mu0 = (self.Tot-tmp)/sTOT
-                for imu, mu in enumerate(self.mu0):
-                    if mu > 1 or mu < -1:
-                        self.mu0[imu] = 0
-            else:
-                self.mu0 = np.zeros((self.nE, ))
+        if 'S1' in datavail:
             # --- compute transport xs
-            self.Transpxs = self.Tot-self.mu0*sTOT
+            self.Transpxs = self.Tot-self.S1.sum(axis=0)
+        elif 'Diffcoef' in datavail:
+            self.Transxs = 1/(3*self.Diffcoef)
         else:
-            self.mu0 = np.zeros((self.nE, ))
-        # check consistency
-        if abs(self.mu0).max() > 1:
-            raise OSError(f'Average cosine larger than 1! Check \
-                          {self.UniName} data!')
+            self.Transpxs = self.Tot
+
         # --- compute diffusion coefficient
         self.Transpxs[self.Transpxs <= 0] = 1E-8
         self.Diffcoef = 1/(3*self.Transpxs)
@@ -773,6 +762,7 @@ class NEMaterial():
         # --- compute mean free path
         self.MeanFreePath = 1/self.Tot.max()
         # --- ensure consistency kinetic parameters (if fissile medium)
+        self.Fiss[self.Fiss <= 5E-7] = 0
         isFiss = self.Fiss.max() > 0
         if isFiss:
             if abs(self.Chit.sum() - 1) > 1E-5:
@@ -794,13 +784,25 @@ class NEMaterial():
         if kincons:
             try:
                 self.beta_tot = self.beta.sum()
-                for g in range(0, self.nE):
-                    chit = (1-self.beta_tot)*self.Chip[g] + \
-                            self.beta_tot*self.Chid[g]
-                    if abs(self.Chit[g]-chit) > 1E-3:
-                        raise OSError(f'Fission spectra or delayed \
-                                        fractions in {self.UniName} not \
-                                        consistent!')
+
+                if isFiss:
+                    if len(self.Chid.shape) == 1:
+                        # each family has same emission spectrum
+                        self.Chid = np.asarray([self.Chid]*self.NPF)
+                    elif self.Chid.shape != (self.NPF, self.nE):
+                        raise OSError(f'Delayed fiss. spectrum should be \
+                                        ({self.NPF}, {self.nE})')
+
+                    for g in range(self.nE):
+                        chit = (1-self.beta_tot)*self.Chip[g] + np.dot(self.beta, self.Chid[:, g])
+                        if abs(self.Chit[g]-chit) > 1E-3:
+                            raise OSError(f'Fission spectra or delayed \
+                                            fractions in {self.UniName} not \
+                                            consistent!')
+                else:
+                    self.Chit = np.zeros((self.nE, ))
+                    self.Chip = np.zeros((self.nE, ))
+                    self.Chid = np.zeros((self.NPF, self.nE))
 
             except AttributeError as err:
                 if 'Chid' in str(err) or 'Chip' in str(err):
@@ -812,11 +814,17 @@ class NEMaterial():
             # ensure pdf normalisation
             if isFiss:
                 self.Chip /= self.Chip.sum()
-                self.Chid /= self.Chid.sum()
+                for p in range(self.NPF):
+                    self.Chid[p, :] /= self.Chid[p, :].sum()
         else:
-            self.Chip = self.Chit
-            self.Chid = self.Chit
-
+            if isFiss:
+                self.Chip = self.Chit
+                self.Chid = self.Chit
+            else:
+                self.Chit = np.zeros((self.nE, ))
+                self.Chip = np.zeros((self.nE, ))
+                self.Chid = np.zeros((self.NPF, self.nE))
+  
     def void(self, keepXS=None, sanitycheck=True):
         """
         Make region void except for some group-wise user-specified reaction.
