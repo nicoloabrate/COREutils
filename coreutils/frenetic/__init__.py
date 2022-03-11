@@ -1,2 +1,2 @@
-from .postprocess import PostProcess
+from .output import NEoutput
 from .InpGen import inpgen, makecommoninput
