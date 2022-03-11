@@ -51,7 +51,7 @@ class AssemblyGeometry:
         else:
             self._from_dict(inpdict)
     
-    def _init(pitch, asstype):
+    def _init(self, pitch, asstype):
         if asstype == 'H':
             # by definition of pitch between two hexagonal assemblies
             self.apothema = pitch/2
@@ -145,6 +145,7 @@ class AxialConfig:
         """
         if isinstance(splitz, list):
             splitz = np.asarray(splitz)
+        
         # cuts defining different material regions
         xscuts = cuts['xscuts']
         if NE_dim == 1 and len(xscuts.keys()) > 1:
@@ -158,6 +159,9 @@ class AxialConfig:
             self.zcuts.sort()
 
         self.nZ = len(self.zcuts)-1
+        if len(splitz) != self.nZ:
+            raise OSError(f"Number of splitz ({len(splitz)}) does not match with number of cuts ({self.nZ})!")
+
         # initialise dict
         attributes = ['regions', 'labels', 'cuts', 'config', 'config_str',
                       'cutsregions', 'cutslabels', 'cutsweights']
