@@ -303,7 +303,7 @@ class NEoutput:
 
         return profile
 
-    def plot1D(self, which, gro=None, t=None, grp=None, pre=None, prp=None,
+    def plot1D(self, which, gro=None, t=None, grp=None, pre=None, prp=None, ax=None,
                z=None, hex=None, leglabels=None, figname=None, xlabel=None, 
                ylabel=None, geometry=None, oldfmt=False, style='sty1D.mplstyle',
                **kwargs):
@@ -380,26 +380,26 @@ class NEoutput:
         if isintegral and nTime == 1:
             raise OSError("Cannot plot integral parameter in steady state!")
 
+        ax = plt.gca() if ax is None else ax
         if isintegral:  # plot integral parameter
             # --- PLOT
             # plot against time or axial coordinate
             with plt.style.context(sty1D):
-                fig = plt.figure()
                 handles = []
                 handlesapp = handles.append
                 if which in ['rho', 'reactivityn']:
                     y *= 1E5
-                lin1, = plt.plot(x, y, **kwargs)
-                plt.xlabel(xlabel)
+                lin1, = ax.plot(x, y, **kwargs)
+                ax.set_xlabel(xlabel)
                 if ylabel is None:
                     # select unit of measure corresponding to profile
                     for k, v in self.integralParameters.items():
                         if which in v:
                             idx = v.index(which)
                             uom = self.integralParameters_measure[k][idx]
-                    plt.ylabel(fr"{which} {uom}")
+                    ax.set_ylabel(fr"{which} {uom}")
                 else:
-                    plt.ylabel(ylabel)
+                    ax.set_ylabel(ylabel)
         else:   # plot distribution         
             if hex is None:
                 hex = [0]
@@ -443,8 +443,7 @@ class NEoutput:
             # --- PLOT
             # plot against time or axial coordinate
             with plt.style.context(sty1D):                
-                fig = plt.figure()
-                axes = plt.gca()
+                ax = plt.gca() if ax is None else ax
                 handles = []
                 handlesapp = handles.append
                 ymin, ymax = np.inf, -np.inf
@@ -452,7 +451,7 @@ class NEoutput:
                 for i, s in enumerate(indexes):
                     y = prof[s]  # .take(indices=d, axis=i)
                     label = self._build_label(s, dims, dim2plot, usrdict)
-                    lin1, = plt.plot(x, y, label=label, **kwargs)
+                    lin1, = ax.plot(x, y, label=label, **kwargs)
                     handlesapp(lin1)
                     # track minimum and maximum
                     ymin = y.min() if y.min() < ymin else ymin
@@ -479,8 +478,8 @@ class NEoutput:
                 else:
                     plt.ylabel(ylabel)
 
-                axes.set_ylim(ymin, ymax)
-                axes.set_xlim(x.min(), x.max())
+                ax.set_ylim(ymin, ymax)
+                ax.set_xlim(x.min(), x.max())
 
                 legend_x = 0.50
                 legend_y = 1.01
