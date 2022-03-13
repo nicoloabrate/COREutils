@@ -29,7 +29,7 @@ except ImportError:
 figfmt = ['png', 'pdf']
 
 def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
-           H5fmt=2):
+           H5fmt=2, NEtxt=False):
     """
     Make FRENETIC NE/TH files if the required data are in core object.
 
@@ -170,7 +170,7 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                    (Tf, Tc), core.NE.regions, H5fmt=H5fmt)
 
         # -- write NE_data.h5
-        writeNEdata(core, verbose=False, H5fmt=H5fmt)
+        writeNEdata(core, verbose=False, H5fmt=H5fmt, txt=NEtxt)
         # move NE files
         NEfiles = ['macro.nml', 'NE_data.h5']
         for f in NEfiles:
