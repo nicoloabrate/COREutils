@@ -204,7 +204,8 @@ def __parseNE(inp, dim):
             if k in ['filename', 'assemblynames', 'rotation']:
                 if dim == 1:
                     NEargs['filename'] = None
-                    NEargs['assemblynames'] = "slab"
+                    if 'assemblynames' not in NEargs.keys():
+                        NEargs['assemblynames'] = ["slab"]
                     NEargs['rotation'] = None
                 else:
                     raise OSError(f'Mandatory {k} key missing in NE input file!')
