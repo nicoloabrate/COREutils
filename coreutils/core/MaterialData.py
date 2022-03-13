@@ -323,7 +323,7 @@ class NEMaterial():
 
                         # if dirTcTf not in filename and dirTfTc not in filename:
                     else:
-                        fname = path.join(datapath, filename)
+                        fname = path.join(jpath, filename)
                     
                     if '.json' not in str(filename):
                         fname = f'{str(filename)}.{reader}'
@@ -334,6 +334,7 @@ class NEMaterial():
                     if Path(fname).exists():
                         self._readjson(fname)
                     else:
+                        print(f'{fname} not found!')
                         reader = 'txt'
 
                 if reader == 'txt':
