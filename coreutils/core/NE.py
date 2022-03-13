@@ -95,7 +95,7 @@ class NE:
             self.labels = self.AxialConfig.labels
             self.assemblytypes = MyDict()
             NZ = len(self.AxialConfig.zcuts)-1
-            NEtypes = ['slab'] if dim == 1 else assemblynames
+            NEtypes = assemblynames
             nAssTypes = len(NEtypes)
             # loop over SAs types (one cycle for 1D)
             for iType, NEty in enumerate(NEtypes):
@@ -139,7 +139,8 @@ class NE:
         # ------ NE MATERIAL DATA AND ENERGY GRID
         if NEdata is not None:
             self.get_energy_grid(NEargs)
-            self.get_material_data(NEdata, univ, CI)
+            self.NEdata = NEdata
+            self.get_material_data(univ, CI)
             # --- check precursors family consistency
             NP = -1
             NPp = -1
@@ -203,12 +204,12 @@ class NE:
 
                 if "replace" in config[time]:
                     self.replace(CI, config[time]["replace"], 
-                                time, CI.TfTc, isfren=NEfren)
+                                time, isfren=NEfren)
 
                 if "replaceSA" in config[time]:
                     self.replaceSA(CI, config[time]["replaceSA"], 
                                    time, isfren=NEfren)
-        
+
         # --- CLEAN DATASET 
         # remove unused regions
         if NEdata is not None:
@@ -280,6 +281,7 @@ class NE:
 
             self.config[float(time)] = newcore
 
+
     def replace(self, core, rpl, time, isfren=False, action='repl'):
         """
         Replace full assemblies or axial regions.
@@ -317,6 +319,7 @@ class NE:
         pconf = zip(rpl['which'], rpl['with'], rpl['where'])
 
         if float(time) in self.config.keys():
+            nt = self.time.index(float(time))
             now = float(time)
         else:
             nt = self.time.index(float(time))
@@ -374,6 +377,17 @@ class NE:
                 if len(axpos) > 0 and len(cutaxpos) > 0:
                     raise OSError('Cannot replace in xscuts and zcuts at the same time!'
                                   ' Add separate replacements!')
+
+                # --- update object with new SA type
+                if action in atype:
+                    regex = rf"\-[0-9]{action}" # TODO test with basename like `IF-1-XXX-1repl`
+                    basetype = re.split(regex, atype, maxsplit=1)[0]
+                    newtype = f"{basetype}-{iR}{action}"
+                    oldtype = atype
+                else:
+                    newtype = f"{atype}-{iR}{action}"
+                    oldtype = newtype
+
                 # --- identify new region number (int)
                 if isinstance(withreg, list):  # look for region given its location
                     withwhich, z = withreg[0], withreg[1]
@@ -407,6 +421,10 @@ class NE:
                 elif isinstance(withreg, str):
                     newreg_str = withreg
                     if not incuts:
+                        if withreg not in regtypes.keys():
+                            self.regions[self.nReg+1] = withreg
+                            self.labels[withreg] = withreg
+                            regtypes = self.regions.reverse()
                         newreg_int = regtypes[withreg]
                         newlab_str = self.labels[newreg_str]
                     else:
@@ -415,16 +433,6 @@ class NE:
                         newlab_str = self.AxialConfig.cuts[atype].labels[idx]
                 else:
                     raise OSError("'with' key in replacemente must be list or string!")
-
-                # --- update object with new SA type
-                if action in atype:
-                    regex = rf"\-[0-9]{action}" # TODO test with basename like `IF-1-XXX-1repl`
-                    basetype = re.split(regex, atype, maxsplit=1)[0]
-                    newtype = f"{basetype}-{iR}{action}"
-                    oldtype = atype
-                else:
-                    newtype = f"{atype}-{iR}{action}"
-                    oldtype = newtype
 
                 nTypes = len(self.assemblytypes.keys())
                 newaxregions = cp(self.AxialConfig.config[itype])
@@ -451,6 +459,10 @@ class NE:
                         reg.insert(iz, newreg_str)
                         lab.insert(iz, newlab_str)
                         self.AxialConfig.cuts[newtype] = AxialCuts(upz, loz, reg, lab)
+                        # add new data if replaced region is missing
+                        if withreg not in self.data[core.TfTc[0]].keys():
+                            self.get_material_data([withreg], core)
+
                 else: 
                     # --- define cutsregions of new SA type
                     cuts = cp(self.AxialConfig.cuts[atype])
@@ -531,12 +543,13 @@ class NE:
                 if newtype not in self.assemblytypes.keys():
                     self.assemblytypes.update({nTypes+1: newtype})
                     self.assemblylabel.update({nTypes+1: newtype})
+
                     self.AxialConfig.config.update({nTypes+1: newaxregions})
                     self.AxialConfig.config_str.update({newtype: newaxregions_str})        
-                # --- replace assembly
-                if not isinstance(assbly, list):
-                    assbly = [assbly]
-                self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
+                    # --- replace assembly
+                    if not isinstance(assbly, list):
+                        assbly = [assbly]
+                    self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
 
     def perturb(self, core, prt, time=0, sanitycheck=True, isfren=True,
                 action='pert'):
@@ -846,9 +859,9 @@ class NE:
                     dim = 3
                     self.replaceSA(core, {newtype: assbly}, now, isfren=isfren)
 
-    def get_material_data(self, NEdata, univ, core):
+    def get_material_data(self, univ, core):
         try:
-            path = NEdata['path']
+            path = self.NEdata['path']
         except KeyError:
             pwd = Path(__file__).parent.parent.parent
             if 'coreutils' not in str(pwd):
@@ -857,23 +870,26 @@ class NE:
             # look into default NEdata dir
             path = str(pwd.joinpath('NEdata', self.egridname))
 
-        if "checktempdep" not in NEdata.keys():
-            NEdata["checktempdep"] = 0
+        if "checktempdep" not in self.NEdata.keys():
+            self.NEdata["checktempdep"] = 0
 
         try:
-            files = NEdata['beginwith']
+            files = self.NEdata['beginwith']
         except KeyError:
             # look for Serpent files in path/serpent
+            pwd = Path(__file__).parent.parent.parent
             serpath = str(pwd.joinpath('NEdata', f'{self.egridname}',
                                         'serpent'))
             files = [f for f in os.listdir(serpath)]
 
-        self.data = {}
+        if not hasattr(self, 'data'):
+            self.data = {}
         for temp in core.TfTc:
-            self.data[temp] = {}
+            if temp not in self.data.keys():
+                self.data[temp] = {}
             tmp = self.data[temp]
             # get temperature for OS operation on filenames or do nothing
-            T = temp if NEdata["checktempdep"] else None
+            T = temp if self.NEdata["checktempdep"] else None
             # look for all data in Serpent format
             serpres = {}
             serpuniv = []

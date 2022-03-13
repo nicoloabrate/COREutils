@@ -148,9 +148,6 @@ class AxialConfig:
         
         # cuts defining different material regions
         xscuts = cuts['xscuts']
-        if NE_dim == 1 and len(xscuts.keys()) > 1:
-            print('WARNING: only first slab in "cuts" is considered.')
-
         # homogenisation cuts
         if cuts['zcuts'] is None:
             self.zcuts = list(set(up+lo))
@@ -178,9 +175,6 @@ class AxialConfig:
         iType = 0
         for asstype, cuts in xscuts.items():
             iType += 1
-            if NE_dim == 1:
-                if asstype != 'slab':
-                    asstype = 'slab'
             # unpack lists
             up, lo, r, lb = [], [], [], []
             uap, lap, rap, lbp = up.append, lo.append, r.append, lb.append
@@ -211,7 +205,6 @@ class AxialConfig:
                 # check if homogenisation is needed
                 if any(y < 1 for y in zw['M1']):
                     homog = True
-
 
             regs = []
             regsapp = regs.append
