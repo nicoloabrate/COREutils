@@ -260,12 +260,11 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                     where[tup] = (row, col)
                 # -- split homogdata in regions and groups
                 for g in range(core.NE.nGro):  # loop over energy groups
-                    basename = f"{dataname}_{ireg}_{g+1}"
                     # check if matrix
                     if 'S' in data or 'Sp' in data:
                         for gdep in range(core.NE.nGro):  # loop over departure g
                             # edit name to include info on dep group
-                            txtname = "_".join([basename, str(gdep+1)])
+                            txtname = f"{dataname}_{ireg}_{gdep+1}_{g+1}"
                             gc = gdep+core.NE.nGro*g
                             for itup, tup in enumerate(temps):
                                 # select matrix entry
@@ -282,6 +281,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                                     fh5.create_dataset(txtname, data=tmp)
 
                     else:
+                        txtname = f"{dataname}_{ireg}_{g+1}"
                         for itup, tup in enumerate(temps):  # loop over temps
                             # select matrix entry
                             r, c = where[tup]
@@ -290,10 +290,10 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                             if itup == len(temps)-1:
                                 if txt or H5fmt == 0:
                                     # write txt file
-                                    mysavetxt(basename, frendata)
+                                    mysavetxt(txtname, frendata)
                                 # save in h5 file
                                 tmp = np.array(frendata, dtype=np.float)
-                                fh5.create_dataset(basename, data=tmp)
+                                fh5.create_dataset(txtname, data=tmp)
 
     elif H5fmt == 2:
         # TODO FIXME check order scattering matrix, which should be: 1_1, 1_2, 1_3 with arr<--dep. The
@@ -462,7 +462,7 @@ def writeConfig(core, NZ, Ntypes):
         startrow = 1
         if core.dim != 2:
             worksheet.write_string(0, 0, df_ax.name)
-            df_ax.to_excel(writer, sheet_name=sheetname, startrow=1 , startcol=0)
+            df_ax.to_excel(writer, sheet_name=sheetname, startrow=1 , startcol=1)
             offset = df_ax.shape[0] + 4
             startrow = df_ax.shape[0] + 5
 
