@@ -160,7 +160,8 @@ class Core:
             else:
                 NEcore = [1]
                 self.NAss = 1
-            self.NE = NE(NEargs, self)
+            datacheck = 1
+            self.NE = NE(NEargs, self, datacheck=datacheck)
 
         # --- TH OBJECT
         if isTH and dim != 1:
