@@ -110,7 +110,7 @@ class AxialConfig:
     """
 
     def __init__(self, cuts=None, splitz=None, labels=None,
-                 NE_dim=3, inpdict=None):
+                 NE_dim=3, inpdict=None, assemblynames=None):
         """
         Define axial configuration
 
@@ -125,11 +125,12 @@ class AxialConfig:
 
         """
         if inpdict is None:
-            self._init(cuts, splitz, labels=labels, NE_dim=NE_dim)
+            self._init(cuts, splitz, labels=labels, NE_dim=NE_dim,
+                       assemblynames=assemblynames)
         else:
             self._from_dict(inpdict)
 
-    def _init(self, cuts, splitz, labels=None, NE_dim=3):
+    def _init(self, cuts, splitz, labels=None, NE_dim=3, assemblynames=None):
         """Initialise with input data
 
         Parameters
@@ -173,8 +174,9 @@ class AxialConfig:
         homog = False
         nReg = 0
         iType = 0
-        for asstype, cuts in xscuts.items():
+        for asstype in assemblynames:
             iType += 1
+            cuts = xscuts[asstype]
             # unpack lists
             up, lo, r, lb = [], [], [], []
             uap, lap, rap, lbp = up.append, lo.append, r.append, lb.append
