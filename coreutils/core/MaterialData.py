@@ -147,15 +147,18 @@ def Homogenise(materials, weights, mixname):
     
     """
     collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(2))),
-                    *list(map(lambda z: "Sp"+str(z), range(2))), 'Invv']
+                    *list(map(lambda z: "Sp"+str(z), range(2))), 'Invv', 'Transpxs']
     collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
-
-    # compute normalising terms
+    inherit = ['NPF', 'nE', 'egridname', 'beta', 'beta_tot', 'energygrid',
+               'lambda', 'lambda_tot', 'L']
+    # compute normalisation constants
     for i, name in enumerate(materials.keys()):
         mat = materials[name]
         if i == 0:
-            homogmat = copy(mat)
-            homogmat.UniName = mixname
+            homogmat = NEMaterial(init=True)
+            setattr(homogmat, 'UniName', mixname)
+            for attr in inherit:
+                setattr(homogmat, attr, getattr(mat, attr))
             G = homogmat.nE
             TOTFLX = np.zeros((G, ))
             FISSRR = np.zeros((G, ))
@@ -166,9 +169,9 @@ def Homogenise(materials, weights, mixname):
         FISPRD += w*mat.Flx*mat.Fiss*mat.Nubar  # fiss. production
 
     nMat = i
-    homogmat.flx = TOTFLX
+    setattr(homogmat, 'flx', TOTFLX)
 
-    for key, data in homogmat.__dict__.items(): # loop over data
+    for key in [*collapse_xs, *collapse_xsf]: # loop over data
         for i, name in enumerate(materials.keys()): # sum over sub-regions
             mat = materials[name].__dict__
             flx = materials[name].Flx
@@ -230,7 +233,7 @@ class NEMaterial():
 
     def __init__(self, uniName=None, energygrid=None, datapath=None,
                  egridname=None, h5file=None, reader='json', serpres=None,
-                 basename=False, temp=False):
+                 basename=False, temp=False, datacheck=True, init=False):
         """
         Initialise object.
 
@@ -283,6 +286,9 @@ class NEMaterial():
                 msg = f"h5file must be dict or str, not {type(h5file)}"
                 raise TypeError(msg)
         else:
+            if init:
+                return
+
             if temp:
                 Tf, Tc = temp
             nE = len(energygrid)-1
@@ -385,7 +391,8 @@ class NEMaterial():
             # //2 since there are 'S' and 'Sp'
             S = sum('S' in s for s in datastr)//2
             self.L = S if S > L else L  # get maximum scattering order
-            self.datacheck()
+            if datacheck:
+                self.datacheck()
 
     def _readjson(self, path):
         """
@@ -744,18 +751,20 @@ class NEMaterial():
             v = np.sqrt(2*avgE/1.674927351e-27)
             self.Invv = 1/(v*100)  # s/cm
 
-        # --- compute mean of scattering cosine
-        if 'S1' in datavail:
-            # --- compute transport xs
-            self.Transpxs = self.Tot-self.S1.sum(axis=0)
-        elif 'Diffcoef' in datavail:
+        # --- compute diffusion coefficient and transport xs
+        if 'Diffcoef' in datavail:
             self.Transxs = 1/(3*self.Diffcoef)
+        elif 'Transpxs' in datavail:
+            self.Diffcoef = 1/(3*self.Transpxs)
         else:
-            self.Transpxs = self.Tot
-
+            if 'S1' in datavail:
+                # --- compute transport xs
+                self.Transpxs = self.Tot-self.S1.sum(axis=0)
+            else:
+                self.Transpxs = self.Tot
+            self.Diffcoef = 1/(3*self.Transpxs)
         # --- compute diffusion coefficient
         self.Transpxs[self.Transpxs <= 0] = 1E-8
-        self.Diffcoef = 1/(3*self.Transpxs)
         # --- compute diffusion length
         # avoid huge diff. coeff. and length
         self.Remxs[self.Remxs <= 0] = 1E-8

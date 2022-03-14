@@ -54,17 +54,17 @@ class NE:
         Replace assemblies with user-defined new or existing type.
     """
 
-    def __init__(self, NEargs=None, CI=None, inpdict=None):
+    def __init__(self, NEargs=None, CI=None, inpdict=None, datacheck=True):
 
         if inpdict is None:
-            self._init(NEargs, CI)
+            self._init(NEargs, CI, datacheck=datacheck)
         else:
             self.from_dict(inpdict)
 
-    def _init(self, NEargs, CI):
+    def _init(self, NEargs, CI, datacheck=True):
         # parse inp args
         dim = CI.dim
-        assemblynames = NEargs['assemblynames']
+        assemblynames = tuple(NEargs['assemblynames'])
         cuts = {'xscuts': NEargs['xscuts'],
                 'zcuts': NEargs['zcuts']}
         config = NEargs['config']
@@ -78,7 +78,7 @@ class NE:
         if cuts is not None and dim != 2:
             # initial axial configuration
             self.AxialConfig = AxialConfig(cuts, NEargs['splitz'], labels=NEargs['labels'], 
-                                            NE_dim=dim)
+                                            NE_dim=dim, assemblynames=assemblynames)
 
         # --- PARSE INPUT REGIONS
         if dim == 2:
@@ -140,7 +140,7 @@ class NE:
         if NEdata is not None:
             self.get_energy_grid(NEargs)
             self.NEdata = NEdata
-            self.get_material_data(univ, CI)
+            self.get_material_data(univ, CI, datacheck=datacheck)
             # --- check precursors family consistency
             NP = -1
             NPp = -1
@@ -459,9 +459,9 @@ class NE:
                         reg.insert(iz, newreg_str)
                         lab.insert(iz, newlab_str)
                         self.AxialConfig.cuts[newtype] = AxialCuts(upz, loz, reg, lab)
-                        # add new data if replaced region is missing
-                        if withreg not in self.data[core.TfTc[0]].keys():
-                            self.get_material_data([withreg], core)
+                        # TODO add new data if replaced region is missing
+                        # if withreg not in self.data[core.TfTc[0]].keys():
+                        #     self.get_material_data([withreg], core, datacheck=datacheck)
 
                 else: 
                     # --- define cutsregions of new SA type
@@ -859,7 +859,7 @@ class NE:
                     dim = 3
                     self.replaceSA(core, {newtype: assbly}, now, isfren=isfren)
 
-    def get_material_data(self, univ, core):
+    def get_material_data(self, univ, core, datacheck=True):
         try:
             path = self.NEdata['path']
         except KeyError:
@@ -905,11 +905,11 @@ class NE:
             for u in univ:
                 if u in serpuniv:
                     tmp[u] = NEMaterial(u, self.energygrid, egridname=self.egridname, 
-                                        serpres=serpres, temp=T)
+                                        serpres=serpres, temp=T, datacheck=datacheck)
                 else: # look for data in json and txt format
                     tmp[u] = NEMaterial(u, self.energygrid, 
                                         egridname=self.egridname,
-                                        datapath=path, temp=T, basename=u)
+                                        datapath=path, temp=T, basename=u, datacheck=datacheck)
             # --- HOMOGENISATION (if any)
             if self.AxialConfig.homogenised and core.dim != 2: 
                 for u0 in self.regions.values():
@@ -921,7 +921,7 @@ class NE:
                         # parse weights
                         w = np.zeros((len(names), ))
                         for iM, mixname in enumerate(names):
-                            idx = self.AxialConfig.cutsregions[NEty][f"M{iM+1}"].index(mixname)
+                            idx = self.AxialConfig.config_str[NEty].index(u0)
                             w[iM] = self.AxialConfig.cutsweights[NEty][f"M{iM+1}"][idx]
                         # perform homogenisation
                         mat4hom = {}
