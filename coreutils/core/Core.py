@@ -143,8 +143,7 @@ class Core:
             raise OSError('nSnap in .json file must be list with len >1, float or int!')
 
         # --- initialise assembly radial geometry object
-        if dim != 1:
-            self.AssemblyGeom = AssemblyGeometry(pitch, shape)  # module indep.
+        self.AssemblyGeom = AssemblyGeometry(pitch, shape)  # module indep.
         # --- NE OBJECT
         if isNE:
             # --- assign map

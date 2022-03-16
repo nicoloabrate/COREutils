@@ -180,7 +180,7 @@ class NE:
             self.replace(CI, NEargs["replace"], 0, isfren=NEfren)
 
         # build time-dependent core configuration
-        if config is not None:
+        if config is not None and CI.trans:
             for time in config.keys():
                 if time != '0':
                     t = float(time)

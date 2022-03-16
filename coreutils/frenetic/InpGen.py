@@ -371,7 +371,7 @@ def makecommoninput(core, template=None):
     except AttributeError as err:
         if "object has no attribute 'Map'" in str(err):  # assume 1D core
             NL, NR, NDIFF, NH = 1, 1, 1, 1
-            PITCH = 1
+            PITCH = core.AssemblyGeom.pitch
         else:
             print(err)
     # check if coupled calculation is possible

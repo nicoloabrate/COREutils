@@ -52,7 +52,7 @@ class AssemblyGeometry:
             self._from_dict(inpdict)
     
     def _init(self, pitch, asstype):
-        if asstype == 'H':
+        if asstype == 'H' or asstype == '1D':
             # by definition of pitch between two hexagonal assemblies
             self.apothema = pitch/2
             self.pitch = pitch

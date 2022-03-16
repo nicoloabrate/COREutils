@@ -140,8 +140,8 @@ def __parseCI(inp):
         else:
             if k == 'shape' and CIargs['dim'] == 1:
                 CIargs[k] = '1D'
-            elif k == 'pitch' and CIargs['dim'] != 3:
-                CIargs[k] = 1
+            elif k == 'pitch' and CIargs['dim'] == 1:
+                CIargs[k] = 1.1547005383792517**0.5
                 pass
             elif (k == 'Tf' or k == 'Tc') and CIargs['dim'] != 3:
                 CIargs[k] = [300]
@@ -162,8 +162,9 @@ def __parseCI(inp):
     for k, v in setToValue['CI'].items():
         if k not in CIargs.keys():
             CIargs[k] = v
-            
-    CIargs['trans'] = True if CIargs['tEnd'] != 0 else False
+    
+    if 'trans' not in CIargs.keys():
+        CIargs['trans'] = True if CIargs['tEnd'] != 0 else False
 
     return CIargs
 
