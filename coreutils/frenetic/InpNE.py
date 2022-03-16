@@ -54,7 +54,7 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
     -------
     ``None``
     """
-    macronames = ["DIFFCOEF", "XSTOT", "XS_SCATT", "XS_FISS", "NUSF", "EFISS"]
+    macronames = ["DIFFCOEF", "XS_TOT", "XS_SCATT", "XS_FISS", "NUSF", "ESIGF"]
     inpnames = ["filediff", "filesigt", "filesigs", "filesigf", "filenusigf",
                 "fileesigf"]
     (Tf, Tc) = temps
@@ -99,6 +99,7 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
         whichmix = core.NE.regions[imix+1]
         chit = core.NE.data[(Tf, Tc)][whichmix].getxs('Chit')[np.newaxis, :]
         chid = core.NE.data[(Tf, Tc)][whichmix].getxs('Chid')[np.newaxis, :]
+        
         imixF = 0
         # look for root universe
         if core.dim == 2:
@@ -193,9 +194,9 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
     ``None``
     """
     # --- define list of output filenames
-    outnames = ["DIFFCOEF", "EFISS", "NUSF", "XS_FISS", "XS_SCATT", "XSTOT",
+    outnames = ["DIFFCOEF", "ESIGF", "NUSF", "XS_FISS", "XS_SCATT", "XS_TOT",
                 "CHIT", "XS_REM"]
-    matkeys = ['Diffcoef', 'Kappa', 'Nsf', 'Fiss', 'S0', 'Tot', 'Chit',
+    matkeys = ['Diffcoef', 'Esigf', 'Nsf', 'Fiss', 'S0', 'Tot', 'Chit',
                 'Remxs']
     if verbose:
         xsverb = ['Capt', 'Nubar', 'Sp0']
@@ -285,7 +286,10 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                         for itup, tup in enumerate(temps):  # loop over temps
                             # select matrix entry
                             r, c = where[tup]
-                            frendata[r, c] = NEdata[tup][reg].__dict__[data][g]
+                            if 'Esigf' in data:
+                                frendata[r, c] = NEdata[tup][reg].__dict__['Fiss'][g]*NEdata[tup][reg].__dict__['Kappa'][g]*1.60217653e-13                  
+                            else:
+                                frendata[r, c] = NEdata[tup][reg].__dict__[data][g]
                             # write data if all T tuples have been spanned
                             if itup == len(temps)-1:
                                 if txt or H5fmt == 0:
@@ -310,12 +314,17 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                         fh5.create_group(tmpgrp)
                     fh5_TfTc = fh5[tmpgrp]
 
-                    if data != 'NuFiss':
+                    if data not in ['Nsf', 'Esigf']:
                         xsdata = reg.__dict__[data]
                     else:
-                        nubar = reg.Nubar
-                        fiss = reg.Fiss
-                        xsdata = nubar*fiss
+                        if data == 'Nsf':
+                            nubar = reg.Nubar
+                            fiss = reg.Fiss
+                            xsdata = nubar*fiss
+                        elif data == 'Esigf':
+                            kappa = reg.Kappa
+                            fiss = reg.Fiss
+                            xsdata = kappa*fiss*1.60217653e-13         
                     # save in h5 file
                     if 'S0' in data:
                         tmp = np.array(xsdata.reshape(core.NE.nGro, core.NE.nGro), dtype=np.float)
