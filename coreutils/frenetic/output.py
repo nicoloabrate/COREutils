@@ -275,6 +275,19 @@ class NEoutput:
                         fname = 'output.h5'
                     idx = v.index(which)+skip
                     notfound = False
+                    break
+                elif which == 'betaeff':
+                    dictkey = k
+                    if 'betaeff(1)' in v:
+                        if oldfmt:
+                            fname = f'intpar.out'
+                        else:
+                            fname = 'output.h5'
+                        idx = []
+                        for p in range(self.core.NE.nPre):
+                            idx.append(v.index(f'betaeff({p+1})')+skip)
+                        notfound = False
+                        break
 
             if notfound:
                 raise OSError(f'{which} not found in data!')
@@ -285,7 +298,13 @@ class NEoutput:
         else:
             fh5 = h5.File(datapath, "r")
             if isintegral:
-                profile = fh5['integralParameters'][dictkey][:, [0, idx]]
+                if which == 'betaeff':
+                    betas = np.array(fh5['integralParameters'][dictkey])[:, [idx]][:, 0, :]
+                    profile = np.zeros((betas.shape[0], 2))
+                    profile[:, 0] = fh5['integralParameters'][dictkey][:, 0]
+                    profile[:, 1] = betas.sum(axis=1)
+                else:
+                    profile = fh5['integralParameters'][dictkey][:, [0, idx]]
             else:
                 # parse specified time, assembly, axial node, group, prec. fam.
                 dims = NEoutput.distrout_dim[which]
@@ -304,9 +323,9 @@ class NEoutput:
         return profile
 
     def plot1D(self, which, gro=None, t=None, grp=None, pre=None, prp=None, ax=None,
-               z=None, hex=None, leglabels=None, figname=None, xlabel=None, 
-               ylabel=None, geometry=None, oldfmt=False, style='sty1D.mplstyle',
-               **kwargs):
+               abscissas=None, z=None, hex=None, leglabels=None, figname=None, xlabel=None, 
+               xlims=None, ylims=None, ylabel=None, geometry=None, oldfmt=False, 
+               style='sty1D.mplstyle', **kwargs):
         """
         Plot time/axial profile of integral parame. or distribution in hex.
 
@@ -387,8 +406,10 @@ class NEoutput:
             with plt.style.context(sty1D):
                 handles = []
                 handlesapp = handles.append
-                if which in ['rho', 'reactivityn']:
+                if which in ['rho', 'reactivityn', 'betaeff']:
                     y *= 1E5
+                if abscissas is not None:
+                    x = abscissas
                 lin1, = ax.plot(x, y, **kwargs)
                 ax.set_xlabel(xlabel)
                 if ylabel is None:
@@ -439,7 +460,7 @@ class NEoutput:
             indexes = [list(tup) for tup in indexes]
             for i in range(len(indexes)):
                 indexes[i].insert(idx, tmp)
-            
+
             # --- PLOT
             # plot against time or axial coordinate
             with plt.style.context(sty1D):                
@@ -451,11 +472,18 @@ class NEoutput:
                 for i, s in enumerate(indexes):
                     y = prof[s]  # .take(indices=d, axis=i)
                     label = self._build_label(s, dims, dim2plot, usrdict)
+                    if abscissas is not None:
+                        x = abscissas
                     lin1, = ax.plot(x, y, label=label, **kwargs)
                     handlesapp(lin1)
                     # track minimum and maximum
-                    ymin = y.min() if y.min() < ymin else ymin
-                    ymax = y.max() if y.max() > ymax else ymax
+                    if ylims is None:
+                        ymin = y.min() if y.min() < ymin else ymin
+                        ymax = y.max() if y.max() > ymax else ymax
+
+                if ylims is not None:
+                    ymin = min(ylims)
+                    ymax = max(ylims)
 
                 plt.xlabel(xlabel)
                 if ylabel is None:
@@ -490,11 +518,11 @@ class NEoutput:
                 else:
                     plt.legend(bbox_to_anchor=(legend_x, legend_y),
                             loc='lower center', ncol=ncol)
-                    
+
                 plt.tight_layout()
                 # plt.show()
                 if figname is not None:
-                    fig.savefig(figname)
+                    ax.savefig(figname)
 
     def RadialMap(self, core, what, z=0, t=0, pre=0, gro=0, grp=0,
                   label=False, figname=None, which=None,
