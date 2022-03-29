@@ -112,11 +112,11 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
         raise OSError(f'"serpent" dir does not exist in {datapath}')
     # check for temperatures
     if T is not None:
-        fname = f"{beginswith}_Tf_{Tf}_Tc_{Tc}"                               
-        if Path(path.join(spath, f"Tf_{Tf}_Tc_{Tc}")).exists():
-            spath = path.join(spath, f"Tf_{Tf}_Tc_{Tc}", fname)
-        elif Path(path.join(spath, f"Tc_{Tc}_Tf_{Tf}")).exists():
-            spath.join(spath, f"Tc_{Tc}_Tf_{Tf}", fname)
+        fname = f"{beginswith}_Tf_{Tf:g}_Tc_{Tc:g}"                               
+        if Path(path.join(spath, f"Tf_{Tf:g}_Tc_{Tc:g}")).exists():
+            spath = path.join(spath, f"Tf_{Tf:g}_Tc_{Tc:g}", fname)
+        elif Path(path.join(spath, f"Tc_{Tc:g}_Tf_{Tf:g}")).exists():
+            spath.join(spath, f"Tc_{Tc:g}_Tf_{Tf:g}", fname)
     else:
         fname = path.join(datapath, beginswith)    
     

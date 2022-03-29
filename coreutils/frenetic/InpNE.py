@@ -55,8 +55,13 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
     ``None``
     """
     macronames = ["DIFFCOEF", "XS_TOT", "XS_SCATT", "XS_FISS", "NUSF", "ESIGF"]
+    macronamesp = ["KERMA", "MUSIGP", "DIFFP", "XS_TOT_P", "XS_SCATT_P", "KERMAP"]
     inpnames = ["filediff", "filesigt", "filesigs", "filesigf", "filenusigf",
                 "fileesigf"]
+    inpnamesp = ["filekerma", "filemusigp", "filediffp", "filesigtp", "filesigsp", "filekermap"]
+    # FIXME read photon data should be automatic
+    core.NE.nGrp = 0
+    # FIXME kerma should be separated from photon data
     (Tf, Tc) = temps
     isNE1D = True if core.dim == 1 else False
     # -- write macro.nml file
@@ -77,6 +82,9 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
     for igro in range(core.NE.nGro):
         f.write('%s,' % ff(vel[igro], 'double'))
 
+    if core.NE.nGrp > 0:
+        f.write(f'\nVELOCP0(1:{core.NE.nGrp}) = 1.0D7,')
+
     f.write(f'\nLAMBDA0(1:{core.NE.nPre}) = ')
 
     for iprec in range(core.NE.nPre):
@@ -88,6 +96,16 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
     f.write(f'IDIFF(1:{nmix}) = {nmix}*2,\n')
     f.write(f'ISIGT(1:{nmix}) = {nmix}*2,\n')
     f.write(f'ISIGF(1:{nmix}) = {nmix}*2,\n')
+    f.write(f'ISIGS(1:{nmix}) = {nmix}*2,\n')
+
+    if core.NE.nGrp > 0:
+        f.write(f'IKERMA(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'ISIGP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'IDIFFP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'IKERMAP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'ISIGTP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'ISIGSP(1:{nmix}) = {nmix}*2,\n')
+
     f.write('TEMPFUEL0 = {},\n'.format(ff(Tf, 'double')))
     f.write('TEMPCOOL0 = {},\n'.format(ff(Tc, 'double')))
     f.write(f'ISIGS(1:{nmix}) = {nmix}*2,\n')
@@ -168,6 +186,30 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
                     for igro in range(core.NE.nGro):
                         f.write(f" '{imix+1}/{macro}', ")
                     f.write('\n')
+
+        if core.NE.nGrp > 0:
+            for inp, macro in zip(inpnamesp, macronamesp):
+
+                if macro == "XS_SCATT_P":
+                    for igrostart in range(core.NE.nGrp):
+                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.nGrp}) =')
+                        for igroend in range(core.NE.nGrp):
+                            f.write(f" 'input/{macro}_{imix+1}_{igrostart+1}_{igroend+1}.txt', ")
+                        f.write('\n')
+                elif macro == "KERMA" or macro == "MUSIGP":
+                    f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
+                    for igro in range(core.NE.nGro):
+                        triple = (macro, imix+1, igro+1)
+                        f.write(" 'input/%s_%d_%d.txt', " % triple)
+                    f.write('\n')
+                else:
+                    f.write(f'{inp}({imix+1},1:{core.NE.nGrp}) =')
+                    for igrp in range(core.NE.nGrp):
+                        triple = (macro, imix+1, igrp+1)
+                        f.write(" 'input/%s_%d_%d.txt', " % triple)
+                    f.write('\n')
+
+
     # write namelist end
     f.write('/\n')
 
@@ -309,7 +351,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                     ireg = regmap[regtype]
                     # create temperatures group
                     # temporary patch
-                    tmpgrp = f'Tf_{tup[0]}_Tc_{tup[1]}'
+                    tmpgrp = f'Tf_{tup[0]:g}_Tc_{tup[1]:g}'
                     if tmpgrp not in fh5.keys():
                         fh5.create_group(tmpgrp)
                     fh5_TfTc = fh5[tmpgrp]

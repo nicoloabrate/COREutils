@@ -121,14 +121,16 @@ class Core:
         CIargs['Tc'].sort()
         fuel_temp = CIargs['Tf']
         cool_temp = CIargs['Tc']
+        fuel_temp = np.asarray(fuel_temp,dtype=np.double)
+        cool_temp = np.asarray(cool_temp,dtype=np.double)
         # ensure ascending order
         for Tf in fuel_temp:
             for Tc in cool_temp:
                 if Tf >= Tc:
                     TfTc.append((Tf, Tc))
         self.TfTc = TfTc
-        self.Tf = Tf
-        self.Tc = Tc
+        self.Tf = fuel_temp
+        self.Tc = cool_temp
         self.TimeEnd = tEnd
         self.trans = trans
         self.dim = dim
