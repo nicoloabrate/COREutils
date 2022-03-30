@@ -82,7 +82,11 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
         f.write('%s,' % ff(vel[igro], 'double'))
 
     if core.NE.nGrp > 0:
-        f.write(f'\nVELOCP0(1:{core.NE.nGrp}) = 1.0D7,')
+        f.write(f'\nVELOCP0(1:{core.NE.nGrp}) = 1.0E7')
+        # FIXME FIXME FIXME at the moment the photon velocity is not computed
+        # therefore hardcode value
+        #for igrp in range(core.NE.nGrp):
+        #    f.write('%s,' % ff(velp[igrp], 'double'))
 
     f.write(f'\nLAMBDA0(1:{core.NE.nPre}) = ')
 
