@@ -89,7 +89,7 @@ class Core:
             isNE = True if NEargs is not None else False
             isTH = True if THargs is not None else False
             if isNE:
-                isPH = True if 'isPH' in NEargs.keys() else False
+                isPH = True if 'PH' in NEargs.keys() else False
             if isPH:
                 PHargs = NEargs['PH']
 

@@ -59,8 +59,7 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
     inpnames = ["filediff", "filesigt", "filesigs", "filesigf", "filenusigf",
                 "fileesigf"]
     inpnamesp = ["filekerma", "filemusigp", "filediffp", "filesigtp", "filesigsp", "filekermap"]
-    # FIXME read photon data should be automatic
-    core.NE.nGrp = 0
+
     # FIXME kerma should be separated from photon data
     (Tf, Tc) = temps
     isNE1D = True if core.dim == 1 else False

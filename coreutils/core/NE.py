@@ -71,7 +71,7 @@ class NE:
         NEfren = NEargs['fren']
         NEassemblylabel = NEargs['assemblylabel']
         NEdata = NEargs['NEdata']
-        isPH = True if 'isPH' in NEargs.keys() else False
+        isPH = True if 'PH' in NEargs.keys() else False
 
         self.time = [0]
         # --- AXIAL GEOMETRY, IF ANY
@@ -153,17 +153,19 @@ class NE:
                             raise OSError(f'Number of neutron precursor families in {k} '
                                         'not consistent with the other regions!')
                 if isPH: # add photon data
-                    for k, mat in self.PHMaterialData[temp].items():
-                        if NPp == -1:
-                            NPp = mat.NPF
-                        else:
-                            if NPp != mat.NPF:
-                                raise OSError(f'Number of photon precursor families in {k} '
-                                            'not consistent with the other regions!')
-
+                    PHargs = NEargs['PH']
+                    self.get_PH_energy_grid(PHargs)
+                    #for k, mat in self.PHMaterialData[temp].items():
+                    #    if NPp == -1:
+                    #        NPp = mat.NPF
+                    #    else:
+                    #        if NPp != mat.NPF:
+                    #            raise OSError(f'Number of photon precursor families in {k} '
+                    #                        'not consistent with the other regions!')
+        
             self.nPre = NP
             if isPH:
-                self.nPrp = NP
+                self.nPrp = 0 # FIXME TODO!
                 self.nGrp = len(self.PHenergygrid)-1
                 self.nDhp = 1 # FIXME TODO!
                 print("WARNING: DHP set to 1!")
@@ -967,6 +969,45 @@ class NE:
 
         if self.energygrid[0] < self.energygrid[0]:
             self.energygrid[np.argsort(-self.energygrid)]
+
+    def get_PH_energy_grid(self, PHargs):
+        #FIXME FIXME FIXME this should be integrated in the foregoing method
+        if 'egridname' in PHargs.keys():
+            ename = PHargs['egridname']
+        else:
+            ename = None
+
+        if 'energygrid' in PHargs.keys():
+            energygrid = PHargs['energygrid']
+        else:
+            energygrid = ename
+
+        if isinstance(energygrid, (list, np.ndarray, tuple)):
+            self.nGrp = len(energygrid)-1
+            self.egridname = f'{self.nGrp}G' if ename is None else ename
+            self.PHenergygrid = energygrid
+        elif isinstance(energygrid, (str, float, int)):
+            pwd = Path(__file__).parent.parent.parent
+            if 'coreutils' not in str(pwd):
+                raise OSError(f'Check coreutils tree for PHdata: {pwd}')
+            else:
+                pwd = pwd.joinpath('PHdata')
+                if isinstance(energygrid, str):
+                    fgname = f'{energygrid}.txt'
+                    self.egridname = str(energygrid)
+                else:
+                    fgname = f'{energygrid}G.txt'
+                    self.egridname = str(energygrid)
+
+                egridpath = pwd.joinpath('group_structures', fgname)
+                self.PHenergygrid = np.loadtxt(egridpath)
+                self.nGrp = len(self.PHenergygrid)-1
+        else:
+            raise OSError(f'Unknown energygrid \
+                            {type(energygrid)}')
+
+        if self.PHenergygrid[0] < self.PHenergygrid[0]:
+            self.PHenergygrid[np.argsort(-self.PHenergygrid)]
 
     @property
     def nReg(self):
