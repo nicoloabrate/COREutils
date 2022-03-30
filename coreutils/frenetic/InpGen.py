@@ -380,8 +380,10 @@ def makecommoninput(core, template=None):
     else:
         isNETH = 0
 
+    TimeEnd = core.TimeEnd if core.trans else 0
+
     data = {'$NH': NH, '$NR': NR, '$NL': NL, '$NDIFF': NDIFF,
-            '$TEND': core.TimeEnd, '$ISNETH': isNETH,
+            '$TEND': TimeEnd, '$ISNETH': isNETH,
             '$PITCH': PITCH/100}
 
     if template is None:

@@ -566,13 +566,19 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2
 
     nConfig = len(core.NE.time)
     meshz = core.NE.AxialConfig.zcuts
-    core.trans = False if max(core.NE.time) == 0 else True
+    # core.trans = False if max(core.NE.time) == 0 else True
     nRun = 2 if core.trans else 1
+    # FIXME tmp patch due to bug in FRENETIC h5 output
+    if nRun == 1 and len(core.NE.time) > 1:
+        h5out = 0
+    else:
+        h5out = 1
 
     geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,
                 '$MESHZ0': meshz, '$NDIM': core.dim, '$SPLITZ': splitz, '$H5fmt': H5fmt,
                 '$NCONFIG': nConfig, '$NRUN': nRun, '$POW': core.power,
-                '$NPROF': len(core.TimeSnap), '$TPROF': core.TimeSnap}
+                '$NPROF': len(core.TimeSnap), '$TPROF': core.TimeSnap,
+                '$IHDF5OUT': h5out}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_NEinput.dat')
