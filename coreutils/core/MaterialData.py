@@ -752,16 +752,17 @@ class NEMaterial():
             self.Invv = 1/(v*100)  # s/cm
 
         # --- compute diffusion coefficient and transport xs
-        if 'Diffcoef' in datavail:
-            self.Transxs = 1/(3*self.Diffcoef)
+        if 'S1' in datavail:
+            # --- compute transport xs (derivation from P1)
+            self.Transpxs = self.Tot-self.S1.sum(axis=0)
+            self.Diffcoef = 1/(3*self.Transpxs)
+        # --- compute diffusion coefficient and transport xs
+        elif 'Diffcoef' in datavail:
+            self.Transpxs = 1/(3*self.Diffcoef)
         elif 'Transpxs' in datavail:
             self.Diffcoef = 1/(3*self.Transpxs)
         else:
-            if 'S1' in datavail:
-                # --- compute transport xs
-                self.Transpxs = self.Tot-self.S1.sum(axis=0)
-            else:
-                self.Transpxs = self.Tot
+            self.Transpxs = self.Tot
             self.Diffcoef = 1/(3*self.Transpxs)
         # --- compute diffusion coefficient
         self.Transpxs[self.Transpxs <= 0] = 1E-8
@@ -816,7 +817,7 @@ class NEMaterial():
 
             except AttributeError as err:
                 if 'Chid' in str(err) or 'Chip' in str(err):
-                    self.Chid = self.Chit
+                    self.Chid = np.asarray([self.Chit]*self.NPF)
                     self.Chip = self.Chit
                 else:
                     print(err)
