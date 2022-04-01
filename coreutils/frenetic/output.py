@@ -9,6 +9,7 @@ Description: Class to read data from FRENETIC output files.
 from ast import alias
 import os
 import re
+from copy import deepcopy as cp
 from warnings import catch_warnings
 import h5py as h5
 import numpy as np
@@ -210,15 +211,25 @@ class NEoutput:
             which = self.aliases[which]
 
         if not oldfmt:
-            datapath = os.path.join(self.NEpath, "output.h5")
-            fh5 = h5.File(datapath, "r")
+            try:
+                datapath = os.path.join(self.NEpath, "output.h5")
+                fh5 = h5.File(datapath, "r")
+            except OSError as err:
+                if 'Unable to open file' in str(err):
+                    oldfmt = True
+                    datapath = os.path.join(self.NEpath, "intpow.out")
         else:
             # just to parse time, if needed
-            datapath = os.path.join(self.NEpath, "intpow")
+            datapath = os.path.join(self.NEpath, "intpow.out")
 
         if which in self.distributions:
             if which == 'timeDistr':
-                return np.asarray(fh5["distributions"]["timeDistr"])
+                times = cp(np.asarray(fh5["distributions"]["timeDistr"])[()])
+                # FIXME path for issue https://github.com/h5py/h5py/issues/2069
+                times[0] = 0
+                # --- close H5 file
+                fh5.close()
+                return times
             isintegral = False
             dictkey = "distributions"
             fname = 'output.h5'
@@ -226,11 +237,7 @@ class NEoutput:
             # check core h5 is present
             if self.core is None:
                 raise OSError(f'Cannot provide distributions. \
-                               No `core.h5` file in {self.casepath}')    
-            else:
-                core = self.core
-            # identify if NE or TH
-            NE = True if hasattr(self.core, "name") else False
+                               No `core.h5` file in {self.casepath}')
 
             # --- PHASE-SPACE PARAMETERS
             if hex is not None:
@@ -242,25 +249,27 @@ class NEoutput:
             # "t" refers to slicing
             if t is None:
                 if len(self.core.NE.time) == 1:
-                    t = [0]
+                    t = [0]  # time instant, not python index!
             # "times" refers to all time instants
             nTime = len(self.core.NE.time)
             if nTime == 1:
                 times = None
                 istrans = False
             else:  # parse time from h5 file
-                istrans = True                
+                istrans = True
                 if oldfmt:
                     times = np.loadtxt(datapath, comments="#", usecols=(0))
                 else:
-                    times = np.asarray(fh5[dictkey]["timeDistr"])
+                    times = cp(np.asarray(fh5[dictkey]["timeDistr"])[()])
+                    # FIXME path for issue https://github.com/h5py/h5py/issues/2069
+                    times[0] = 0
             # --- TIME AND AXIAL COORDINATE PARAMETERS
             gro, grp, pre, prp, idt, idz = self._shift_index(gro, grp, pre, prp, t, z, times=times)
             dimdict = {'ntim': idt, 'nelz': idz, 'nhex': hex, 'ngro': gro,
                        'ngrp': grp, 'nprec': pre}
-            nodes = self.core.NE.AxialConfig.AxNodes
+
             if t is not None:
-                times = self.core.TimeSnap
+                timesSnap = self.core.TimeSnap # TODO distinguish existence of snapshots in simulations
 
         else:  # integral data
             isintegral = True
@@ -280,7 +289,7 @@ class NEoutput:
                     dictkey = k
                     if 'betaeff(1)' in v:
                         if oldfmt:
-                            fname = f'intpar.out'
+                            fname = 'intpar.out'
                         else:
                             fname = 'output.h5'
                         idx = []
@@ -294,17 +303,17 @@ class NEoutput:
 
         # --- PARSE PROFILE FROM H5 FILE
         if oldfmt:
+            datapath = os.path.join(self.NEpath, fname)
             profile = np.loadtxt(datapath, comments="#", usecols=(0, idx))
         else:
-            fh5 = h5.File(datapath, "r")
             if isintegral:
                 if which == 'betaeff':
-                    betas = np.array(fh5['integralParameters'][dictkey])[:, [idx]][:, 0, :]
+                    betas = cp(np.array(fh5['integralParameters'][dictkey])[:, [idx]][:, 0, :])
                     profile = np.zeros((betas.shape[0], 2))
-                    profile[:, 0] = fh5['integralParameters'][dictkey][:, 0]
+                    profile[:, 0] = cp(fh5['integralParameters'][dictkey][:, 0])
                     profile[:, 1] = betas.sum(axis=1)
                 else:
-                    profile = fh5['integralParameters'][dictkey][:, [0, idx]]
+                    profile = fh5['integralParameters'][dictkey][:, [0, idx]][()]
             else:
                 # parse specified time, assembly, axial node, group, prec. fam.
                 dims = NEoutput.distrout_dim[which]
@@ -320,11 +329,14 @@ class NEoutput:
                 profile = np.asarray(fh5[dictkey][which])
                 profile = profile[np.ix_(*dimlst)]
 
-        return profile
+        # --- close H5 file
+        if not oldfmt:
+            fh5.close()
+        return profile[:]
 
     def plot1D(self, which, gro=None, t=None, grp=None, pre=None, prp=None, ax=None,
-               abscissas=None, z=None, hex=None, leglabels=None, figname=None, xlabel=None, 
-               xlims=None, ylims=None, ylabel=None, geometry=None, oldfmt=False, 
+               abscissas=None, z=None, hex=None, leglabels=None, figname=None, xlabel=None,
+               xlims=None, ylims=None, ylabel=None, geometry=None, oldfmt=False,
                style='sty1D.mplstyle', **kwargs):
         """
         Plot time/axial profile of integral parame. or distribution in hex.
@@ -384,7 +396,6 @@ class NEoutput:
             istrans = True
             if not oldfmt:
                 datapath = os.path.join(self.NEpath, "output.h5")
-                fh5 = h5.File(datapath, "r")
             if isintegral:
                 x = prof[:, 0]
                 y = prof[:, 1]
@@ -392,8 +403,10 @@ class NEoutput:
                 if oldfmt:
                     times = np.loadtxt(datapath, comments="#", usecols=(0))
                 else:
-                    times = np.asarray(fh5["distributions"]["timeDistr"])
-            # time = [None]
+                    times = cp(self.get('timeDistr')[()])
+                    # FIXME path for issue https://github.com/h5py/h5py/issues/2069
+                    times[0] = 0
+
         if t is None:
             t = [0]
         if isintegral and nTime == 1:
@@ -421,14 +434,14 @@ class NEoutput:
                     ax.set_ylabel(fr"{which} {uom}")
                 else:
                     ax.set_ylabel(ylabel)
-        else:   # plot distribution         
+        else:   # plot distribution
             if hex is None:
                 hex = [0]
             # get python-wise index for slicing
-            igro, igrp, ipre, iprp, idt, idz = self._shift_index(gro, grp, pre, 
+            igro, igrp, ipre, iprp, idt, idz = self._shift_index(gro, grp, pre,
                                                                prp, t, z, times=times)
             # map indexes from full- to sliced-array
-            igro, igrp, ipre, iprp, idt, idz = self._to_index(igro, igrp, ipre, iprp, 
+            igro, igrp, ipre, iprp, idt, idz = self._to_index(igro, igrp, ipre, iprp,
                                                               idt, idz)
 
             if nTime > 1 and len(t) == nTime:  # plot against time
@@ -450,7 +463,6 @@ class NEoutput:
             usrdict = {'ntim': t, 'nelz': z, 'ngro': gro,
                        'ngrp': grp, 'nprec': pre, 'nhex': hex}
             dimlst = [None]*len(dims)
-            ndim = 1
             for k in dims:
                 i = dims.index(k)
                 dimlst[i] = dimdict[k]
@@ -463,7 +475,7 @@ class NEoutput:
 
             # --- PLOT
             # plot against time or axial coordinate
-            with plt.style.context(sty1D):                
+            with plt.style.context(sty1D):
                 ax = plt.gca() if ax is None else ax
                 handles = []
                 handlesapp = handles.append
@@ -506,7 +518,7 @@ class NEoutput:
                 else:
                     plt.ylabel(ylabel)
 
-                ax.set_ylim(ymin, ymax)
+                # ax.set_ylim(ymin, ymax)
                 ax.set_xlim(x.min(), x.max())
 
                 legend_x = 0.50
@@ -618,10 +630,10 @@ class NEoutput:
             nodes = self.core.NE.AxialConfig.AxNodes
             idz = np.argmin(abs(z-nodes))
 
-            times = self.core.TimeSnap
-            idt = np.argmin(abs(t-times))
+            timeSnap = self.core.TimeSnap
+            idt = np.argmin(abs(t-timeSnap))
 
-            title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], times[idt])
+            title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], timeSnap[idt])
 
         if cbarLabel:
             idx = self.distributions.index(what)
@@ -644,8 +656,8 @@ class NEoutput:
                   loglog=None, logx=None, logy=None, title=title,
                   scale=1, fmt="%.2f", numbers=False, **kwargs)
 
-    def whereMaxSpectralRad(path, core, plot=True):
-    
+    def whereMaxSpectralRad(self, path, core, plot=True):
+
         with open(os.path.join(path, 'neutronic', 'outputNE.log'), 'r') as f:
             for l in f:
                 if '@ D3DMATI: MAXVAL(SPECTRAL NORM)' in l:
@@ -665,7 +677,7 @@ class NEoutput:
                     print('Max spectral norm in {} SAs at z={} cm'.format(hexty, z))
                 myIK = myIK+1
 
-    def _shift_index(self, gro, grp, pre, prp, t, z, 
+    def _shift_index(self, gro, grp, pre, prp, t, z,
                      times=None):
         """Convert input parameters to lists of indexes for slicing.
 
@@ -777,17 +789,17 @@ class NEoutput:
         return igro, igrp, ipre, iprp, idt, idz
 
     def _build_label(self, s, dims, dim2plot, usrdict):
-        
+
         label_dict = {'ngro': 'g', 'ngrp': 'g',
                       'pre': 'p', 'prp': 'p', 'nhex': 'n='}
         dim2plot_dict = {'ntim': 't', 'nelz': 'z'}
         uom = {'ntim': 's', 'nelz': 'cm'}
-        
+
         if plt.rcParams['text.usetex']:
             equal = "$=$"
         else:
             equal = "="
-        
+
         label = []
         for i, k in enumerate(dims):
             if self.core.dim == 1 and k == 'nhex':
