@@ -223,7 +223,7 @@ class NEoutput:
             datapath = os.path.join(self.NEpath, "intpow.out")
 
         if which in self.distributions:
-            if which == 'timeDistr':
+            if which == "timeDistr":
                 times = cp(np.asarray(fh5["distributions"]["timeDistr"])[()])
                 # FIXME path for issue https://github.com/h5py/h5py/issues/2069
                 times[0] = 0
@@ -254,9 +254,7 @@ class NEoutput:
             nTime = len(self.core.NE.time)
             if nTime == 1:
                 times = None
-                istrans = False
             else:  # parse time from h5 file
-                istrans = True
                 if oldfmt:
                     times = np.loadtxt(datapath, comments="#", usecols=(0))
                 else:
@@ -266,7 +264,7 @@ class NEoutput:
             # --- TIME AND AXIAL COORDINATE PARAMETERS
             gro, grp, pre, prp, idt, idz = self._shift_index(gro, grp, pre, prp, t, z, times=times)
             dimdict = {'ntim': idt, 'nelz': idz, 'nhex': hex, 'ngro': gro,
-                       'ngrp': grp, 'nprec': pre}
+                       'ngrp': grp, 'npre': pre}
 
             if t is not None:
                 timesSnap = self.core.TimeSnap # TODO distinguish existence of snapshots in simulations
@@ -337,7 +335,7 @@ class NEoutput:
     def plot1D(self, which, gro=None, t=None, grp=None, pre=None, prp=None, ax=None,
                abscissas=None, z=None, hex=None, leglabels=None, figname=None, xlabel=None,
                xlims=None, ylims=None, ylabel=None, geometry=None, oldfmt=False,
-               style='sty1D.mplstyle', **kwargs):
+               style='sty1D.mplstyle', legend=True, **kwargs):
         """
         Plot time/axial profile of integral parame. or distribution in hex.
 
@@ -368,11 +366,27 @@ class NEoutput:
             else:
                 sty1D = style
 
+        if which == "precursTot":
+            pre = np.arange(1, self.core.NE.nPre+1)
+            which = "precurs"
+            sum_dims = ["npre", "nelz", "nhex"]
+            tot = True
+        elif which == "precurspTot":
+            pre = np.arange(1, self.core.NE.nPrp+1)
+            which = "precursp"
+            sum_dims = ["nprp", "nelz", "nhex"]
+            tot = True
+        else:
+            tot = False
+
         label = which
         if which in self.aliases.keys():
             which = self.aliases[which]
 
         # select unit of measure corresponding to profile
+        plotvstime = True if t else False
+        if t:
+            t = None
         if which in self.distributions:
             isintegral = False
             idx = self.distributions.index(which)
@@ -386,18 +400,26 @@ class NEoutput:
                     uom = self.integralParameters_measure[k][idx]
         # --- parse profile
         prof = self.get(which, gro=gro, t=t, z=z, grp=grp, pre=pre, prp=prp)
+        # sum along axes, if total distribution is requested
+        if tot:
+            dims = self.distrout_dim[which]
+            for sum_dim in sum_dims:
+                sum_ax = dims.index(sum_dim)
+                prof = prof.sum(axis=sum_ax)
+                dims = list(dims)
+                dims.remove(sum_dim)
+                dims = tuple(dims)
+            pre = None
         # --- select independent variable
         # it can be time or axial coordinate
         nTime = len(self.core.NE.time)
         if nTime == 1:
             times = None # np.array([0])
-            istrans = False
         else:  # parse time from h5 file
-            istrans = True
             if not oldfmt:
                 datapath = os.path.join(self.NEpath, "output.h5")
             if isintegral:
-                x = prof[:, 0]
+                times = prof[:, 0]
                 y = prof[:, 1]
             else:
                 if oldfmt:
@@ -406,9 +428,11 @@ class NEoutput:
                     times = cp(self.get('timeDistr')[()])
                     # FIXME path for issue https://github.com/h5py/h5py/issues/2069
                     times[0] = 0
+                if plotvstime:
+                    t = times
 
         if t is None:
-            t = [0]
+            t = [0]  # initial condition
         if isintegral and nTime == 1:
             raise OSError("Cannot plot integral parameter in steady state!")
 
@@ -423,6 +447,8 @@ class NEoutput:
                     y *= 1E5
                 if abscissas is not None:
                     x = abscissas
+                else:
+                    x = times
                 lin1, = ax.plot(x, y, **kwargs)
                 ax.set_xlabel(xlabel)
                 if ylabel is None:
@@ -436,7 +462,8 @@ class NEoutput:
                     ax.set_ylabel(ylabel)
         else:   # plot distribution
             if hex is None:
-                hex = [0]
+                hex = [0] # 1st hexagon (this is python index, not hex. number)
+
             # get python-wise index for slicing
             igro, igrp, ipre, iprp, idt, idz = self._shift_index(gro, grp, pre,
                                                                prp, t, z, times=times)
@@ -444,7 +471,7 @@ class NEoutput:
             igro, igrp, ipre, iprp, idt, idz = self._to_index(igro, igrp, ipre, iprp,
                                                               idt, idz)
 
-            if nTime > 1 and len(t) == nTime:  # plot against time
+            if nTime > 1 and plotvstime:  # plot against time
                 x = times
                 dim2plot = 'ntim'
                 idx = dims.index('ntim')
@@ -459,9 +486,9 @@ class NEoutput:
 
             # --- DEFINE SLICES
             dimdict = {'ntim': idt, 'nelz': idz, 'ngro': igro,
-                        'ngrp': igrp, 'nprec': ipre, 'nhex': hex}
+                        'ngrp': igrp, 'npre': ipre, 'nhex': hex}
             usrdict = {'ntim': t, 'nelz': z, 'ngro': gro,
-                       'ngrp': grp, 'nprec': pre, 'nhex': hex}
+                       'ngrp': grp, 'npre': pre, 'nhex': hex}
             dimlst = [None]*len(dims)
             for k in dims:
                 i = dims.index(k)
@@ -528,8 +555,9 @@ class NEoutput:
                     plt.legend(handles, leglabels, bbox_to_anchor=(legend_x, legend_y),
                             loc='lower center', ncol=ncol)
                 else:
-                    plt.legend(bbox_to_anchor=(legend_x, legend_y),
-                            loc='lower center', ncol=ncol)
+                    if legend:
+                        plt.legend(bbox_to_anchor=(legend_x, legend_y),
+                                loc='lower center', ncol=ncol)
 
                 plt.tight_layout()
                 # plt.show()
