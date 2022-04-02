@@ -62,7 +62,6 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
 
     # FIXME kerma should be separated from photon data
     (Tf, Tc) = temps
-    isNE1D = True if core.dim == 1 else False
     # -- write macro.nml file
     asstypeN = 0
     f = io.open('macro.nml', 'w', newline='\n')
@@ -553,7 +552,6 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2
     if whereNH5INP is None:
         whereNH5INP = "'NE_data.h5'"
 
-    isNE1D = True if core.dim == 1 else False
     if H5fmt is False:
         H5fmt = 1
 
