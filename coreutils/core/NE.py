@@ -182,7 +182,7 @@ class NE:
             self.replace(CI, NEargs["replace"], 0, isfren=NEfren)
 
         # build time-dependent core configuration
-        if config is not None and CI.trans:
+        if config is not None:
             for time in config.keys():
                 if time != '0':
                     t = float(time)
@@ -882,7 +882,11 @@ class NE:
             pwd = Path(__file__).parent.parent.parent
             serpath = str(pwd.joinpath('NEdata', f'{self.egridname}',
                                         'serpent'))
-            files = [f for f in os.listdir(serpath)]
+            try:
+                files = [f for f in os.listdir(serpath)]
+            except FileNotFoundError as err:
+                print(str(err))
+                files = []
 
         if not hasattr(self, 'data'):
             self.data = {}
