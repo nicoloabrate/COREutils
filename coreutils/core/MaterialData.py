@@ -776,6 +776,8 @@ class NEMaterial():
         self.Fiss[self.Fiss <= 5E-7] = 0
         isFiss = self.Fiss.max() > 0
         if isFiss:
+            # FIXME FIXME check Serpent RSD and do correction action
+            self.Chit[self.Chit <= 1E-5] = 0
             if abs(self.Chit.sum() - 1) > 1E-5:
                 print(f'Total fission spectra in {self.UniName} not \
                       normalised!')
@@ -799,10 +801,15 @@ class NEMaterial():
                 if isFiss:
                     if len(self.Chid.shape) == 1:
                         # each family has same emission spectrum
+                        # FIXME FIXME check Serpent RSD and do correction action
+                        self.Chid[self.Chid <= 1E-5] = 0
                         self.Chid = np.asarray([self.Chid]*self.NPF)
                     elif self.Chid.shape != (self.NPF, self.nE):
                         raise OSError(f'Delayed fiss. spectrum should be \
                                         ({self.NPF}, {self.nE})')
+
+                    # FIXME FIXME check Serpent RSD and do correction action
+                    self.Chip[self.Chip <= 1E-5] = 0
 
                     for g in range(self.nE):
                         chit = (1-self.beta_tot)*self.Chip[g] + np.dot(self.beta, self.Chid[:, g])
