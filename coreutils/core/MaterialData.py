@@ -704,7 +704,7 @@ class NEMaterial():
 
         if sanitycheck:
             # force normalisation
-            if abs(self.Chit.sum() - 1) > 1E-5:
+            if abs(self.Chit.sum() - 1) > 1E-4:
                 if np.any(self.Chit == 0) :
                     pass
                 else:
@@ -760,15 +760,13 @@ class NEMaterial():
         elif 'Diffcoef' in datavail:
             self.Transpxs = 1/(3*self.Diffcoef)
         elif 'Transpxs' in datavail:
+            self.Transpxs[self.Transpxs <= 0] = 1E-8
             self.Diffcoef = 1/(3*self.Transpxs)
         else:
             self.Transpxs = self.Tot
             self.Diffcoef = 1/(3*self.Transpxs)
-        # --- compute diffusion coefficient
-        self.Transpxs[self.Transpxs <= 0] = 1E-8
         # --- compute diffusion length
-        # avoid huge diff. coeff. and length
-        self.Remxs[self.Remxs <= 0] = 1E-8
+        self.Remxs[self.Remxs <= 0] = 1E-8 # avoid huge diff. coeff. and length
         self.DiffLength = np.sqrt(self.Diffcoef/self.Remxs)
         # --- compute mean free path
         self.MeanFreePath = 1/self.Tot.max()
@@ -777,10 +775,10 @@ class NEMaterial():
         isFiss = self.Fiss.max() > 0
         if isFiss:
             # FIXME FIXME check Serpent RSD and do correction action
-            self.Chit[self.Chit <= 1E-5] = 0
-            if abs(self.Chit.sum() - 1) > 1E-5:
-                print(f'Total fission spectra in {self.UniName} not \
-                      normalised!')
+            self.Chit[self.Chit <= 1E-4] = 0
+            if abs(self.Chit.sum() - 1) > 1E-4:
+                print(f'Total fission spectra in {self.UniName} not normalised!'
+                      'Forcing normalisation...')
             # ensure pdf normalisation
             self.Chit /= self.Chit.sum()
             if "Kappa" not in self.__dict__.keys():
@@ -802,21 +800,33 @@ class NEMaterial():
                     if len(self.Chid.shape) == 1:
                         # each family has same emission spectrum
                         # FIXME FIXME check Serpent RSD and do correction action
-                        self.Chid[self.Chid <= 1E-5] = 0
+                        self.Chid[self.Chid <= 1E-4] = 0
+                        self.Chid /= self.Chid.sum()
                         self.Chid = np.asarray([self.Chid]*self.NPF)
                     elif self.Chid.shape != (self.NPF, self.nE):
-                        raise OSError(f'Delayed fiss. spectrum should be \
+                        raise NEMaterialError(f'Delayed fiss. spectrum should be \
                                         ({self.NPF}, {self.nE})')
 
                     # FIXME FIXME check Serpent RSD and do correction action
-                    self.Chip[self.Chip <= 1E-5] = 0
+                    self.Chip[self.Chip <= 1E-4] = 0
 
-                    for g in range(self.nE):
-                        chit = (1-self.beta_tot)*self.Chip[g] + np.dot(self.beta, self.Chid[:, g])
-                        if abs(self.Chit[g]-chit) > 1E-3:
-                            raise OSError(f'Fission spectra or delayed \
-                                            fractions in {self.UniName} not \
-                                            consistent!')
+                    try:
+                        for g in range(0, self.nE):
+                            chit = (1-self.beta.sum())*self.Chip[g] + \
+                                    np.dot(self.beta, self.Chid[:, g])
+                            if abs(self.Chit[g]-chit) < 1E-4:
+                                raise NEMaterialError()
+                    except NEMaterialError:
+                        print(f'Fission spectra or delayed fractions'
+                              f' in {self.UniName} not consistent! '
+                              'Forcing consistency acting on chi-prompt...')
+                    else:
+                        self.Chip = (self.Chit-np.dot(self.beta, self.Chid))/(1-self.beta.sum())
+                        for g in range(0, self.nE):
+                            chit = (1-self.beta.sum())*self.Chip[g] + \
+                                    np.dot(self.beta, self.Chid[:, g])
+                            if abs(self.Chit[g]-chit) > 1E-4:
+                                raise NEMaterialError("Normalisation failed!")
                 else:
                     self.Chit = np.zeros((self.nE, ))
                     self.Chip = np.zeros((self.nE, ))
@@ -943,8 +953,8 @@ class NEMaterial():
             flx = spectrum
         else:
             if 'Flx' not in self.__dict__.keys():
-                raise OSError(f'Collapsing failed: weighting flux missing in'
-                              '{self.UniName}')
+                raise OSError('Collapsing failed: weighting flux missing in'
+                              f'{self.UniName}')
             else:
                 flx = self.Flx
 
@@ -963,6 +973,9 @@ class NEMaterial():
             raise OSError('Collapsing failed: few-group structure  \
                           boundaries do not match with multi-group \
                           one')
+        for ig, g in enumerate(fewgrp):
+            if g not in multigrp:
+                raise OSError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
 
         iS = 0
         collapsed = {}
@@ -1025,6 +1038,7 @@ class NEMaterial():
                 else:
                     continue
             iS = iE
+        collapsed['Diffcoef'] = 1/(3*collapsed['Transpxs'])
         # overwrite data
         self.energygrid = fewgrp
         self.nE = G
@@ -1234,3 +1248,6 @@ class CZMaterialData:
                               "with the number of the cooling zones!")
             else:
                 self.pressures = dict(zip(CZassemblynames, pressures))
+
+class NEMaterialError(Exception):
+    pass
