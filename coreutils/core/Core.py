@@ -61,15 +61,15 @@ class Core:
         Write core lattice to txt file.
     """
 
-    def __init__(self, inpjson):
+    def __init__(self, inpjson, P1consistent=False):
         if '.h5' in inpjson:
             self._from_h5(inpjson)
         elif ".json" in inpjson:
-            self.from_json(inpjson)
+            self.from_json(inpjson, P1consistent=P1consistent)
         else:
             raise OSError("Input must .h5 or .json file!")
 
-    def from_json(self, inpjson):
+    def from_json(self, inpjson, P1consistent=False):
         if ".json" not in inpjson:
             raise OSError("Input file must be in .json format!")
         # -- parse input file
@@ -162,7 +162,7 @@ class Core:
                 NEcore = [1]
                 self.NAss = 1
             datacheck = 1
-            self.NE = NE(NEargs, self, datacheck=datacheck)
+            self.NE = NE(NEargs, self, datacheck=datacheck, P1consistent=P1consistent)
 
         # --- TH OBJECT
         if isTH and dim != 1:

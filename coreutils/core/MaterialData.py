@@ -134,7 +134,7 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
     return res
 
 
-def Homogenise(materials, weights, mixname):
+def Homogenise(materials, weights, mixname, P1consistent=P1consistent):
     """
     Homogenise multi-group parameters.
 
@@ -225,7 +225,7 @@ def Homogenise(materials, weights, mixname):
             tmp = np.divide(data, TOTFLX, where=TOTFLX!=0)
             hd[key] = tmp
 
-    homogmat.datacheck()
+    homogmat.datacheck(P1consistent=P1consistent)
     return homogmat
 
 class NEMaterial():
@@ -233,7 +233,7 @@ class NEMaterial():
 
     def __init__(self, uniName=None, energygrid=None, datapath=None,
                  egridname=None, h5file=None, reader='json', serpres=None,
-                 basename=False, temp=False, datacheck=True, init=False):
+                 basename=False, temp=False, datacheck=True, init=False, P1consistent=False):
         """
         Initialise object.
 
@@ -392,7 +392,7 @@ class NEMaterial():
             S = sum('S' in s for s in datastr)//2
             self.L = S if S > L else L  # get maximum scattering order
             if datacheck:
-                self.datacheck()
+                self.datacheck(P1consistent=P1consistent)
 
     def _readjson(self, path):
         """
@@ -626,7 +626,7 @@ class NEMaterial():
             plt.tight_layout()
             plt.savefig(f"{figname}.png")
 
-    def perturb(self, what, howmuch, depgro=None, sanitycheck=True):
+    def perturb(self, what, howmuch, depgro=None, sanitycheck=True, P1consistent=False):
         """
 
         Perturb material composition.
@@ -710,7 +710,7 @@ class NEMaterial():
                 else:
                     self.Chit = self.Chit/self.Chit.sum()
 
-            self.datacheck()
+            self.datacheck(P1consistent=P1consistent)
 
     def datacheck(self, P1consistent=False):
         """
@@ -786,7 +786,7 @@ class NEMaterial():
         isFiss = self.Fiss.max() > 0
         if isFiss:
             # FIXME FIXME check Serpent RSD and do correction action
-            self.Chit[self.Chit <= 1E-4] = 0
+            # self.Chit[self.Chit <= 1E-4] = 0
             if abs(self.Chit.sum() - 1) > 1E-4:
                 print(f'Total fission spectra in {self.UniName} not normalised!'
                       'Forcing normalisation...')
@@ -825,7 +825,7 @@ class NEMaterial():
                         for g in range(0, self.nE):
                             chit = (1-self.beta.sum())*self.Chip[g] + \
                                     np.dot(self.beta, self.Chid[:, g])
-                            if abs(self.Chit[g]-chit) < 1E-4:
+                            if abs(self.Chit[g]-chit) > 1E-4:
                                 raise NEMaterialError()
                     except NEMaterialError:
                         print(f'Fission spectra or delayed fractions'
@@ -941,7 +941,7 @@ class NEMaterial():
 
             json.dump(tmp, f, sort_keys=True, indent=10)
 
-    def collapse(self, fewgrp, spectrum=None, egridname=None):
+    def collapse(self, fewgrp, spectrum=None, egridname=None, P1consistent=P1consistent):
         """
         Collapse in energy the multi-group data.
 
@@ -1058,7 +1058,7 @@ class NEMaterial():
             if key in collapsed.keys():
                 self.__dict__[key] = collapsed[key]
         # ensure data consistency
-        self.datacheck()
+        self.datacheck(P1consistent=P1consistent)
 
 
 class NEMix(NEMaterial):
@@ -1066,7 +1066,7 @@ class NEMix(NEMaterial):
     """Create regions mixing other materials."""
 
     def __init__(self, *, universes, densities=None, energygrid, datapath=None,
-                 egridname=None, reader='json', mixname=None):
+                 egridname=None, reader='json', mixname=None, P1consistent=False):
         """
         Initialise object.
 
@@ -1198,7 +1198,7 @@ class NEMix(NEMaterial):
         # //2 since there are 'S' and 'Sp'
         S = sum('S' in s for s in datastr)//2
         self.L = S if S > L else L  # get maximum scattering order
-        self.datacheck()
+        self.datacheck(P1consistent=P1consistent)
 
 
 class CZMaterialData:
