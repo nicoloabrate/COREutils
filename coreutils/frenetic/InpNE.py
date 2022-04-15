@@ -93,7 +93,7 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
         f.write('%s,' % ff(lambda0[iprec], 'double'))
 
     if core.NE.nDhp > 0:
-        f.write(' \nlambdadhp0(1:1) = 0.000000d+00,\n')
+        f.write(' \nlambdadhp0(1:1) = 1.000000d+99,\n') # FIXME FIXME FIXME large value for steady state
         f.write('betadhp0(1:1) = 0.000000d+00,\n')
     f.write(f'IDIFF(1:{nmix}) = {nmix}*2,\n')
     f.write(f'ISIGT(1:{nmix}) = {nmix}*2,\n')
@@ -142,7 +142,11 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
         f.write(f'CHIT0({imix+1},1:{core.NE.nGro}) = ')
         for igro in range(core.NE.nGro):
             f.write('%s,' % ff(chit[imixF, igro], 'double'))
-
+        
+        # single photon group --> all emitted in this group
+        if core.NE.nGrp > 0:
+            f.write('\nZETAT0(%d,1:%d) = 1.0E+0,' % (imix+1,core.NE.nGrp))
+            
         for igro in range(core.NE.nGro):
             if len(chid.shape) > 2:
                 v = chid[imixF, 0, igro]
