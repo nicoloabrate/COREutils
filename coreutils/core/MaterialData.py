@@ -712,7 +712,7 @@ class NEMaterial():
 
             self.datacheck()
 
-    def datacheck(self):
+    def datacheck(self, P1consistent=False):
         """
         Check data consistency and add missing data.
 
@@ -752,19 +752,30 @@ class NEMaterial():
             self.Invv = 1/(v*100)  # s/cm
 
         # --- compute diffusion coefficient and transport xs
-        if 'S1' in datavail:
-            # --- compute transport xs (derivation from P1)
-            self.Transpxs = self.Tot-self.S1.sum(axis=0)
-            self.Diffcoef = 1/(3*self.Transpxs)
-        # --- compute diffusion coefficient and transport xs
-        elif 'Diffcoef' in datavail:
-            self.Transpxs = 1/(3*self.Diffcoef)
-        elif 'Transpxs' in datavail:
-            self.Transpxs[self.Transpxs <= 0] = 1E-8
-            self.Diffcoef = 1/(3*self.Transpxs)
+        if P1consistent:
+            if 'S1' in datavail:
+                # --- compute transport xs (derivation from P1)
+                self.Transpxs = self.Tot-self.S1.sum(axis=0)
+                # mu0 = self.S1/self.S0
+                self.Diffcoef = 1/(3*self.Transpxs)
+            elif 'Diffcoef' in datavail:
+                self.Transpxs = 1/(3*self.Diffcoef)
+            elif 'Transpxs' in datavail:
+                self.Transpxs[self.Transpxs <= 0] = 1E-8
+                self.Diffcoef = 1/(3*self.Transpxs)
+            else:
+                self.Transpxs = self.Tot
+                self.Diffcoef = 1/(3*self.Transpxs)
         else:
-            self.Transpxs = self.Tot
-            self.Diffcoef = 1/(3*self.Transpxs)
+            # --- compute diffusion coefficient and transport xs
+            if 'Transpxs' in datavail:
+                self.Transpxs[self.Transpxs <= 1E-8] = 1E-8
+                self.Diffcoef = 1/(3*self.Transpxs)
+            elif 'Diffcoef' in datavail:
+                self.Transpxs = 1/(3*self.Diffcoef)
+            else:
+                self.Transpxs = self.Tot
+                self.Diffcoef = 1/(3*self.Transpxs)
         # --- compute diffusion length
         self.Remxs[self.Remxs <= 0] = 1E-8 # avoid huge diff. coeff. and length
         self.DiffLength = np.sqrt(self.Diffcoef/self.Remxs)
