@@ -134,7 +134,7 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
     return res
 
 
-def Homogenise(materials, weights, mixname, P1consistent=P1consistent):
+def Homogenise(materials, weights, mixname, P1consistent=False):
     """
     Homogenise multi-group parameters.
 
@@ -941,7 +941,7 @@ class NEMaterial():
 
             json.dump(tmp, f, sort_keys=True, indent=10)
 
-    def collapse(self, fewgrp, spectrum=None, egridname=None, P1consistent=P1consistent):
+    def collapse(self, fewgrp, spectrum=None, egridname=None, P1consistent=False):
         """
         Collapse in energy the multi-group data.
 

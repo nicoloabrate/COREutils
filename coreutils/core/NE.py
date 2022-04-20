@@ -54,7 +54,8 @@ class NE:
         Replace assemblies with user-defined new or existing type.
     """
 
-    def __init__(self, NEargs=None, CI=None, inpdict=None, datacheck=True):
+    def __init__(self, NEargs=None, CI=None, inpdict=None, datacheck=True,
+                 P1consistent=False):
 
         if inpdict is None:
             self._init(NEargs, CI, datacheck=datacheck)
