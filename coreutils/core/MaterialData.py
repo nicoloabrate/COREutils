@@ -114,9 +114,9 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
     if T is not None:
         fname = f"{beginswith}_Tf_{Tf:g}_Tc_{Tc:g}"                               
         if Path(path.join(spath, f"Tf_{Tf:g}_Tc_{Tc:g}")).exists():
-            spath = path.join(spath, f"Tf_{Tf:g}_Tc_{Tc:g}", fname)
+            spath = path.join(spath, f"Tf_{Tf:g}_Tc_{Tc:g}")
         elif Path(path.join(spath, f"Tc_{Tc:g}_Tf_{Tf:g}")).exists():
-            spath.join(spath, f"Tc_{Tc:g}_Tf_{Tf:g}", fname)
+            spath.join(spath, f"Tc_{Tc:g}_Tf_{Tf:g}")
     else:
         fname = path.join(datapath, beginswith)    
     
