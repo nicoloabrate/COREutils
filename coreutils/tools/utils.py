@@ -16,8 +16,8 @@ from collections import OrderedDict, UserDict
 CImandatory = ('dim', 'shape', 'pitch', 'Tc', 'Tf') # 'pitch' only if shape!='1D', 'cuts' only in '1D'
 NEmandatory = ('filename', 'assemblynames', 'rotation',
                'energygrid', 'cuts')
-THmandatory = ('coolingzonefile', 'massflowrates', 'temperatures', 'rotation',
-               'pressures', 'coolingzonenames')
+THmandatory = ('czfile', 'massflowrates', 'temperatures', 'rotation',
+               'pressures', 'cznames')
 # set to value in dict if this key is missing
 setToValue = {
                 'CI': {
@@ -261,10 +261,10 @@ def __parseTH(inp):
             pass
         else:
             # check mandatory args not needed for 1D case
-            if k in ['coolingzonesnames']:
+            if k in ['cznames']:
                 # in case of misplelling
-                if 'coolingzonenames' in inp.keys():
-                    THargs[k] = inp['coolingzonenames']
+                if 'cznames' in inp.keys():
+                    THargs[k] = inp['cznames']
                 else:
                     raise OSError(f'Mandatory {k} key missing in CI input file!')
             else:

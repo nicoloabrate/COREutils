@@ -186,8 +186,10 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
     else:
         logging.warn('macro.nml and NE_data.h5 not written!')
 
+    TH = True if hasattr(core, "TH") else False
+
     # make TH input (HA_*_*.txt)
-    if 'THconfig' in core.__dict__.keys():
+    if TH:
         THpath = mkdir("TH", casepath)
         THdatapath = mkdir("data", THpath)
         writeTHdata(core, template=templateTH)
@@ -196,11 +198,8 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
         for f in os.listdir(pwd):
             if f.startswith("HA"):
                 move(f, join(THdatapath, f))
-    else:
-        logging.warn('No TH configuration, so HA_xx_xx.dat not written and data dir not created!')
 
-    # make CZ input (mdot.txt, temp.txt, press.txt, filecool.txt)
-    if 'CZconfig' in core.__dict__.keys():
+        # make CZ input (mdot.txt, temp.txt, press.txt, filecool.txt)
         THpath = mkdir("TH", casepath)
         # write CZ .txt data
         writeCZdata(core)
@@ -208,11 +207,11 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
         makeTHinput(core, template=templateCZ)
         # move TH files
         THfiles = ['mdot.dat', 'press.dat', 'temp.dat', 'input.dat',
-                   'filecool.dat']
+                #    'filecool.dat'
+                   ]
         [move(f, join(THpath, f)) for f in THfiles]
     else:
-        logging.warn('No CZconfig, so mdot.dat, press.dat, temp.dat, input.dat not written!')
-
+        logging.warn('No TH configuration, so HA_xx_xx.dat not written and other data not created!')
 
     # plot configurations
     if NE:

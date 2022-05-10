@@ -29,61 +29,57 @@ def writeCZdata(core):
     -------
     ``None``
     """
-    # generate filecool.dat
-    f = io.open('filecool.dat', 'w', newline='\n')
-    for nchan, chan in core.CZassemblytypes.items():
-        which = core.getassemblylist(nchan, flagfren=True,
-                                     whichconf="CZconfig")
-        if which != []:
-            # join assembly numbers in a single string
-            which = [str(w) for w in which]
-            which = ','.join(which)
-            f.write("%s,\n" % which)
+    # # generate filecool.dat
+    # f = io.open('filecool.dat', 'w', newline='\n')
+    # for nchan, chan in core.TH.CZassemblytypes.items():
+    #     which = core.getassemblylist(nchan, core.TH.CZconfig[t], isfren=True)
+    #     if which != []:
+    #         # join assembly numbers in a single string
+    #         which = [str(w) for w in which]
+    #         which = ','.join(which)
+    #         f.write("%s,\n" % which)
 
     # generate mdot.dat
     f = io.open('mdot.dat', 'w', newline='\n')
-    f.write("%d, \n" % len(core.CZtime))
-    for t in core.CZtime:
+    f.write("%d," % len(core.TH.CZtime))
+    for t in core.TH.CZtime:
         # loop over each assembly
         mflow = ["%s" % ff(t, 'double')]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
-            whichtype = core.getassemblytype(n, flagfren=True,
-                                             whichconf="CZconfig")
-            whichtype = core.CZassemblytypes[whichtype]
-            val = core.CZMaterialData.massflowrates[whichtype]
+            whichtype = core.getassemblytype(n, core.TH.CZconfig[t], isfren=True)
+            whichtype = core.TH.CZassemblytypes[whichtype]
+            val = core.TH.CZMaterialData.massflowrates[whichtype]
             mflow.append("%s" % ff(val, 'double'))
         # write to file
         f.write("%s \n" % ",".join(mflow))
 
     # generate temp.dat
     f = io.open('temp.dat', 'w', newline='\n')
-    f.write("%d, \n" % len(core.CZtime))
-    for t in core.CZtime:
+    f.write("%d," % len(core.TH.CZtime))
+    for t in core.TH.CZtime:
         # loop over each assembly
         temp = ["%s" % ff(t, 'double')]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
-            whichtype = core.getassemblytype(n, flagfren=True,
-                                             whichconf="CZconfig")
-            whichtype = core.CZassemblytypes[whichtype]
-            val = core.CZMaterialData.temperatures[whichtype]
+            whichtype = core.getassemblytype(n, core.TH.config[t], isfren=True)
+            whichtype = core.TH.CZassemblytypes[whichtype]
+            val = core.TH.CZMaterialData.temperatures[whichtype]
             temp.append("%s" % ff(val, 'double'))
         # write to file
         f.write("%s \n" % ",".join(temp))
 
     # generate press.dat
     f = io.open('press.dat', 'w', newline='\n')
-    f.write("%d, \n" % len(core.CZtime))
-    for t in core.CZtime:
+    f.write("%d," % len(core.TH.CZtime))
+    for t in core.TH.CZtime:
         # loop over each assembly
         press = ["%s" % ff(t, 'double')]
         for n in core.Map.fren2serp.keys():
             # get mass flow rate
-            whichtype = core.getassemblytype(n, flagfren=True,
-                                             whichconf="CZconfig")
-            whichtype = core.CZassemblytypes[whichtype]
-            val = core.CZMaterialData.pressures[whichtype]
+            whichtype = core.getassemblytype(n, core.TH.config[t], isfren=True)
+            whichtype = core.TH.CZassemblytypes[whichtype]
+            val = core.TH.CZMaterialData.pressures[whichtype]
             press.append("%s" % ff(val, 'double'))
         # write to file
         f.write("%s \n" % ",".join(press))
@@ -105,8 +101,8 @@ def makeTHinput(core, template=None):
     -------
     ``None``
     """
-    geomdata = {'$NHEX': core.NAss, '$NPROF': len(core.TimeProf),
-                '$TPROF': core.TimeProf}
+    geomdata = {'$NHEX': core.NAss, '$NPROF': len(core.TimeSnap),
+                '$TPROF': core.TimeSnap}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_THinput.dat')
@@ -148,11 +144,10 @@ def writeTHdata(core, template=None):
     -------
     ``None``
     """
-    for nchan, chan in core.THassemblytypes.items():
+    for nchan, chan in core.TH.THassemblytypes.items():
         # loop over time
-        for nt, t in enumerate(core.THtime):
-            which = core.getassemblylist(nchan, time=t, flagfren=True,
-                                         whichconf="THconfig")
+        for nt, t in enumerate(core.TH.time):
+            which = core.getassemblylist(nchan, core.TH.config[t], isfren=True)
             # join assembly numbers in a single string
             which = [str(w) for w in which]
             which = ','.join(which)

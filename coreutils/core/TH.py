@@ -55,8 +55,8 @@ class TH:
             self.from_dict(inpdict)
 
     def _init(self, THargs, CI):
-        CZassemblynames = THargs['coolingzonenames']
-        THdata = THargs['THargs']
+        CZassemblynames = THargs['cznames']
+        THdata = THargs['THdata']
         # sort list
         assnum = np.arange(1, len(CZassemblynames)+1)
 
@@ -65,7 +65,7 @@ class TH:
         self.CZassemblytypes = MyDict(dict(zip(assnum, CZassemblynames)))
 
         # define TH core with assembly types
-        CZcore = UnfoldCore(THargs['coolingzonesfile'], THargs['rotation'], CZassemblynames).coremap
+        CZcore = UnfoldCore(THargs['czfile'], THargs['rotation'], CZassemblynames).coremap
 
         if THdata is not None:
             THassemblynames = THdata['assemblynames']

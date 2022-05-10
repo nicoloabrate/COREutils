@@ -167,10 +167,11 @@ class Core:
         # --- TH OBJECT
         if isTH and dim != 1:
             # --- assign TH map
-            assemblynames = THargs['assemblynames']
+            assemblynames = THargs['THdata']['assemblynames']
             nAssTypes = len(assemblynames)
             assemblynames = MyDict(dict(zip(assemblynames, np.arange(1, nAssTypes+1))))
-            THcore = UnfoldCore(THargs['filename'], THargs['rotation'], assemblynames).coremap
+            THcore = UnfoldCore(
+                THargs['THdata']['filename'], THargs['rotation'], assemblynames).coremap
             if not hasattr(self, 'Map'):
                 self.Map = Map(THcore, THargs['rotation'], self.AssemblyGeom, inp=tmp.inp)
             if not hasattr(self, 'Nass'):
@@ -193,7 +194,7 @@ class Core:
             tmp2 = cp(NEcore)
             tmp2[tmp2 != 0] = 1
 
-            if THargs['THargs'] is not None:
+            if THargs['THdata'] is not None:
                 tmp3 = cp(THcore)
                 tmp3[tmp3 != 0] = 1
 
