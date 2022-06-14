@@ -118,7 +118,7 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
         elif Path(path.join(spath, f"Tc_{Tc:g}_Tf_{Tf:g}")).exists():
             spath.join(spath, f"Tc_{Tc:g}_Tf_{Tf:g}")
     else:
-        fname = path.join(datapath, beginswith)    
+        fname = path.join(spath, beginswith)    
     
     if '_res.m' not in str(fname):
         fname = f'{str(fname)}_res.m'

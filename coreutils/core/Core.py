@@ -356,7 +356,7 @@ class Core:
                 for s, f in self.Map.serp2fren.items():
                     typemap[s-1] = f
             else:
-                for s in self.Map.serp2fren.keys():
+                for s in self.Map.serpcentermap.keys():
                     typemap[s-1] = s
             asstypes = np.reshape(typemap, (Nx, Ny), order='F')
 

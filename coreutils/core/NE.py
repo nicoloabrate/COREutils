@@ -116,10 +116,11 @@ class NE:
 
         # --- define core time-dep. configurations
         # save coordinates for each layer (it can be updated later!)
-        self.zcoord = MyDict()
-        zc = self.AxialConfig.zcuts
-        for iR, z1z2 in enumerate(zip(zc[:-1], zc[1:])):
-            self.zcoord[iR] = z1z2
+        if cuts is not None and dim != 2:
+            self.zcoord = MyDict()
+            zc = self.AxialConfig.zcuts
+            for iR, z1z2 in enumerate(zip(zc[:-1], zc[1:])):
+                self.zcoord[iR] = z1z2
 
         if NEassemblylabel is not None:
             self.assemblylabel = MyDict(dict(zip(np.arange(1, nAssTypes+1),
@@ -918,24 +919,25 @@ class NE:
                                         egridname=self.egridname,
                                         datapath=path, temp=T, basename=u, datacheck=datacheck, P1consistent=P1consistent)
             # --- HOMOGENISATION (if any)
-            if self.AxialConfig.homogenised and core.dim != 2: 
-                for u0 in self.regions.values():
-                    if "+" in u0: # homogenisation is needed
-                        # identify SA type and subregions
-                        strsplt = re.split(r"\d_", u0, maxsplit=1)
-                        NEty = strsplt[0]
-                        names = re.split(r"\+", strsplt[1])
-                        # parse weights
-                        w = np.zeros((len(names), ))
-                        for iM, mixname in enumerate(names):
-                            idx = self.AxialConfig.config_str[NEty].index(u0)
-                            w[iM] = self.AxialConfig.cutsweights[NEty][f"M{iM+1}"][idx]
-                        # perform homogenisation
-                        mat4hom = {}
-                        for name in names:
-                            mat4hom[name] = self.data[temp][name]
-                        weight4hom = dict(zip(names, w))
-                        tmp[u0] = Homogenise(mat4hom, weight4hom, u0)
+            if core.dim != 2:
+                if self.AxialConfig.homogenised:
+                    for u0 in self.regions.values():
+                        if "+" in u0: # homogenisation is needed
+                            # identify SA type and subregions
+                            strsplt = re.split(r"\d_", u0, maxsplit=1)
+                            NEty = strsplt[0]
+                            names = re.split(r"\+", strsplt[1])
+                            # parse weights
+                            w = np.zeros((len(names), ))
+                            for iM, mixname in enumerate(names):
+                                idx = self.AxialConfig.config_str[NEty].index(u0)
+                                w[iM] = self.AxialConfig.cutsweights[NEty][f"M{iM+1}"][idx]
+                            # perform homogenisation
+                            mat4hom = {}
+                            for name in names:
+                                mat4hom[name] = self.data[temp][name]
+                            weight4hom = dict(zip(names, w))
+                            tmp[u0] = Homogenise(mat4hom, weight4hom, u0)
 
     def get_energy_grid(self, NEargs):
         if 'egridname' in NEargs.keys():
