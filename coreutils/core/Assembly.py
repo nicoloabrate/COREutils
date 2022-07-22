@@ -89,6 +89,8 @@ class AssemblyGeometry:
 
     def _from_dict(self, inpdict):
         for k, v in inpdict.items():
+            if isinstance(v, bytes):
+                v = v.decode()
             setattr(self, k, v)
 
 

@@ -195,7 +195,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                             txt = str(key)
                         txtcol = 'w' if isDark(asscol[lab[iz]]) else 'k'
                         plt.text(x*scale, (loz[iz]+dz/2)*scale, txt, ha='center',
-                                va='center', color=txtcol)
+                                va='center', color=txtcol, fontsize=fontsize)
                 else:
                     if asstype:
                         for assN, txt in dictname:
@@ -204,7 +204,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                             x, y = core.Map.serpcentermap[core.Map.fren2serp[assN]]
                             plt.text(x*scale, (loz[iz]+dz/2)*scale, txt,
                                     ha='center', va='center',
-                                    color=txtcol)
+                                    color=txtcol, fontsize=fontsize)
 
             # add my cuts on top of patch
             if zcuts and 'zcuts' in core.NE.AxialConfig.__dict__.keys():
@@ -231,12 +231,12 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
 
 def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
               label=False, figname=None, which=None, fren=False,
-              whichconf='NE', asstype=False, dictname=None,
+              whichconf='NE', asstype=False, dictname=None, mycols=None,
               legend=False, fill=True, style='radgeom.mplstyle',
-              axes=None, cmap='Spectral_r', thresh=None,
-              cbarLabel=True, xlabel=None, ylabel=None,
+              axes=None, cmap='Spectral_r', thresh=None, fontsize=6,
+              cbarfontsize=15, cbarLabel=None, xlabel=None, ylabel=None,
               loglog=None, logx=None, logy=None, title=None,
-              scale=1, fmt=None, numbers=False, **kwargs):
+              scale=1, fmt=None, numbers=False, cbar=True, **kwargs):
     """
     Plot something (geometry, input/output data) on the x-y plane.
 
@@ -295,6 +295,12 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
     None.
 
     """
+    if mycols is None:
+        mycols = mycols1
+
+    if cbarLabel is None:
+        cbarLabel = "data"
+
     if style == 'radgeom.mplstyle':
         pwd = Path(__file__).parent
         radgesty = str(Path.joinpath(pwd, style))
@@ -319,11 +325,12 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
         config = core.__dict__[whichconf].config[time]
         # array of assembly type
         typelabel = np.reshape(config, (NxNy, 1))
-        maxtype = int(max(typelabel))
-        coretype = range(0, maxtype+1)  # define
+        coretype = np.unique(typelabel)  # define
 
         # color dict
-        asscol = dict(zip(coretype, mycols1))
+        if len(coretype) > len(mycols):
+            raise OSError("Need more colours to plot!")
+        asscol = dict(zip(coretype, mycols))
 
     # check which variable
     amap = core.Map
@@ -340,6 +347,9 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
             "thresh should be real, not {}".format(type(thresh)))
     # open figure
     with plt.style.context(radgesty):
+        if tallies is not None:
+            rcParams.update({'font.size': cbarfontsize})
+        
         fig = plt.figure()
         ax = fig.add_subplot(111)
         usetex = True if rcParams['text.usetex'] else False
@@ -399,7 +409,10 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
             pc.set_array(values)
             pc.set_norm(normalizer)
             ax.add_collection(pc)
-            addColorbar(ax, pc, cbarLabel=cbarLabel)
+            if cbar:
+                colorbar = addColorbar(ax, pc, cbarLabel=cbarLabel)
+                if fmt is not None:
+                    colorbar.ax.set_yticklabels([fmt % val for val in colorbar.get_ticks()])
 
             # add labels on top of the polygons
             if label:
@@ -415,10 +428,10 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                     else:
                         x, y = coord
                         # plot text inside assemblies
-                        txtcol = 'w' # if isDark(asscol[lab[iz]]) else 'k'
+                        txtcol = 'k' # if isDark(col) else 'k'
                         txt = fmt % tallies[amap.serp2fren[key]-1] if fren else fmt % tallies[key-1]
                         plt.text(x*scale, y*scale, txt, ha='center',
-                                va='center', color=txtcol)
+                                va='center', color=txtcol, fontsize=fontsize)
                     
         else:
             # add labels on top of the polygons
@@ -438,16 +451,16 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                             txt = str(key)
                         txtcol = 'w' if isDark(col) else 'k'
                         plt.text(x*scale, y*scale, txt, ha='center',
-                                va='center', color=txtcol) # 
+                                va='center', color=txtcol, fontsize=fontsize) # 
                 else:
                     if asstype:  # plot assembly type
                         txt = dictname[typelabel[key-1, 0]]
                         txt = txt.split("-")[0]
                         if len(txt) > 3:
                             txt = txt[0:3]
-                        txtcol = 'w' if isDark(col) else 'k'
+                        txtcol = 'k' # if isDark(col) else 'k'
                         plt.text(x*scale, y*scale, txt, ha='center', va='center',
-                                 color=txtcol)
+                                 color=txtcol, fontsize=fontsize)
 
                     # FIXME: must be a better way to do this avoiding asstype, maybe.
                     # change "dictname" because maybe we want tuples to have
@@ -460,7 +473,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                             txt = dictname[int(assk)]
                             txtcol = 'w' if isDark(col) else 'k'
                             plt.text(x*scale, y*scale, txt, ha='center',
-                                    va='center', color=txtcol)
+                                    va='center', color=txtcol, fontsize=fontsize)
                         except KeyError:
                             continue
 
@@ -506,7 +519,7 @@ def SlabPlot(core, time=0, ax=None, xlabel=None, figname=None, ncols=None, style
         reg = list(set(core.NE.labels.values()))
         nReg = len(reg)
         # color dict
-        asscol = dict(zip(reg, mycols1))
+        asscol = dict(zip(reg, mycols))
 
         labels = []
         handles = []
