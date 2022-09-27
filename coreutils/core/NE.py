@@ -225,6 +225,16 @@ class NE:
                     if u not in self.regions.values():
                         tmp.pop(u)
 
+        # --- ADD OPTIONAL ARGUMENTS
+        if "axplot" in NEargs:
+            if not hasattr(self, "NEplot"):
+                self.NEplot = {}
+            self.NEplot['axplot'] = NEargs["axplot"]
+        if "radplot" in NEargs:
+                    if not hasattr(self, "NEplot"):
+                        self.NEplot = {}
+                    self.NEplot['radplot'] = NEargs["radplot"]
+
     def from_dict(self, inpdict):
         mydicts = ["assemblytypes", "regions", "zcoord", "assemblylabel"]
         for k, v in inpdict.items():
@@ -257,6 +267,7 @@ class NE:
         else:
             nt = self.time.index(float(time))
             now = self.time[nt-1]
+            time = self.time[nt]
         
         asstypes = self.assemblytypes.reverse()
         for NEtype in repl.keys():
@@ -733,9 +744,11 @@ class NE:
 
         if float(time) in self.config.keys():
             now = float(time)
+            time = now
         else:
             nt = self.time.index(float(time))
             now = self.time[nt-1]
+            time = self.time[nt]
         
         iT = 0  # replacement counter
         for v in list(self.regions.values()):
@@ -861,7 +874,7 @@ class NE:
                     if not isinstance(assbly, list):
                         assbly = [assbly]
                     dim = 3
-                    self.replaceSA(core, {newtype: assbly}, now, isfren=isfren)
+                    self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
 
     def get_material_data(self, univ, core, datacheck=True, P1consistent=False):
         try:

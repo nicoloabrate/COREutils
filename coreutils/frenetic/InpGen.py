@@ -26,7 +26,7 @@ except ImportError:
     # Try backported to PY<37 `importlib_resources`.
     import importlib_resources as pkg_resources
 
-figfmt = ['png', 'pdf']
+figfmt = ['png']
 
 def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
            H5fmt=2, NEtxt=False):
@@ -229,28 +229,60 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
 
         AUX_NE_plot = []
         asslabel = core.NE.assemblytypes
+        # --- plot core radial configuration
         if core.dim != 1:
             for fmt in figfmt:
-                # --- radial map (assembly numbers)
+                # assembly numbers
                 figname = f'NE-rad-map.{fmt}'
                 AUX_NE_plot.append(figname)
                 RadialMap(core, label=True, fren=True, whichconf="NE", 
                           legend=True, asstype=True, figname=figname)
-                # --- radial configurations
+                # radial configurations
                 for itime, t in enumerate(core.NE.time):
                     figname = f'NE-rad-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
                     RadialMap(core, time=t, label=True, fren=True, 
                               whichconf="NE", dictname=asslabel,
                               legend=True, asstype=True, figname=figname)
+                # --- user-defined custom figures
+                if "NEplot" in core.NE.__dict__.keys():
+                    if "radplot" in core.NE.NEplot.keys():
+                        for iconf, conf in enumerate(core.NE.NEplot["radplot"]):
+                            labeldict = None
+                            asstype = True
+                            figname = f'NE-rad-custom{iconf}.{fmt}'
+                            AUX_NE_plot.append(figname)
 
+                            if "sext" in conf:
+                                whichSA = core.Map.getSAsextant(conf["sext"])
+                            elif "whichSA" in conf:
+                                whichSA = conf["whichSA"]
+                            else:
+                                whichSA = None
+
+                            radtime = conf["time"] if "time" in conf else 0
+
+                            if "labels" in conf:
+                                if len(whichSA) != len(conf["labels"]):
+                                    print("Warning for plot: label numbers do not match with whichSA key!")
+                                else:
+                                    labeldict = {}
+                                    for i, l in enumerate(conf["labels"]):
+                                        for j in whichSA[i]:
+                                            labeldict[j] = l
+                                    whichSA = None
+                                    asstype = False
+
+                            RadialMap(core, time=radtime, label=True, fren=True, 
+                                      whichconf="NE", dictname=labeldict, which=whichSA,
+                                      legend=True, asstype=asstype, figname=figname)
+
+        # --- plot core axial configurations
         if core.dim != 1:
             x0 = []
             y0 = []
             sextI = []
-
             x0y0 = core.Map.serpcentermap[offset]
-
             for n, xy in core.Map.serpcentermap.items():
                 n = core.Map.serp2fren[n]
                 if abs(xy[1]) < 1E-4:
@@ -261,7 +293,6 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                     sextI.append(n)
         else:
             SAs = None
-        # plot core Axial configuration
         for fmt in figfmt:
             for itime, t in enumerate(core.NE.time):
                 if core.dim == 1:
@@ -312,6 +343,7 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                                     figname=figname, legend=True)
                 else:
                     raise OSError(f'Cannot use this kind of plot for {core.dim}D cores!')
+
         f = 'configurations.xlsx'
         try:
             move(f, join(AUXpath, f))

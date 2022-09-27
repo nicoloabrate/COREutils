@@ -282,17 +282,18 @@ class write():
                 obj = obj
             elif isinstance(obj, (dict, object)):
                 obj = asarray([obj])
+        
         if isinstance(groupname, list) is False:
             if isinstance(groupname, str):
                 groupname = [groupname]
             else:
                 self.fh5.close()
                 raise OSError(f'Unknown type {groupname.type} for groupname!')
-        
+
         if len(obj) != len(groupname):
             self.fh5.close()
             raise OSError('Number of objects and group names must be equal!')
-        
+
         if attributes is not None:
             if isinstance(attributes, list) is False:
                 attributes = [attributes]
@@ -312,7 +313,6 @@ class write():
                 write.dict2h5(self.fh5, grp, ob, attributes=at, skip=skip)
                 self.fh5[grp].attrs['pytype'] = str(type(ob))
             elif isinstance(ob, object):
-                # at = {'pytype': type(ob).__name__} , attributes=at
                 write.dict2h5(self.fh5, grp, ob.__dict__, skip=skip)
                 self.fh5[grp].attrs['pytype'] = str(type(ob))
 
@@ -370,39 +370,19 @@ class write():
 
         for key, item in dic.items():
             doskip = False
-            for i, s in enumerate(skip):
-                if str(key) == s:
-                    logging.info(f"Skipping key {s}")
-                    doskip = True
-                elif str(key) in s:
-                    tmp = s.split('.')[1:][0]
-                    skip[i] = tmp
+            if skip is not None:
+                for i, s in enumerate(skip):
+                    if str(key) == s:
+                        logging.info(f"Skipping key {s}")
+                        doskip = True
+                    elif str(key) in s:
+                        tmp = s.split('.')[1:][0]
+                        skip[i] = tmp
             if doskip:
                 continue
-            # if type(key) == str:
-            #     typekey = 'str'
-            # else:
-            #     typekey = str(type(key).__name__)
 
-            # convert items
-            if isinstance(item, (int64, float64, bytes, int, float)):
-                fh5g.create_dataset(str(key), data=item)
-            elif isinstance(item, str):
-                dt_str = h5py.special_dtype(vlen=str)
-                fh5g.create_dataset(str(key), data=item, dtype=dt_str)
-            elif isinstance(item, (list, tuple, ndarray, set)):
-                write.iterable2h5(fh5[grp], key, item, skip=skip)
-            elif isinstance(item, dict):
-                if type(item) != dict: # any subclass of dict
-                    item = dict(item)
-                write.dict2h5(fh5[grp], key, item, attributes=attributes, skip=skip)
-            elif isinstance(item, object):
-                write.dict2h5(fh5[grp], key, item, skip=skip)
-            else:
-                raise ValueError('Cannot save {} type!'.format(type(item)))
-            # --- assign key and value types
-            fh5g[str(key)].attrs['pytype'] = str(type(item))
-            fh5g[str(key)].attrs['keytype'] = str(type(key))
+            write.item2h5(fh5, grp, key, item, attributes=attributes, skip=skip)
+
 
     def iterable2h5(fh5, dataname, iterable, attrs=None, grp=None, skip=None):
 
@@ -412,18 +392,21 @@ class write():
         if grp:
             fh5.create_group(grp)
             fh5 = fh5[grp]
+        else:
+            fh5 = fh5
 
         ittype = iterable.dtype
         datanametype = str(type(dataname))
         if type(dataname) != str:
             dataname = str(dataname)
-
-        for i, s in enumerate(skip):
-            if dataname == s:
-                return None
-            elif dataname in s:
-                tmp = s.split('.')[1:][0]
-                skip[i] = tmp
+        
+        if skip is not None:
+            for i, s in enumerate(skip):
+                if dataname == s:
+                    return None
+                elif dataname in s:
+                    tmp = s.split('.')[1:][0]
+                    skip[i] = tmp
 
         if isinstance(iterable, ndarray):
             if 'U' in str(ittype):  # string array
@@ -433,9 +416,21 @@ class write():
                 fh5[dataname].attrs['pytype'] = str(type(iterable))
                 fh5[dataname].attrs['keytype'] = str(datanametype)
             elif 'object' in str(ittype):
-                fh5[grp].attrs.create('pytype', type(iterable))
+                fh5.create_group(dataname)
+                # fh5[grp].attrs.create('pytype', type(iterable))
+                # for i, obj in enumerate(iterable):
+                #     write.dict2h5(fh5[grp], i, obj.__dict__)
+                # fh5.attrs.create('pytype', type(iterable))
                 for i, obj in enumerate(iterable):
-                    write.dict2h5(fh5[grp], i, obj.__dict__)
+                    objtype = type(obj)
+                    write.item2h5(fh5, dataname, str(i), obj, attributes=attrs, skip=skip)
+
+                #     if 'dict' in str(objtype):
+                #         write.dict2h5(fh5[dataname], i, obj)
+                #     else:
+                #         write.dict2h5(fh5[dataname], i, obj.__dict__)
+                #     fh5[dataname][str(i)].attrs['pytype'] = str(objtype)
+                # fh5[dataname].attrs['pytype'] = str(type(iterable))
             elif ittype in [*read._int_types, *read._float_types]:
                 fh5.create_dataset(dataname, data=iterable, chunks=True,
                                    compression="gzip", compression_opts=4)
@@ -453,6 +448,54 @@ class write():
         if attrs:
             for k, v in attrs.items():
                 fh5.attrs.create(k, v)
+
+    def item2h5(fh5, group, key, item, attributes=None, skip=None):
+        """Dump item to h5 file.
+
+        Parameters
+        ----------
+        fh5 : object
+            h5 handle
+        group : str
+            Group containing the item
+        key : str
+            name of the item
+        item : object
+            Item to be dumped
+        attributes : object, optional
+            attributes object, by default None
+        skip : iterable, optional
+            list of sub-items to be skipped, by default None
+
+        Raises
+        ------
+        ValueError
+            _description_
+        """
+        # --- float and int
+        if isinstance(item, (int64, float64, bytes, int, float)):
+            fh5[group].create_dataset(str(key), data=item)
+        # --- string
+        elif isinstance(item, str):
+            dt_str = h5py.special_dtype(vlen=str)
+            fh5[group].create_dataset(str(key), data=item, dtype=dt_str)
+        # --- iterable
+        elif isinstance(item, (list, tuple, ndarray, set)):
+            write.iterable2h5(fh5[group], key, item, skip=skip)
+        # --- dict
+        elif isinstance(item, dict):
+            if type(item) != dict: # any subclass of dict
+                item = dict(item)
+            write.dict2h5(fh5[group], key, item, attributes=attributes, skip=skip)
+        # --- object
+        elif isinstance(item, object):
+            write.dict2h5(fh5[group], key, item, skip=skip)
+        # --- raise error if type not recognised
+        else:
+            raise ValueError('Cannot save {} type!'.format(type(item)))
+        # --- assign key and value types
+        fh5[group][str(key)].attrs['pytype'] = str(type(item))
+        fh5[group][str(key)].attrs['keytype'] = str(type(key))
 
 
 def _checkname(fname):

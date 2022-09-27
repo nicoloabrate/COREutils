@@ -17,11 +17,13 @@ from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 from matplotlib import rc, rcParams, colors
 
 
-mycols1 = ["#19647e", "#28afb0", "#f4d35e", "#ee964b", # generated with Coloor
+mycols1 = ["#19647e", "#28afb0", "#ee964b", # generated with Coloor
            "#ba324f", "#1f3e9e", "#efd28d",
-           "#004777", "#ffffff", "#a30000", "#ff7700", "#175676", "#00afb5",
-           "#4ba3c3", "#cce6f4", "#d62839", 
-           "#086788", "#07a0c3", "#f0c808", "#fff1d0", "#dd1c1a",
+        #    "#004777", 
+           "#ffffff", # "#a30000", "#ff7700", # "#175676", "#00afb5",
+        #    "#4ba3c3", "#cce6f4", "#d62839", 
+        #    "#086788", "#07a0c3", 
+           "#f0c808", "#fff1d0", "#dd1c1a",
            "#003049", "#d62828", "#f77f00", "#fcbf49", "#eae2b7",
            "#6C5548", "#B45A38", "#603827", "#13466E", "#F5A964", 
            "#1980A7", "#491F15", "#006094", "#E8743F", "#2AA3C4", "#1f271b", 
@@ -325,7 +327,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
         config = core.__dict__[whichconf].config[time]
         # array of assembly type
         typelabel = np.reshape(config, (NxNy, 1))
-        coretype = np.unique(typelabel)  # define
+        coretype = core.__dict__[whichconf].assemblytypes.keys() # np.unique(typelabel)  # define
 
         # color dict
         if len(coretype) > len(mycols):
@@ -439,7 +441,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 # check key is in "which" list
                 if key not in which:
                     continue
-        
+
                 x, y = coord
                 col = asscol[typelabel[key-1, 0]]
                 # plot text inside assemblies
@@ -458,7 +460,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                         txt = txt.split("-")[0]
                         if len(txt) > 3:
                             txt = txt[0:3]
-                        txtcol = 'k' # if isDark(col) else 'k'
+                        txtcol = 'w' if isDark(col) else 'k'
                         plt.text(x*scale, y*scale, txt, ha='center', va='center',
                                  color=txtcol, fontsize=fontsize)
 
@@ -466,7 +468,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                     # change "dictname" because maybe we want tuples to have
                     # overlappings (phytra fig) write other labels
                     else:
-                        atype = core.getassemblytype(key, time=time)
+                        atype = core.getassemblytype(key, config)
                         x, y = core.Map.serpcentermap[key]
                         try:
                             assk = str(core.Map.serp2fren[key]) if fren else key

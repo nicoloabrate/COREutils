@@ -37,6 +37,7 @@ setToValue = {
                         'replace': None,
                         'replaceSA': None,
                         'assemblylabel': None,
+                        'axplot': None,
                       },
                 'TH': {
                         'fren': True,

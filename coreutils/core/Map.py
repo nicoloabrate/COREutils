@@ -104,6 +104,21 @@ class Map:
         # Serpent centers map
         self.serpcentermap = dict(zip(serpmap, coord))
 
+    def getSAsextant(self, sext):
+        """Get SAs belonging to a certain core sextant (for hexagonal SAs).
+
+        Parameters
+        ----------
+        sext : int
+            Sextant number. The first sextant is obtained drawing an angle of 60 degrees in the quadrant x>0, y>0. Then the
+            others are obtained moving counter-clockwise.
+        """
+        Nass = len((self.serpcentermap))
+        nSAs = int(Nass/6)
+        whichSA = [w for w in np.arange(nSAs*(sext-1)+2, nSAs*sext+2)]
+        whichSA.append(1)
+        return whichSA
+
     def _from_dict(self, inpdict):
         for k, v in inpdict.items():
             setattr(self, k, v)
