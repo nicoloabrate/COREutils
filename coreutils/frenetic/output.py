@@ -686,7 +686,7 @@ class NEoutput:
 
     def whereMaxSpectralRad(self, path, core, plot=True):
 
-        with open(os.path.join(path, 'neutronic', 'outputNE.log'), 'r') as f:
+        with open(os.path.join(path, 'outputNE.log'), 'r') as f:
             for l in f:
                 if '@ D3DMATI: MAXVAL(SPECTRAL NORM)' in l:
                     # parse IK, IG
@@ -698,11 +698,12 @@ class NEoutput:
         for iz in range(0, nElz):
             for ih in range(1, self.core.NAss+1):
                 if myIK == IK:
-                    hexty = self.core.getassemblytype(ih, isfren=True)
+                    # TODO parse each time config.
+                    hexty = self.core.getassemblytype(ih, config=core.NE.config[0], isfren=True)
                     hexty = self.core.NE.assemblytypes[hexty]
                     print(ih)
                     z = self.core.NE.AxialConfig.AxNodes[iz]
-                    print('Max spectral norm in {} SAs at z={} cm'.format(hexty, z))
+                    print(f'Max spectral norm in {hexty} SAs at z={z} cm')
                 myIK = myIK+1
 
     def _shift_index(self, gro, grp, pre, prp, t, z,
