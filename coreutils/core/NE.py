@@ -378,7 +378,7 @@ class NE:
                             notfound = False
                             axposapp(ipos)
                             break
-                    if notfound: # check in cuts
+                    if notfound: # check in cuts defining axial regions (e.g., from Serpent)
                         zcuts = zip(self.AxialConfig.cuts[atype].loz, self.AxialConfig.cuts[atype].upz)
                         for ipos, coord in enumerate(zcuts):
                             if tuple(rplZ) == coord:
@@ -457,8 +457,12 @@ class NE:
                         newaxregions[ax] = newreg_int
                         newaxregions_str[ax] = newreg_str
                     # add new type in xscuts (mainly for plot)
-                    for rplZ in where:
-                        cuts = cp(self.AxialConfig.cuts[atype])
+                    for irplZ, rplZ in enumerate(where):
+                        # check new atype exists (if len(where) > 1)
+                        if irplZ == 0:
+                            cuts = cp(self.AxialConfig.cuts[atype])
+                        else:
+                            cuts = cp(self.AxialConfig.cuts[newtype])
                         upz, loz, reg, lab = cuts.upz, cuts.loz, cuts.reg, cuts.labels
                         if rplZ[0] not in loz:
                             loz.append(rplZ[0])
@@ -618,10 +622,18 @@ class NE:
                             prtdict['where'] = None
                             continue
                         else:
-                            raise OSError(f'Mandatoy key {mk} missing in perturbation for t={time} s')
+                            raise OSError(f'Mandatoy key `{mk}` missing in perturbation for t={time} s')
             if 'depgro' not in prtdict.keys():
                 prtdict['depgro'] = None
 
+            # parse all SAs including the "region" if specified by the user
+            if prtdict['which'] == 'all':
+                # determine integer type of SAs according to "region" and "where" keys
+                for iSA, SA_str in enumerate(self.AxialConfig.config_str.keys()):
+                    if prtdict['region'] in self.AxialConfig.config_str[SA_str]:
+                        atype = iSA+1
+                prtdict['which'] = core.getassemblylist(atype, config=self.config[now], isfren=isfren)
+            
             # arrange which into list of lists according to SA type
             whichlst = {}
             for w in prtdict['which']:
@@ -663,7 +675,7 @@ class NE:
                         if notfound:
                             raise OSError(f"Cannot find axial region in {z1z2} for replacement!")
                     if incuts:
-                        oldreg = self.AxialConfig.cuts[atype].regs[ipos]
+                        oldreg = self.AxialConfig.cuts[atype].reg[ipos]
                         zpert = [list(zcuts[ipos])]
                     else:
                         oldreg = self.AxialConfig.config_str[atype][ipos]
