@@ -202,6 +202,9 @@ class NE:
                     self.translate(CI, config[time]["translate"],
                                    time, isfren=NEfren)
 
+                if "critical" in config[time]:
+                    self.critical(CI, config[time]["critical"], time)
+
                 if "perturb" in config[time]:
                     self.perturb(CI, config[time]["perturb"],
                                    time, isfren=NEfren, P1consistent=P1consistent)
@@ -570,6 +573,58 @@ class NE:
                         assbly = [assbly]
                     self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
 
+    def critical(self, core, prt):
+        """
+        
+        Enforce criticality, given the static keff of the system
+
+        Parameters
+        ----------
+        core : _type_
+            _description_
+        """
+        iP = 0  # perturbation counter
+        for p in list(self.regions.values()):
+            if action in p:
+                iP += 1
+        if float(time) in self.config.keys():
+            now = float(time)
+        else:
+            nt = self.time.index(float(time))
+            now = self.time[nt-1]
+
+        # --- dict sanity check
+        if 'keff' not in prtdict.keys():
+            raise OSError(f'Mandatoy key `keff` missing in ''critical'' card for t={time} s')
+        
+        keff = keff*self.nGro
+
+        # # --- get all fissile regions at the present config
+        # if core.dim == 2: # check all regions
+        #     reg2d_now = self.config[now].unique()
+        #     fiss_mat = []
+        #     for iReg in reg2d_now:
+        #         reg_str = self.regions[iReg]
+            #     for temp in core.TfTc:
+        #             if self.data[temps][reg_str].isfiss:
+                #         self.data[temp][prtreg] = cp(self.data[temp][oldreg])
+                #         self.data[temp][prtreg].perturb(perturbation, howmuch, depgro, sanitycheck=sanitycheck, P1consistent=P1consistent)
+
+        # else:
+            #     # --- perturb data and assign it
+
+        #     # --- add new assemblies
+        #     self.regions[self.nReg+1] = prtreg
+        #     self.labels[prtreg] = f"{self.labels[oldreg]}-{iP}{action}"
+        #     # --- define replacement dict to introduce perturbation
+        #     if core.dim == 2:
+        #         repl = {atype: assbly}
+        #         self.replaceSA(core, repl, time, isfren=isfren)
+        #     else:
+        #         repl = {"which": [assbly], "with": [prtreg], "where": [zpert]}
+        #         self.replace(core, repl, time, isfren=isfren, action=action, P1consistent=P1consistent)
+
+
     def perturb(self, core, prt, time=0, sanitycheck=True, isfren=True,
                 action='pert', P1consistent=False):
         """
@@ -881,7 +936,7 @@ class NE:
                         self.assemblytypes.update({nTypes+1: newtype})
                         self.assemblylabel.update({nTypes+1: newtype})
                         self.AxialConfig.config.update({nTypes+1: newaxregions})
-                        self.AxialConfig.config_str.update({newtype: newaxregions_str})        
+                        self.AxialConfig.config_str.update({newtype: newaxregions_str})
                     # --- replace assembly
                     if not isinstance(assbly, list):
                         assbly = [assbly]
