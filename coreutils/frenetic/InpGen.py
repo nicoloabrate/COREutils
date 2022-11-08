@@ -26,6 +26,8 @@ except ImportError:
     # Try backported to PY<37 `importlib_resources`.
     import importlib_resources as pkg_resources
 
+np.seterr(invalid='ignore')
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 figfmt = ['png']
 
 def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
@@ -181,7 +183,7 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                 print('Overwriting file {}'.format(f))
                 move(f, join(NEpath, f))
 
-        move('meanfreepath_difflength.json', join(AUXpath, 'meanfreepath_difflength.json'))
+        move('DiffLengthToNodeHeight.json', join(AUXpath, 'DiffLengthToNodeHeight.json'))
 
     else:
         logging.warn('macro.nml and NE_data.h5 not written!')
@@ -312,11 +314,19 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
                             a = core.getassemblylist(l, config, isfren=True)
                             allassbly.append(min(a))
                     allassbly.sort()
+
                     figname = f'NEax-alltypes-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
                     AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
                                 figname=figname, legend=True, floating=True)
                     plt.close()
+
+                    figname = f'NEax-alltypes-splitz-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    AUX_NE_plot.append(figname)
+                    AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
+                                  splitz=True, figname=figname, legend=True, floating=True)
+                    plt.close()
+
                     # plot y=0 SAs
                     figname = f'NEax-x0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)

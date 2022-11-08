@@ -37,7 +37,7 @@ mycols1.extend(xkcd)
 
 def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                   figname=None, fren=False, asstype=False,
-                  style='axgeom.mplstyle',
+                  style='axgeom.mplstyle', splitz=False,
                   zcuts=False, title=None, scale=1, floating=False,
                   legend=False, seed=None, showhomog=False, **kwargs):
     """
@@ -66,6 +66,9 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
 
     usetex : bool, optional
         Bool to choose TeX format for strings. The default is ``False``.
+    splitz : bool, optional
+        Boolean for plotting user-defined nodal cuts stored in ``Core`` object.
+        Default is ``False``.
     zcuts : bool, optional
         Boolean for plotting user-defined cuts stored in ``Core`` object.
         Default is ``None``.
@@ -209,10 +212,52 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                                     color=txtcol, fontsize=fontsize)
 
             # add my cuts on top of patch
+            upz = core.NE.AxialConfig.cuts[asstype].upz
+            loz = core.NE.AxialConfig.cuts[asstype].loz
+            iz = 0
             if zcuts and 'zcuts' in core.NE.AxialConfig.__dict__.keys():
                 for myz in core.NE.AxialConfig.zcuts:
+                    # parse which color is in background
+                    zcol = 'w' if isDark(asscol[lab[iz]]) else 'k'
                     plt.hlines(myz*scale, (x-L/2)*scale, (x+L/2)*scale,
-                               linestyles='-.', linewidth=0.5, edgecolor='k')
+                               linestyles='-.', linewidth=0.5, edgecolor=zcol)
+                if myz > loz[iz]:
+                    iz += 1
+
+            # add node splitting on top of patch
+            if splitz and 'AxNodes' in core.NE.AxialConfig.__dict__.keys():
+                iz1, izn, iz2 = 0, 0, 0
+                nS = 0
+                iNode = 0
+                for iCut, z1z2 in core.NE.zcoord.items(): # span het. cuts
+                    z1, z2 = z1z2
+                    nE = nS+core.NE.AxialConfig.splitz[iCut]
+                    for node in core.NE.AxialConfig.AxNodes[nS:nE]:
+                        if node < z1 or node > z2:
+                            raise OSError("Something is wrong with the nodes!")
+                        zn1 = z1 if iNode == 0 else zn2
+                        zn2 = zn1+core.NE.AxialConfig.dz[iNode]
+                        # --- plot node boundaries
+                        # parse which color is in background
+                        if zn1 > upz[iz1]:
+                            iz1 += 1
+                        zcol = 'w' if isDark(asscol[lab[iz1]]) else 'k'
+                        plt.hlines(zn1*scale, (x-L/2)*scale, (x+L/2)*scale,
+                                   linestyles='-', linewidth=0.1, edgecolor=zcol)
+                        # parse which color is in background
+                        zcol = 'w' if isDark(asscol[lab[iz2]]) else 'k'
+                        plt.hlines(zn2*scale, (x-L/2)*scale, (x+L/2)*scale,
+                                   linestyles='-', linewidth=0.1, edgecolor=zcol)
+                        if zn2 > upz[iz2]:
+                            iz2 += 1
+                        # --- plot node center
+                        # parse which color is in background
+                        if node > upz[izn]:
+                            izn += 1
+                        zcol = 'w' if isDark(asscol[lab[izn]]) else 'k'
+                        plt.scatter(x*scale, node*scale, s=1, c=zcol)
+                        iNode += 1
+                    nS = nE
 
         plt.axis('off')
         ax.set_xlim([min(xx)-L/2, max(xx)+L/2])
