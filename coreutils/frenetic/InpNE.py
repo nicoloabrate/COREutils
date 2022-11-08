@@ -394,28 +394,71 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
     # get MFP and diff. length for sanity check wrt splitz
     DFLmin = {}
     MFPmin = {}
+    DFLmax = {}
+    MFPmax = {}
     for itup, tup in enumerate(temps):
         for regtype, reg in core.NE.data[tup].items():
             if itup == 0:
                 DFLmin[regtype] = reg.DiffLength.min()
+                DFLmax[regtype] = reg.DiffLength.max()
                 MFPmin[regtype] = reg.MeanFreePath
             else:
                 if DFLmin[regtype] > reg.DiffLength.min():
                     DFLmin[regtype] = reg.DiffLength.min()
+                if DFLmax[regtype] < reg.DiffLength.max():
+                    DFLmax[regtype] = reg.DiffLength.max()
                 if MFPmin[regtype] > reg.MeanFreePath:
                     MFPmin[regtype] = reg.MeanFreePath
 
-    for asstype, cuts in core.NE.AxialConfig.config_str.items():
-        for i, reg in enumerate(cuts):
-            deltaz = (core.NE.zcoord[i][1]-core.NE.zcoord[i][0])
-            dz = deltaz/core.NE.AxialConfig.splitz[i]
-            L = DFLmin[reg]
-            if dz > L:  # MFPmin[reg], 
-                logging.info(f'WARNING: split in reg. {reg} for {asstype} SA'
-                             f' should be refined by a factor {dz/L}')
+    zNodes = core.NE.AxialConfig.AxNodes
+    nNodes = len(zNodes)
+    # preallocation
+    DFLtoZ = {}
+    for asstype in core.NE.AxialConfig.config_str.keys():
+        DFLtoZ[asstype] = [] # np.zeros((nNodes, 3))
 
-        with open('meanfreepath_difflength.json', 'w') as outfile:
-            json.dump({"DiffLength": DFLmin, "MeanFreePath": MFPmin}, outfile, indent=8)
+    nS = 0
+    iNode = 0
+    for iCut, z1z2 in core.NE.zcoord.items(): # span het. cuts
+        z1, z2 = z1z2
+        nE = nS+core.NE.AxialConfig.splitz[iCut]
+        for node in core.NE.AxialConfig.AxNodes[nS:nE]: # 
+            if node < z1 or node > z2:
+                raise OSError("Something is wrong with the nodes!")
+            zn1 = z1 if iNode == 0 else zn2
+            zn2 = zn1+core.NE.AxialConfig.dz[iNode]
+            for asstype in core.NE.AxialConfig.config_str.keys():
+                reg = core.NE.AxialConfig.config_str[asstype][iCut]
+                # DFLtoZ[asstype][iNode, 0] = zn1
+                # DFLtoZ[asstype][iNode, 1] = zn2
+                # DFLtoZ[asstype][iNode, 2] = DFLmax[reg]/core.NE.AxialConfig.dz[iNode]
+                DFLtoZ[asstype].append([zn1, zn2, DFLmax[reg]/core.NE.AxialConfig.dz[iNode]])
+            iNode += 1
+        nS = nE
+
+    with open('DiffLengthToNodeHeight.json', 'w') as outfile:
+        json.dump({"DFLtoZ": DFLtoZ}, outfile, indent=2)
+
+        # for asstype, cuts in core.NE.AxialConfig.config_str.items():
+        #     
+        # for node in zNodes[nS:nE]: # span only nodes in [z1, z2]
+
+        #     if node < z1 and node > z2:
+            
+        #     else:
+
+    # for asstype, cuts in core.NE.AxialConfig.config_str.items():
+    #     DFLtoZ[asstype] = np.zeros((nNodes, 3))
+    #     for i, reg in enumerate(cuts):
+    #         deltaz = (core.NE.zcoord[i][1]-core.NE.zcoord[i][0])
+    #         dz = deltaz/core.NE.AxialConfig.splitz[i]
+    #         L = DFLmin[reg]
+    #         if dz > L:  # MFPmin[reg], 
+    #             logging.info(f'WARNING: split in reg. {reg} for {asstype} SA'
+    #                          f' should be refined by a factor {dz/L}')
+
+    #     with open('meanfreepath_difflength.json', 'w') as outfile:
+    #         json.dump({"DiffLength": DFLmin, "MeanFreePath": MFPmin}, outfile, indent=8)
 
 
 def writeConfig(core, NZ, Ntypes):
