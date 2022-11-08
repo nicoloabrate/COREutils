@@ -1060,6 +1060,8 @@ class NEMaterial():
         # ensure data consistency
         self.datacheck(P1consistent=P1consistent)
 
+    def isfiss(self):
+        return self.Fiss.max() > 0
 
 class NEMix(NEMaterial):
     # TODO check this actually works!
