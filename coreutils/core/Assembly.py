@@ -192,6 +192,7 @@ class AxialConfig:
             for i in idx:
                 lo[i] = tmp1[i]
                 r[i] = tmp2[i]
+                # FIXME label should be mandatory argument
                 lb[i] = tmp3[i]
             lbl = []
             if labels is None:
