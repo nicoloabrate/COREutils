@@ -8,11 +8,14 @@ Description: Set of methods for generating FRENETIC input files.
 """
 import io
 import os
+import git
+import socket
 import logging
 import pathlib
 import numpy as np
-from shutil import move, copyfile, SameFileError
 from os.path import join
+from datetime import datetime
+from shutil import move, copyfile, SameFileError
 from . import templates
 from coreutils.tools.utils import fortranformatter as ff
 from coreutils.tools.plot import RadialMap, AxialGeomPlot, SlabPlot
@@ -29,6 +32,10 @@ except ImportError:
 np.seterr(invalid='ignore')
 logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 figfmt = ['png']
+
+repopath = pathlib.Path(__file__).resolve().parents[2]
+repo = git.Repo(repopath)
+sha = repo.head.object.hexsha  # commit id
 
 def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
            H5fmt=2, NEtxt=False):
@@ -76,6 +83,11 @@ def inpgen(core, json, casename=None, templates=None, plotNE=None, whichSA=None,
         os.remove(join(casepath, f'{jsonname}'))
         print(f'Overwriting file {jsonname}')
         copyfile(f'{json}', join(casepath, f'{jsonname}'))
+
+    # --- add GIT info
+    print_coreutils_info()
+    move('coreutils_info.txt', join(AUXpath, 'coreutils_info.txt'))
+
     # --- save core object to root directory
     # core.to_h5('core')
     corefname = 'core.h5'
@@ -483,3 +495,22 @@ def mkdir(dirname, indirs=None):
     os.makedirs((path), exist_ok=True)
 
     return path
+
+
+def print_coreutils_info():
+    # datetime object containing current date and time
+    now = datetime.now()
+    mmddyyhh = now.strftime("%B %d, %Y %H:%M:%S")
+    with open("coreutils_info.txt", "w") as f:
+        f.write(f"FRENETIC input generated on with `coreutils`: \n")
+        f.write(f"# -------------------------- \n")
+        f.write(f"HOSTNAME: {socket.gethostname()} \n")
+        try:
+            f.write(f"USERNAME: {os.getlogin()} \n")
+        except OSError:
+            f.write(f"USERNAME: unknown \n")
+        f.write(f"GIT_REPO_URL: {repo.remotes.origin.url} \n")
+        f.write(f"GIT_COMMIT_ID: {sha} \n")
+        f.write(f"GIT_BRANCH: {repo.active_branch} \n")
+        f.write(f"DDYYMMHH: {mmddyyhh} \n")
+        f.write(f"# -------------------------- \n")
