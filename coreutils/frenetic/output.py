@@ -701,7 +701,6 @@ class NEoutput:
                     # TODO parse each time config.
                     hexty = self.core.getassemblytype(ih, config=core.NE.config[0], isfren=True)
                     hexty = self.core.NE.assemblytypes[hexty]
-                    print(ih)
                     z = self.core.NE.AxialConfig.AxNodes[iz]
                     print(f'Max spectral norm in {hexty} SAs at z={z} cm')
                 myIK = myIK+1
