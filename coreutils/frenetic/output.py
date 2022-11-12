@@ -59,6 +59,8 @@ class NEoutput:
                'intpowtot': 'power tot.', 'intpowneu': 'power neu.', 'intpowpho': 'power pho.',
                'intpowfis': 'power fis.'}
 
+    post_process_keys = ['precursTot', 'precurspTot']
+
     distrout_attr = ['neutron adjoint flux', 'photon adjoint flux',
                      'neutron direct flux', 'photon direct flux',
                      'total fission power density',
@@ -207,8 +209,20 @@ class NEoutput:
         None
         """
         # look for aliases, e.g., `keff` instead of `eigenvalue dir.`
+        tot = False
         if which in self.aliases.keys():
             which = self.aliases[which]
+        elif which in self.post_process_keys:
+            if which == "precursTot":
+                pre = np.arange(1, self.core.NE.nPre+1)
+                which = "precurs"
+                sum_dims = ["npre", "nelz", "nhex"]
+                tot = True
+            elif which == "precurspTot":
+                pre = np.arange(1, self.core.NE.nPrp+1)
+                which = "precursp"
+                sum_dims = ["nprp", "nelz", "nhex"]
+                tot = True
 
         if not oldfmt:
             try:
@@ -218,9 +232,13 @@ class NEoutput:
                 if 'Unable to open file' in str(err):
                     oldfmt = True
                     datapath = os.path.join(self.NEpath, "intpow.out")
+                    if not os.path.exists(datapath):
+                        raise NEOutputError(f"No output in directory {self.NEpath}")
         else:
             # just to parse time, if needed
             datapath = os.path.join(self.NEpath, "intpow.out")
+            if not os.path.exists(datapath):
+                raise NEOutputError(f"No output in directory {self.NEpath}")
 
         if which in self.distributions:
             if which == "timeDistr":
@@ -236,8 +254,8 @@ class NEoutput:
             idx = self.distributions.index(which)
             # check core h5 is present
             if self.core is None:
-                raise OSError(f'Cannot provide distributions. \
-                               No `core.h5` file in {self.casepath}')
+                raise NEOutputError(f'Cannot provide distributions. \
+                                    No `core.h5` file in {self.casepath}')
 
             # --- PHASE-SPACE PARAMETERS
             if hex is not None:
@@ -246,6 +264,9 @@ class NEoutput:
             else:
                 if self.core.dim == 1:
                     hex = [0]  # 0 instead of 1 for python indexing
+                else:
+                    hex = np.arange(1, self.core.NAss).tolist()
+
             # "t" refers to slicing
             if t is None:
                 if len(self.core.NE.time) == 1:
@@ -297,7 +318,7 @@ class NEoutput:
                         break
 
             if notfound:
-                raise OSError(f'{which} not found in data!')
+                raise NEOutputError(f'{which} not found in data!')
 
         # --- PARSE PROFILE FROM H5 FILE
         if oldfmt:
@@ -326,6 +347,15 @@ class NEoutput:
 
                 profile = np.asarray(fh5[dictkey][which])
                 profile = profile[np.ix_(*dimlst)]
+
+                if tot:
+                    dims = self.distrout_dim[which]
+                    for sum_dim in sum_dims:
+                        sum_ax = dims.index(sum_dim)
+                        profile = profile.sum(axis=sum_ax)
+                        dims = list(dims)
+                        dims.remove(sum_dim)
+                        dims = tuple(dims)
 
         # --- close H5 file
         if not oldfmt:
@@ -358,7 +388,7 @@ class NEoutput:
             if toolspath.exists():
                 sty1D = str(Path.joinpath(pwd, "tools", style))
             else:
-                raise OSError(f"{toolspath} not found!")
+                raise NEOutputError(f"{toolspath} not found!")
         else:
             if not Path(style).exists():
                 print(f'Warning: {style} style sheet not found! \
@@ -410,6 +440,7 @@ class NEoutput:
                 dims.remove(sum_dim)
                 dims = tuple(dims)
             pre = None
+            plotvstime = True
         # --- select independent variable
         # it can be time or axial coordinate
         nTime = len(self.core.NE.time)
@@ -434,7 +465,7 @@ class NEoutput:
         if t is None:
             t = [0]  # initial condition
         if isintegral and nTime == 1:
-            raise OSError("Cannot plot integral parameter in steady state!")
+            raise NEOutputError("Cannot plot integral parameter in steady state!")
 
         ax = plt.gca() if ax is None else ax
         if isintegral:  # plot integral parameter
@@ -509,7 +540,7 @@ class NEoutput:
                 ymin, ymax = np.inf, -np.inf
                 # loop over dimensions to slice
                 for i, s in enumerate(indexes):
-                    y = prof[s]  # .take(indices=d, axis=i)
+                    y = prof[s[i]]  # .take(indices=d, axis=i)
                     label = self._build_label(s, dims, dim2plot, usrdict)
                     if abscissas is not None:
                         x = abscissas
@@ -937,6 +968,9 @@ class NEoutput:
             if lst[-1] != "hdf5":
                 lst[-1] = "hdf5"
                 fname = ".".join(lst)
-                raise OSError("File extension is wrong. Only HDF5 can be parsed")
+                raise FileNotFoundError("File extension is wrong. Only HDF5 can be parsed")
 
         return fname
+
+class NEOutputError(Exception):
+    pass
