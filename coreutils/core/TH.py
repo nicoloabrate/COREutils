@@ -55,7 +55,11 @@ class TH:
             self.from_dict(inpdict)
 
     def _init(self, THargs, CI):
+        # parse inp args
+        dim = CI.dim  # it could be useful in the future for 1D and 2D cases
         CZassemblynames = THargs['cznames']
+        CZconfig = THargs['CZconfig']
+        THconfig = THargs['THconfig']
         THdata = THargs['THdata']
         # sort list
         assnum = np.arange(1, len(CZassemblynames)+1)
@@ -67,67 +71,88 @@ class TH:
         # define TH core with assembly types
         CZcore = UnfoldCore(THargs['czfile'], THargs['rotation'], CZassemblynames).coremap
 
-        if THdata is not None:
-            THassemblynames = THdata['assemblynames']
-            assnum = np.arange(1, len(THassemblynames)+1)
-            THassemblynames = MyDict(dict(zip(THassemblynames,
-                                                    assnum)))
-            # define dict between strings and ints for assembly type
-            self.THassemblytypes = MyDict(dict(zip(assnum,
-                                                    THassemblynames)))
-            THinp = THdata['filename']
-            tmp = UnfoldCore(THinp, THargs['rotation'], THassemblynames)
-            THcore = tmp.coremap
-            THinp = tmp.inp
+        # --- define THcore
+        THassemblynames = THdata['assemblynames']
+        assnum = np.arange(1, len(THassemblynames)+1)
+        THassemblynames = MyDict(dict(zip(THassemblynames, assnum)))
+        # define dict between strings and ints for assembly type
+        self.THassemblytypes = MyDict(dict(zip(assnum, THassemblynames)))
+        THinp = THdata['filename']
+        tmp = UnfoldCore(THinp, THargs['rotation'], THassemblynames)
+        THcore = tmp.coremap
+        THinp = tmp.inp
 
         if THcore.shape != CZcore.shape:
             raise OSError("CZ and TH core dimensions mismatch!")
-        
-        if THdata is not None and "replace" in THdata.keys():
-            # loop over assembly types
-            for k, v in THdata["replace"].items():
-                try:
-                    THcore = self.replace(THassemblynames[k], v, THargs['fren'],
-                                            THcore)
-                except KeyError:
-                    raise OSError("%s not present in TH assembly types!"
-                                    % k)
-        # TH configuration
-        self.time = [0]
-        self.config = {}
-        self.config[0] = THcore
 
-        # CZ replace
-        if isinstance(THargs['replace'], dict):
-            # loop over assembly types
-            for k, v in THargs['replace'].items():
-                try:
-                    CZcore = self.replace(CZassemblynames[k], v, THargs['fren'],
-                                            CZcore)
-                except KeyError:
-                    raise OSError("%s not present in CZ assembly types!"
-                                    % k)
-        else:
-            if THargs['replace'] is not None:
-                raise OSError("'replace' in TH must be of type dict!")
+        self.CZtime = [0]
+        self.THtime = [0]
+        self.CZconfig = {}
+        self.THconfig = {}
+        self.CZconfig[0] = CZcore
+        self.THconfig[0] = THcore
+
+        # --- build time-dependent TH and CZ core configuration
+        configurations = {'THconfig': THconfig, 'CZconfig': CZconfig}
+        for name, config in configurations.items():
+            configtype = name.split('config')[0]
+            if config is not None:
+                for time in config.keys():
+                    if time != '0':
+                        t = float(time)
+                        # increment time list
+                        self.__dict__[f"{configtype}time"].append(t)
+                    else:
+                        # set initial condition
+                        t = 0
+                    # check operation
+                    if config[time] == {}:  # enforce constant properties
+                        nt = self.__dict__[f"{configtype}time"].index(float(time))
+                        now = self.__dict__[f"{configtype}time"][nt-1]
+                        self.__dict__[name][float(time)] = self.__dict__[name][now]
+
+                    if "perturbBCs" in config[time]:
+                        self.perturb(CI, config[time]["perturb"], time, configtype=configtype, isfren=True)
+
+                    if "replace" in config[time]:
+                        self.replaceSA(CI, config[time]["replace"], time, configtype=configtype, isfren=True)
+
+        # # --- build time-dependent core configuration
+        # if CZconfig is not None:
+        #     for time in CZconfig.keys():
+        #         if time != '0':
+        #             t = float(time)
+        #             # increment time list
+        #             self.time.append(t)
+        #         else:
+        #             # set initial condition
+        #             t = 0
+        #         # check operation
+        #         if CZconfig[time] == {}:  # enforce constant properties
+        #             nt = self.time.index(float(time))
+        #             now = self.time[nt-1]
+        #             self.CZconfig[float(time)] = self.CZconfig[now]
+
+        #         if "perturbBCs" in config[time]:
+        #             self.perturb(CI, CZconfig[time]["perturb"], time, configtype="CZ", isfren=NEfren)
+
+        #         if "replace" in config[time]:
+        #             self.replaceSA(CI, CZconfig[time]["replace"], time, configtype="CZ", isfren=NEfren)
 
         # assign material properties
         cz = CZMaterialData(THargs['massflowrates'], THargs['pressures'], 
                             THargs['temperatures'], self.CZassemblytypes.values())
         self.CZMaterialData = cz
 
-        # keep each core configuration in time
-        self.CZconfig = {}
-        self.CZconfig[0] = CZcore
-        self.CZtime = [0]
-        # check if boundary conditions change in time
-        THbcs = THargs['boundaryconditions']
-        if THbcs is not None:
-            for time in THbcs.keys():
-                t = float(time)
-                # increment time list
-                self.CZtime.append(t)
-                self.perturbBC(CI, THbcs[time], time, isfren=THargs['fren'])
+        # --- ADD OPTIONAL ARGUMENTS
+        if "axplot" in THargs:
+            if not hasattr(self, "THplot"):
+                self.THplot = {}
+            self.THplot['axplot'] = THargs["axplot"]
+        if "radplot" in THargs:
+                    if not hasattr(self, "THplot"):
+                        self.THplot = {}
+                    self.THplot['radplot'] = THargs["radplot"]
 
     def from_dict(self, inpdict):
         mydicts = ["assemblytypes", "assemblylabel"]
@@ -136,6 +161,64 @@ class TH:
                 setattr(self, k, MyDict(v))
             else:
                 setattr(self, k, v)
+
+    def replaceSA(self, core, repl, time, configtype="CZ", isfren=False):
+        """
+        Replace full assemblies.
+
+        Parameters
+        ----------
+        repl : dict
+            Dictionary with SA name as key and list of SAs to be replaced as value
+        isfren : bool, optional
+            Flag for FRENETIC numeration. The default is ``False``.
+
+        Returns
+        -------
+        ``None``
+
+        """
+        if configtype == "CZ":
+            asstypes = self.CZassemblytypes.reverse()
+            config = self.CZconfig
+        elif configtype == "TH":
+            asstypes = self.THassemblytypes.reverse()
+            config = self.THconfig
+        else:
+            raise OSError(f"{configtype} configtype argument unknown!")
+        
+        if float(time) in config.keys():
+            now = float(time)
+        else:
+            nt = self.time.index(float(time))
+            now = self.time[nt-1]
+            time = self.time[nt]
+        
+        for SAtype in repl.keys():
+            if SAtype not in asstypes.keys():
+                raise OSError(f"SA {SAtype} not defined in {configtype} config.! Replacement cannot be performed!")
+            lst = repl[SAtype]
+            if not isinstance(lst, list):
+                raise OSError("replaceSA must be a dict with SA name as key and"
+                                "a list with assembly numbers (int) to be replaced"
+                                "as value!")
+            if core.dim == 1:
+                newcore = [asstypes[SAtype]]
+            else:
+                # --- check map convention
+                if isfren:
+                    # translate FRENETIC numeration to Serpent
+                    index = [core.Map.fren2serp[i]-1 for i in lst]  # -1 for index
+                else:
+                    index = [i-1 for i in lst]  # -1 to match python indexing
+                # --- get coordinates associated to these assemblies
+                index = (list(set(index)))
+                rows, cols = np.unravel_index(index, core.Map.type.shape)
+                newcore = config[now]+0
+                # --- load new assembly type
+                newcore[rows, cols] = asstypes[SAtype]
+
+            config[float(time)] = newcore
 
     def perturbBC(self, core, pertconfig, time, isfren=False):
         """
@@ -155,6 +238,7 @@ class TH:
         ``None``
 
         """
+        print("TODO: this method is an older version, it should be updated!")
         # check input type
         try:
             # check consistency between dz and which
