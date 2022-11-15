@@ -482,7 +482,7 @@ def writeConfig(core, NZ, Ntypes):
     f1 = io.open('config.inp', 'w', newline='\n')
     NAssTypes = len(core.NE.assemblytypes)
 
-    writer = pd.ExcelWriter("configurations.xlsx", engine='xlsxwriter')
+    writer = pd.ExcelWriter("configurationsNE.xlsx", engine='xlsxwriter')
     workbook=writer.book
 
     ax_config = {}

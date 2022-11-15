@@ -369,11 +369,16 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
     if tallies is None:
 
         NxNy = core.Map.type.size
-        config = core.__dict__[whichconf].config[time]
+        if whichconf != "NE":
+            config = core.TH.__dict__[f"{whichconf}config"][time]
+        else:
+            config = core.__dict__[whichconf].config[time]
         # array of assembly type
         typelabel = np.reshape(config, (NxNy, 1))
-        coretype = core.__dict__[whichconf].assemblytypes.keys() # np.unique(typelabel)  # define
-
+        if whichconf != "NE":
+            coretype = core.TH.__dict__[f"{whichconf}assemblytypes"].keys()
+        else:
+            coretype = core.__dict__[whichconf].assemblytypes.keys() # np.unique(typelabel)  # define
         # color dict
         if len(coretype) > len(mycols):
             raise OSError("Need more colours to plot!")

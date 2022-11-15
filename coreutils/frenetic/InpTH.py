@@ -29,61 +29,25 @@ def writeCZdata(core):
     -------
     ``None``
     """
-    # # generate filecool.dat
-    # f = io.open('filecool.dat', 'w', newline='\n')
-    # for nchan, chan in core.TH.CZassemblytypes.items():
-    #     which = core.getassemblylist(nchan, core.TH.CZconfig[t], isfren=True)
-    #     if which != []:
-    #         # join assembly numbers in a single string
-    #         which = [str(w) for w in which]
-    #         which = ','.join(which)
-    #         f.write("%s,\n" % which)
+    input_files = {'mdot.dat': 'massflowrates', 
+                   'temp.dat': 'temperatures', 
+                   'press.dat': 'pressures'}
 
-    # generate mdot.dat
-    f = io.open('mdot.dat', 'w', newline='\n')
-    f.write("%d," % len(core.TH.CZtime))
-    for t in core.TH.CZtime:
-        # loop over each assembly
-        mflow = ["%s" % ff(t, 'double')]
-        for n in core.Map.fren2serp.keys():
-            # get mass flow rate
-            whichtype = core.getassemblytype(n, core.TH.CZconfig[t], isfren=True)
-            whichtype = core.TH.CZassemblytypes[whichtype]
-            val = core.TH.CZMaterialData.massflowrates[whichtype]
-            mflow.append("%s" % ff(val, 'double'))
-        # write to file
-        f.write("%s \n" % ",".join(mflow))
-
-    # generate temp.dat
-    f = io.open('temp.dat', 'w', newline='\n')
-    f.write("%d," % len(core.TH.CZtime))
-    for t in core.TH.CZtime:
-        # loop over each assembly
-        temp = ["%s" % ff(t, 'double')]
-        for n in core.Map.fren2serp.keys():
-            # get mass flow rate
-            whichtype = core.getassemblytype(n, core.TH.config[t], isfren=True)
-            whichtype = core.TH.CZassemblytypes[whichtype]
-            val = core.TH.CZMaterialData.temperatures[whichtype]
-            temp.append("%s" % ff(val, 'double'))
-        # write to file
-        f.write("%s \n" % ",".join(temp))
-
-    # generate press.dat
-    f = io.open('press.dat', 'w', newline='\n')
-    f.write("%d," % len(core.TH.CZtime))
-    for t in core.TH.CZtime:
-        # loop over each assembly
-        press = ["%s" % ff(t, 'double')]
-        for n in core.Map.fren2serp.keys():
-            # get mass flow rate
-            whichtype = core.getassemblytype(n, core.TH.config[t], isfren=True)
-            whichtype = core.TH.CZassemblytypes[whichtype]
-            val = core.TH.CZMaterialData.pressures[whichtype]
-            press.append("%s" % ff(val, 'double'))
-        # write to file
-        f.write("%s \n" % ",".join(press))
-
+    for inp in input_files.keys():
+        # generate input .dat
+        f = io.open(inp, 'w', newline='\n')
+        f.write(f"{len(core.TH.CZtime)},")
+        for t in core.TH.CZtime:
+            # loop over each assembly
+            data = [f"{t:.8e}"]
+            for n in core.Map.fren2serp.keys():
+                # get data in assembly
+                whichtype = core.getassemblytype(n, core.TH.CZconfig[t], isfren=True)
+                whichtype = core.TH.CZassemblytypes[whichtype]
+                val = core.TH.CZMaterialData.__dict__[input_files[inp]][whichtype]
+                data.append(f"{val:1.8e}")
+            # write to file
+            f.write(f'{",".join(data)} \n')
 
 def makeTHinput(core, template=None):
     """
@@ -146,13 +110,13 @@ def writeTHdata(core, template=None):
     """
     for nchan, chan in core.TH.THassemblytypes.items():
         # loop over time
-        for nt, t in enumerate(core.TH.time):
-            which = core.getassemblylist(nchan, core.TH.config[t], isfren=True)
+        for nt, t in enumerate(core.TH.THtime):
+            which = core.getassemblylist(nchan, core.TH.THconfig[t], isfren=True)
             # join assembly numbers in a single string
             which = [str(w) for w in which]
             which = ','.join(which)
             # --- print one file per each TH channel type
-            newline = "IHA = %s, !int id number for HAs of this type" % which
+            newline = f"IHA = {which}, !int id number for HAs of this type"
             # open reference file
             if template is None:
                 tmp = pkg_resources.read_text(templates, 'template_HA_01_01.dat')
@@ -163,8 +127,7 @@ def writeTHdata(core, template=None):
                     tmp = temp_contents. splitlines()
 
             # open new file
-            f = io.open('HA_%02d_%02d.dat' % (nchan, nt+1), 'w',
-                        newline='\n')
+            f = io.open(f'HA_{nchan:02d}_{nt+1:02d}.dat', 'w', newline='\n')
             # loop over lines in reference file
             for line in tmp:
                 if "IHA" in line:
