@@ -17,7 +17,7 @@ CImandatory = ('dim', 'shape', 'pitch', 'Tc', 'Tf') # 'pitch' only if shape!='1D
 NEmandatory = ('filename', 'assemblynames', 'rotation',
                'energygrid', 'cuts')
 THmandatory = ('czfile', 'massflowrates', 'temperatures', 'rotation',
-               'pressures', 'cznames')
+               'pressures', 'cznames', 'THdata')
 # set to value in dict if this key is missing
 setToValue = {
                 'CI': {
@@ -41,8 +41,9 @@ setToValue = {
                       },
                 'TH': {
                         'fren': True,
-                        'THdata': None, 
-                        'replace': None, 
+                        'replace': None,
+                        'THconfig': None,
+                        'CZconfig': None,
                         'boundaryconditions': None,
                        }
               } 
@@ -267,9 +268,9 @@ def __parseTH(inp):
                 if 'cznames' in inp.keys():
                     THargs[k] = inp['cznames']
                 else:
-                    raise OSError(f'Mandatory {k} key missing in CI input file!')
+                    raise OSError(f'Mandatory {k} key missing in TH input file!')
             else:
-                raise OSError(f'Mandatory {k} key missing in CI input file!')
+                raise OSError(f'Mandatory {k} key missing in TH input file!')
 
     # set missing (not mandatory) keys to default value
     for k, v in setToValue['TH'].items():
