@@ -14,7 +14,7 @@ from pathlib import Path
 from matplotlib.patches import RegularPolygon, Rectangle
 from matplotlib.collections import PatchCollection
 from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
-from matplotlib import rc, rcParams, colors
+from matplotlib import rc, rcParams, colors, cm
 
 
 mycols1 = ["#19647e", "#28afb0", "#ee964b", # generated with Coloor
@@ -63,9 +63,6 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         Name to save the figure in .png format. The default is ``None``.
     fren : bool, optional
         Boolean for FRENETIC numeration. The default is ``False``.
-
-    usetex : bool, optional
-        Bool to choose TeX format for strings. The default is ``False``.
     splitz : bool, optional
         Boolean for plotting user-defined nodal cuts stored in ``Core`` object.
         Default is ``False``.
@@ -283,7 +280,8 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
               axes=None, cmap='Spectral_r', thresh=None, fontsize=6,
               cbarfontsize=15, cbarLabel=None, xlabel=None, ylabel=None,
               loglog=None, logx=None, logy=None, title=None,
-              scale=1, fmt=None, numbers=False, cbar=True, **kwargs):
+              scale=1, fmt=None, fmt_cbar=None, txtcol='k', numbers=False,
+              cbar=True, **kwargs):
     """
     Plot something (geometry, input/output data) on the x-y plane.
 
@@ -299,8 +297,6 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
         DESCRIPTION. The default is None.
     what : TYPE, optional
         DESCRIPTION. The default is None.
-    usetex : TYPE, optional
-        DESCRIPTION. The default is False.
     fill : TYPE, optional
         DESCRIPTION. The default is True.
     axes : TYPE, optional
@@ -388,8 +384,9 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
     amap = core.Map
     if which is None:  # consider all assemblies
         which = list(amap.serpcentermap.keys())
+
     else:
-        if fren:  # FRENETIC numeration
+        if fren:  # FRENETIC numeration to Serpent
             which = [amap.fren2serp[k] for k in which]
 
     if thresh is None:
@@ -415,14 +412,15 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
             if k not in which:
                 continue
             if tallies is not None:
-                if tallies[k-1] <= thresh:
+                idx = amap.serp2fren[k]-1 if fren else k-1
+                if tallies[idx] <= thresh:
                     continue
                 else:
-                    valuesapp(tallies[k-1])
+                    valuesapp(tallies[idx])
                 # plot geometry filled with colour
                 asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges,
-                                        L*scale, orientation=orientation,
-                                        **kwargs)
+                                            L*scale, orientation=orientation,
+                                            **kwargs)
                 coordapp(xy)
                 x, y = xy
                 # scale coordinate
@@ -431,12 +429,20 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 patchesapp(asspatch)
             else:
                 # select color
+                # idx = amap.serp2fren[k]-1 if fren else 
                 col = asscol[typelabel[k-1, 0]]
                 # get type
+                if whichconf == 'NE':
+                    SAslabels = core.NE.assemblylabel
+                elif whichconf == 'CZ':
+                    SAslabels = core.TH.CZassemblylabel
+                elif whichconf == 'TH':
+                    SAslabels = core.TH.THassemblylabel
+
                 atype = core.getassemblytype(k, config)
                 asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges, L*scale,
                                         orientation=orientation, color=col, ec='k', lw=0.5,
-                                        fill=fill, label=core.NE.assemblylabel[atype], **kwargs)
+                                        fill=fill, label=SAslabels[atype], **kwargs)
                 ax.add_patch(asspatch)
 
         if tallies is not None:  # plot physics
@@ -449,21 +455,33 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
             pc = PatchCollection(patches, cmap=cmap, ec='k', lw=0.5, **kwargs)
 
             if title:
-                nodes = core.NE.AxialConfig.AxNodes
-                idz = np.argmin(abs(z-nodes))
-                times = core.TimeProf
+                if whichconf == 'NE':
+                    times = np.array(core.NE.time)
+                elif whichconf == 'CZ':
+                    times = np.array(core.TH.CZtime)
+                elif whichconf == 'TH':
+                    times = np.array(core.TH.THtime)
+                
                 idt = np.argmin(abs(time-times))
-                title = 'z={nodes[idz]:.2f} [cm], t={times[idt]:.2f} [s]'
-
+                if core.dim != 2:
+                    nodes = core.NE.AxialConfig.AxNodes if whichconf == 'NE' else core.TH.AxialConfig.AxNodes
+                    idz = np.argmin(abs(z-nodes))
+                    title = 'z={nodes[idz]:.2f} [cm], t={times[idt]:.2f} [s]'
+                else:
+                    if len(times) > 1:
+                        title = 't={times[idt]:.2f} [s]'
+                    else:
+                        title = None
             formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
                        xlabel=xlabel or "X [cm]",
                        ylabel=ylabel or "Y [cm]", title=title)
             pc.set_array(values)
             pc.set_norm(normalizer)
             ax.add_collection(pc)
+
             if cbar:
                 colorbar = addColorbar(ax, pc, cbarLabel=cbarLabel)
-                if fmt is not None:
+                if fmt_cbar is not None:
                     colorbar.ax.set_yticklabels([fmt % val for val in colorbar.get_ticks()])
 
             # add labels on top of the polygons
@@ -472,16 +490,21 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                     fmt = "%.1e" if abs(np.max(np.max(tallies))) > 999 else "%.1f"
                 else:
                     fmt = fmt
-                for key, coord in (core.Map.serpcentermap).items():
+
+                mapValToCol = cm.ScalarMappable(norm=pc.norm, cmap=cmap)
+                for k, coord in (core.Map.serpcentermap).items():
                     # check key is in "which" list
-                    k = core.Map.serp2fren[key] if fren else key
-                    if k not in which or tallies[k-1] <= thresh:
+                    idx = amap.serp2fren[k]-1 if fren else k-1
+                    if k not in which or tallies[idx] <= thresh:
                         continue
                     else:
                         x, y = coord
-                        # plot text inside assemblies
-                        txtcol = 'k' # if isDark(col) else 'k'
-                        txt = fmt % tallies[amap.serp2fren[key]-1] if fren else fmt % tallies[key-1]
+                        # see https://stackoverflow.com/questions/28752727/map-values-to-colors-in-matplotlib
+                        # see https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html#sphx-glr-gallery-images-contours-and-fields-image-annotated-heatmap-py
+                        # get patch colour
+                        col = mapValToCol.to_rgba(values[idx])
+                        txtcol = 'w' if isDark(col) else 'k'
+                        txt = fmt % tallies[idx]
                         plt.text(x*scale, y*scale, txt, ha='center',
                                 va='center', color=txtcol, fontsize=fontsize)
                     
