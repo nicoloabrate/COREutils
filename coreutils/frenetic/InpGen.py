@@ -77,6 +77,7 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
     AUXpath = mkdir("auxiliary", casepath)
     AUXpathNE = mkdir("NE", AUXpath)
     AUXpathTH = mkdir("TH", AUXpath)
+
     # --- save json to root directory
     jsonname = pathlib.Path(json).name
     try:
@@ -137,13 +138,13 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
     if NE:
         NEpath = mkdir("NE", casepath)
         # define number of axial cuts
-        nFreAxReg = len(core.NE.AxialConfig.zcuts)-1
-        nAssTypes = 1 if isNE1D else len(core.NE.AxialConfig.cuts)  # len(core.config[tlast].regions)
+        nFreAxReg = len(core.NE.AxialConfig.zcuts)-1 if core.dim != 2 else 1
+
         # define nmix (number of different regions)
         nmix = len(core.NE.regions.keys())
 
         # --- write config.inp
-        writeConfig(core, nFreAxReg, nAssTypes)
+        writeConfig(core, nFreAxReg)
 
         # --- write input.dat
         makeNEinput(core, template=templateNE, H5fmt=H5fmt)
@@ -196,7 +197,7 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
                 print('Overwriting file {}'.format(f))
                 move(f, join(NEpath, f))
 
-        move('DiffLengthToNodeHeight.json', join(AUXpathNE, 'DiffLengthToNodeHeight.json'))
+        move('DiffLengthToNodeSize.json', join(AUXpathNE, 'DiffLengthToNodeSize.json'))
 
     else:
         logging.warn('macro.nml and NE_data.h5 not written!')
@@ -297,7 +298,7 @@ def auxNE(core, AUXpathNE):
                                     legend=True, asstype=asstype, figname=figname)
 
     # --- plot core axial configurations
-    if core.dim != 1:
+    if core.dim != 2:
         x0 = []
         y0 = []
         sextI = []
@@ -312,6 +313,7 @@ def auxNE(core, AUXpathNE):
                 sextI.append(n)
     else:
         SAs = None
+
     for fmt in figfmt:
         for itime, t in enumerate(core.NE.time):
             if core.dim == 1:
@@ -368,8 +370,6 @@ def auxNE(core, AUXpathNE):
                     AUX_NE_plot.append(figname)
                     AxialGeomPlot(core, SAs, time=t, fren=True, zcuts=True,
                                 figname=figname, legend=True)
-            else:
-                raise OSError(f'Cannot use this kind of plot for {core.dim}D cores!')
 
     f = 'configurationsNE.xlsx'
     try:
@@ -421,121 +421,7 @@ def auxTH(core, AUXpathTH):
                     RadialMap(core, time=t, label=True, fren=True, 
                             whichconf=conftype, dictname=asslabel,
                             legend=True, asstype=True, figname=figname)
-                # # --- user-defined custom figures
-                # if "NEplot" in core.NE.__dict__.keys():
-                #     if "radplot" in core.NE.NEplot.keys():
-                #         for iconf, conf in enumerate(core.NE.NEplot["radplot"]):
-                #             labeldict = None
-                #             asstype = True
-                #             figname = f'NE-rad-custom{iconf}.{fmt}'
-                #             AUX_NE_plot.append(figname)
 
-                #             if "sext" in conf:
-                #                 whichSA = core.Map.getSAsextant(conf["sext"])
-                #             elif "whichSA" in conf:
-                #                 whichSA = conf["whichSA"]
-                #             else:
-                #                 whichSA = None
-
-                #             radtime = conf["time"] if "time" in conf else 0
-
-                #             if "labels" in conf:
-                #                 if len(whichSA) != len(conf["labels"]):
-                #                     print("Warning for plot: label numbers do not match with whichSA key!")
-                #                 else:
-                #                     labeldict = {}
-                #                     for i, l in enumerate(conf["labels"]):
-                #                         for j in whichSA[i]:
-                #                             labeldict[j] = l
-                #                     whichSA = None
-                #                     asstype = False
-
-                #             RadialMap(core, time=radtime, label=True, fren=True, 
-                #                     whichconf="NE", dictname=labeldict, which=whichSA,
-                #                     legend=True, asstype=asstype, figname=figname)
-
-    # # --- plot core axial configurations
-    # if core.dim != 1:
-    #     x0 = []
-    #     y0 = []
-    #     sextI = []
-    #     x0y0 = core.Map.serpcentermap[offset]
-    #     for n, xy in core.Map.serpcentermap.items():
-    #         n = core.Map.serp2fren[n]
-    #         if abs(xy[1]) < 1E-4:
-    #             x0.append(n)
-    #         if abs(xy[0]) < 1E-4:
-    #             y0.append(n)
-    #         if abs(np.tan(angle) - (xy[1]-x0y0[1])/(xy[0]-x0y0[0])) < 1E-4:
-    #             sextI.append(n)
-    # else:
-    #     SAs = None
-    # for fmt in figfmt:
-    #     for itime, t in enumerate(core.NE.time):
-    #         if core.dim == 1:
-    #             figname = f'NEslab-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-    #             AUX_NE_plot.append(figname)
-    #             SlabPlot(core, time=t, figname=figname, )
-    #             plt.close()
-    #         elif core.dim == 3:
-    #             # --- default plot
-    #             # plot one SA per each kind at each time
-    #             # add one assembly per type
-    #             allassbly = []
-    #             config = core.NE.config[t]
-    #             lst = np.unique(config.flatten())
-    #             for l in lst:
-    #                 if l != 0:
-    #                     a = core.getassemblylist(l, config, isfren=True)
-    #                     allassbly.append(min(a))
-    #             allassbly.sort()
-
-    #             figname = f'NEax-alltypes-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-    #             AUX_NE_plot.append(figname)
-    #             AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
-    #                         figname=figname, legend=True, floating=True)
-    #             plt.close()
-
-    #             figname = f'NEax-alltypes-splitz-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-    #             AUX_NE_plot.append(figname)
-    #             AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
-    #                           splitz=True, figname=figname, legend=True, floating=True)
-    #             plt.close()
-
-    #             # plot y=0 SAs
-    #             figname = f'NEax-x0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-    #             AUX_NE_plot.append(figname)
-    #             AxialGeomPlot(core, x0, time=t, fren=True, zcuts=True,
-    #                         figname=figname, legend=True)
-    #             plt.close()
-    #             # plot x=0 SAs
-    #             figname = f'NEax-y0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-    #             AUX_NE_plot.append(figname)
-    #             AxialGeomPlot(core, y0, time=t, fren=True, zcuts=True,
-    #                         figname=figname, legend=True, floating=True)
-    #             plt.close()
-    #             # plot along 1st sextant
-    #             figname = f'NEax-sextI-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-    #             AUX_NE_plot.append(figname)
-    #             AxialGeomPlot(core, sextI, time=t, fren=True, zcuts=True,
-    #                         figname=figname, legend=True, floating=True)
-    #             plt.close()
-    #             # custom plot
-    #             if whichSA is not None:
-    #                 figname = f'NEax-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-    #                 AUX_NE_plot.append(figname)
-    #                 AxialGeomPlot(core, SAs, time=t, fren=True, zcuts=True,
-    #                             figname=figname, legend=True)
-    #         else:
-    #             raise OSError(f'Cannot use this kind of plot for {core.dim}D cores!')
-
-    # f = 'configurationsTH.xlsx'
-    # try:
-    #     move(f, join(AUXpathTH, f))
-    # except SameFileError:
-    #     os.remove(join(AUXpathTH, f))
-    #     print('Overwriting file {}'.format(f))
-    #     move(f, join(AUXpathTH, f))
 
     # move files in directory
     for f in AUX_TH_plot:

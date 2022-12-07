@@ -229,14 +229,14 @@ class NE:
                         tmp.pop(u)
 
         # --- ADD OPTIONAL ARGUMENTS
-        if "axplot" in NEargs:
+        if "axplot" in NEargs and NEargs["axplot"] is not None:
             if not hasattr(self, "NEplot"):
                 self.NEplot = {}
             self.NEplot['axplot'] = NEargs["axplot"]
-        if "radplot" in NEargs:
-                    if not hasattr(self, "NEplot"):
-                        self.NEplot = {}
-                    self.NEplot['radplot'] = NEargs["radplot"]
+        if "radplot" in NEargs and NEargs["radplot"] is not None:
+            if not hasattr(self, "NEplot"):
+                self.NEplot = {}
+            self.NEplot['radplot'] = NEargs["radplot"]
 
     def from_dict(self, inpdict):
         mydicts = ["assemblytypes", "regions", "zcoord", "assemblylabel"]

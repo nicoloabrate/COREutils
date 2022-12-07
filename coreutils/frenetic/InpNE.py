@@ -410,58 +410,40 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                 if MFPmin[regtype] > reg.MeanFreePath:
                     MFPmin[regtype] = reg.MeanFreePath
 
-    zNodes = core.NE.AxialConfig.AxNodes
-    nNodes = len(zNodes)
-    # preallocation
-    DFLtoZ = {}
-    for asstype in core.NE.AxialConfig.config_str.keys():
-        DFLtoZ[asstype] = [] # np.zeros((nNodes, 3))
+    if core.dim != 2:
+        zNodes = core.NE.AxialConfig.AxNodes
+        nNodes = len(zNodes)
 
-    nS = 0
-    iNode = 0
-    for iCut, z1z2 in core.NE.zcoord.items(): # span het. cuts
-        z1, z2 = z1z2
-        nE = nS+core.NE.AxialConfig.splitz[iCut]
-        for node in core.NE.AxialConfig.AxNodes[nS:nE]: # 
-            if node < z1 or node > z2:
-                raise OSError("Something is wrong with the nodes!")
-            zn1 = z1 if iNode == 0 else zn2
-            zn2 = zn1+core.NE.AxialConfig.dz[iNode]
-            for asstype in core.NE.AxialConfig.config_str.keys():
-                reg = core.NE.AxialConfig.config_str[asstype][iCut]
-                # DFLtoZ[asstype][iNode, 0] = zn1
-                # DFLtoZ[asstype][iNode, 1] = zn2
-                # DFLtoZ[asstype][iNode, 2] = DFLmax[reg]/core.NE.AxialConfig.dz[iNode]
-                DFLtoZ[asstype].append([zn1, zn2, DFLmax[reg]/core.NE.AxialConfig.dz[iNode]])
-            iNode += 1
-        nS = nE
+        # preallocation
+        DFLtoZ = {}
+        for asstype in core.NE.AxialConfig.config_str.keys():
+            DFLtoZ[asstype] = [] # np.zeros((nNodes, 3))
 
-    with open('DiffLengthToNodeHeight.json', 'w') as outfile:
+        nS = 0
+        iNode = 0
+        for iCut, z1z2 in core.NE.zcoord.items(): # span het. cuts
+            z1, z2 = z1z2
+            nE = nS+core.NE.AxialConfig.splitz[iCut]
+            for node in core.NE.AxialConfig.AxNodes[nS:nE]: # 
+                if node < z1 or node > z2:
+                    raise OSError("Something is wrong with the nodes!")
+                zn1 = z1 if iNode == 0 else zn2
+                zn2 = zn1+core.NE.AxialConfig.dz[iNode]
+                for asstype in core.NE.AxialConfig.config_str.keys():
+                    reg = core.NE.AxialConfig.config_str[asstype][iCut]
+                    DFLtoZ[asstype].append([zn1, zn2, DFLmax[reg]/core.NE.AxialConfig.dz[iNode]])
+                iNode += 1
+            nS = nE
+    else:
+        # preallocation
+        DFLtoZ = {}
+        for asstype in core.NE.regions.values():
+            DFLtoZ[asstype] = DFLmax[asstype]/np.sqrt(core.AssemblyGeom.area)
+
+    with open('DiffLengthToNodeSize.json', 'w') as outfile:
         json.dump({"DFLtoZ": DFLtoZ}, outfile, indent=2)
 
-        # for asstype, cuts in core.NE.AxialConfig.config_str.items():
-        #     
-        # for node in zNodes[nS:nE]: # span only nodes in [z1, z2]
-
-        #     if node < z1 and node > z2:
-            
-        #     else:
-
-    # for asstype, cuts in core.NE.AxialConfig.config_str.items():
-    #     DFLtoZ[asstype] = np.zeros((nNodes, 3))
-    #     for i, reg in enumerate(cuts):
-    #         deltaz = (core.NE.zcoord[i][1]-core.NE.zcoord[i][0])
-    #         dz = deltaz/core.NE.AxialConfig.splitz[i]
-    #         L = DFLmin[reg]
-    #         if dz > L:  # MFPmin[reg], 
-    #             logging.info(f'WARNING: split in reg. {reg} for {asstype} SA'
-    #                          f' should be refined by a factor {dz/L}')
-
-    #     with open('meanfreepath_difflength.json', 'w') as outfile:
-    #         json.dump({"DiffLength": DFLmin, "MeanFreePath": MFPmin}, outfile, indent=8)
-
-
-def writeConfig(core, NZ, Ntypes):
+def writeConfig(core, NZ):
     """
     Write config.inp file.
 
@@ -471,8 +453,6 @@ def writeConfig(core, NZ, Ntypes):
         Core object created with Core class.
     NZ : int
         Number of axial cuts
-    Ntypes : int
-        Number of assembly types
 
     Returns
     -------
@@ -531,9 +511,12 @@ def writeConfig(core, NZ, Ntypes):
         for n in range(1, core.NAss+1):  # loop over all assemblies (1 assembly in 1D)
             iType = core.getassemblytype(n, core.NE.config[t], isfren=True)
             aType = core.NE.assemblytypes[iType]
-            config_int[:, n-1] = core.NE.AxialConfig.config[iType]
-            config_str[:, n-1] = core.NE.AxialConfig.config_str[aType]
-        
+            if core.dim != 2:
+                config_int[:, n-1] = core.NE.AxialConfig.config[iType]
+                config_str[:, n-1] = core.NE.AxialConfig.config_str[aType]
+            else:
+                config_int[:, n-1] = iType
+                config_str[:, n-1] = aType
         for iz in range(NZ):
             # f1.write('%s ' % ff(t, 'double'))  # write time instant for each cut
             f1.write(f"{ff(t, 'double')}  ")  # write time instant for each cut
@@ -602,18 +585,24 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2
     if H5fmt is False:
         H5fmt = 1
 
-    tmp = core.NE.AxialConfig.splitz
-    NZ = len(core.NE.AxialConfig.zcuts)-1
-    if isinstance(tmp, (int)):
-        splitz = [tmp]*NZ
-    elif isinstance(tmp, (list, np.ndarray)):
-        splitz = tmp if len(tmp) > 1 else [tmp[0]]*NZ
+    if core.dim != 2:
+        tmp = core.NE.AxialConfig.splitz
+        NZ = len(core.NE.AxialConfig.zcuts)-1
+        if isinstance(tmp, (int)):
+            splitz = [tmp]*NZ
+        elif isinstance(tmp, (list, np.ndarray)):
+            splitz = tmp if len(tmp) > 1 else [tmp[0]]*NZ
+        else:
+            raise OSError(f'splitz in core.NEAxialsConfig.splitz cannot'
+                        f'be of type {type(tmp)}')
+        meshz = core.NE.AxialConfig.zcuts
     else:
-        raise OSError(f'splitz in core.NEAxialsConfig.splitz cannot'
-                      f'be of type {type(tmp)}')
+        NZ = 1
+        splitz = [1]
+        meshz = [0, 0]
 
     nConfig = len(core.NE.time)
-    meshz = core.NE.AxialConfig.zcuts
+
     # core.trans = False if max(core.NE.time) == 0 else True
     nRun = 2 if core.trans else 1
     # FIXME tmp patch due to bug in FRENETIC h5 output
