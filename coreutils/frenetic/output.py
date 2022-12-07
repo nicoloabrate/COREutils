@@ -61,28 +61,31 @@ class NEoutput:
 
     post_process_keys = ['precursTot', 'precurspTot']
 
-    distrout_attr = ['neutron adjoint flux', 'photon adjoint flux',
-                     'neutron direct flux', 'photon direct flux',
-                     'total fission power density',
-                     'total neutron power density',
-                     'total photon power density',
-                     'total thermal power density',
-                     'delayed neutron precursor concentrations',
-                     'delayed photon precursor concentrations',
-                     'neutron fission energy production rate density',
-                     'neutron fission reaction rate density',
-                     'neutron kerma energy production rate density',
-                     'photon kerma energy production rate density',
-                     'neutron leakage rate density',
-                     'photon leakage rate density',
-                     'neutron fission neutron production rate density',
-                     'neutron scattering reaction rate density',
-                     'photon scattering reaction rate density',
-                     'neutron source emission density',
-                     'photon source emission density',
-                     'neutron total reaction rate density',
-                     'photon total reaction rate density',
-                     'coolant temperature', 'fuel temperature']
+    distrout_attr = {'fluxadj': 'neutron adjoint flux',
+                    'fluxadjp': 'photon adjoint flux',
+                    'fluxdir': 'neutron direct flux',
+                    'fluxdirp': 'photon direct flux',
+                    'powerfis': 'fission power density',
+                    'powerneu': 'KERMA power density',
+                    'powerpho': 'photon power density',
+                    'powertot': 'total power density',
+                    'precurs': 'delayed neutron precursor concentrations',
+                    'precursp': 'delayed photon precursor concentrations',
+                    'rrd_efis': 'neutron fission energy production rate density',
+                    'rrd_fis': 'neutron fission reaction rate density',
+                    'rrd_ker': 'neutron kerma energy production rate density',
+                    'rrd_kerp': 'photon kerma energy production rate density',
+                    'rrd_lkg': 'neutron leakage rate density',
+                    'rrd_lkgp': 'photon leakage rate density',
+                    'rrd_nfis': 'neutron fission neutron production rate density',
+                    'rrd_sct': 'neutron scattering reaction rate density',
+                    'rrd_sctp': 'photon scattering reaction rate density',
+                    'rrd_src': 'neutron source emission density',
+                    'rrd_srcp': 'photon source emission density',
+                    'rrd_tot': 'neutron total reaction rate density',
+                    'rrd_totp': 'photon total reaction rate density',
+                    'tempfuel': 'coolant temperature',
+                    'tempcool': 'fuel temperature'}
 
     distrout_dim = {'fluxadj': ('ntim', 'ngro', 'nelz', 'nhex'),
                     'fluxadjp': ('ntim', 'ngrp', 'nelz', 'nhex'),
@@ -265,7 +268,7 @@ class NEoutput:
                 if self.core.dim == 1:
                     hex = [0]  # 0 instead of 1 for python indexing
                 else:
-                    hex = np.arange(1, self.core.NAss).tolist()
+                    hex = np.arange(0, self.core.NAss).tolist()
 
             # "t" refers to slicing
             if t is None:
@@ -659,14 +662,26 @@ class NEoutput:
         None.
 
         """
+        # ensure only one hyperslab slice is plotted
+        if not isinstance(z, (int, np.integer)):
+            raise NEOutputError("`z` should be an integer!")
+        if not isinstance(t, (int, np.integer)):
+            raise NEOutputError("`t` should be an integer!")
+        if not isinstance(gro, (int, np.integer)):
+            raise NEOutputError("`gro` should be an integer!")
+        if not isinstance(grp, (int, np.integer)):
+            raise NEOutputError("`grp` should be an integer!")
+        if not isinstance(pre, (int, np.integer)):
+            raise NEOutputError("`pre` should be an integer!")
+
         # check data type
         if isinstance(what, dict):  # comparison with FRENETIC and other vals.
             tallies = np.zeros((self.core.NAss, len(what.keys())))
             for i, k in enumerate(what.keys()):
                 v2 = what[k]
                 v1 = self.get(k, hex=which, t=t,
-                              z=z, pre=pre, gro=gro, grp=grp,
-                              core=core)
+                              z=z, pre=pre, gro=gro, grp=grp)
+                v1 = np.squeeze(v1)
                 tmp = np.true_divide(norm(v1-v2), norm(v1))
                 tmp[tmp == np.inf] = 0
                 tmp = np.nan_to_num(tmp)
@@ -675,28 +690,34 @@ class NEoutput:
         elif isinstance(what, list):  # list of output
             tallies = np.zeros((self.core.NAss, len(what)))
             for i, w in enumerate(what):
-                tallies[:, i] = self.get(w, hex=which, t=t,
-                                         z=z, pre=pre, gro=gro, grp=grp,
-                                         core=core)
+                _tmp = self.get(w, hex=which, t=t, z=z, 
+                                pre=pre, gro=gro, grp=grp)
+                tallies[:, i] = np.squeeze(_tmp)
 
         elif isinstance(what, str):  # single output
             tallies = self.get(what, hex=which, t=t, z=z,
-                               pre=pre, gro=gro, grp=grp, core=core)
+                               pre=pre, gro=gro, grp=grp)
+            tallies = np.squeeze(tallies)
         else:
             raise TypeError('Input must be str, dict or list!')
 
         if title:
-            nodes = self.core.NE.AxialConfig.AxNodes
-            idz = np.argmin(abs(z-nodes))
-
             timeSnap = self.core.TimeSnap
             idt = np.argmin(abs(t-timeSnap))
 
-            title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], timeSnap[idt])
+            if core.dim != 2:
+                nodes = self.core.NE.AxialConfig.AxNodes
+                idz = np.argmin(abs(z-nodes))
+                title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], timeSnap[idt])
+            else:
+                nodes = np.array([0])
+                idz = 0
+                title = 't=%.2f [s]' % (timeSnap[idt])
+
 
         if cbarLabel:
             idx = self.distributions.index(what)
-            dist = self.distributions_descr[idx]
+            dist = self.distributions_descr[what]
             uom = self.distributions_measure[idx]
             uom = uom.replace('**', '^')
             changes = ['-1', '-2', '-3']
@@ -707,13 +728,31 @@ class NEoutput:
             cbarLabel = r'%s $%s$' % (dist, uom)
 
         RadialMap(core, tallies=tallies, z=z, time=t, pre=pre, gro=gro,
-                  grp=grp, label=False, figname=None, which=None, fren=False,
-                  whichconf='NEconfig', asstype=False, dictname=None,
-                  legend=False, txtcol='k', usetex=False, fill=False,
-                  axes=None, cmap='Spectral_r', thresh=None,
-                  cbarLabel=cbarLabel, xlabel=None, ylabel=None,
-                  loglog=None, logx=None, logy=None, title=title,
-                  scale=1, fmt="%.2f", numbers=False, **kwargs)
+                  grp=grp, 
+                  label=label,
+                  figname=figname,
+                  which=None,
+                  fren=True,
+                  whichconf='NE',
+                  asstype=False,
+                  dictname=None,
+                  legend=False,
+                  txtcol='k',
+                  fill=False,
+                  axes=axes,
+                  cmap=cmap,
+                  thresh=thresh,
+                  cbarLabel=cbarLabel,
+                  xlabel=xlabel,
+                  ylabel=ylabel,
+                  loglog=loglog,
+                  logx=logx, 
+                  logy=logy,
+                  title=title,
+                  scale=scale, 
+                  fmt=fmt,
+                  numbers=False, 
+                  **kwargs)
 
     def whereMaxSpectralRad(self, path, core, plot=True):
 
@@ -724,7 +763,9 @@ class NEoutput:
                     num = l.split('(IK,IG)= ')[1]
                     IK, IG = num.split()
                     IK, IG = int(IK), int(IG)
-        nElz = len(self.core.NE.AxialConfig.AxNodes)
+                else:
+                    IK, IG = None, None
+        nElz = len(self.core.NE.AxialConfig.AxNodes) if core.dim != 2 else 1
         myIK = 0
         for iz in range(0, nElz):
             for ih in range(1, self.core.NAss+1):
@@ -775,12 +816,12 @@ class NEoutput:
                 prp = [prp-1]
             prp = [p-1 for p in prp]
 
-        nodes = self.core.NE.AxialConfig.AxNodes
+        nodes = self.core.NE.AxialConfig.AxNodes if self.core.dim != 2 else np.array([0])
         if z is not None:
             if isinstance(z, (list, np.ndarray)):
                 idz = [np.argmin(abs(zi-nodes)) for zi in z]
             else:
-                idz = np.argmin(abs(z-nodes))
+                idz = [np.argmin(abs(z-nodes))]
         else:
             idz = np.arange(0, len(nodes)).tolist()
 
