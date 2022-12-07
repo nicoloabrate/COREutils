@@ -40,8 +40,8 @@ basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
 kinetics = ['lambda', 'beta']
 alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
 
-collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(2))),
-                *list(map(lambda z: "Sp"+str(z), range(2))), 'Invv']
+collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 1))),
+               *list(map(lambda z: "Sp"+str(z), range(0, 1))), 'Invv', 'Diffcoef']
 collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
 
 units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
@@ -321,7 +321,7 @@ class NEMaterial():
                     # check for temperatures
                     if temp:
                         dirTfTc = f"Tf_{Tf}_Tc_{Tc}"
-                        dirTcTf = f"Tc_{Tc}_Tf_{Tf}"                                   
+                        dirTcTf = f"Tc_{Tc}_Tf_{Tf}"
                         if Path(path.join(jpath, dirTfTc)).exists():
                             jpath = path.join(jpath, dirTfTc, filename)
                         elif Path(path.join(jpath, dirTcTf)).exists():
@@ -981,9 +981,9 @@ class NEMaterial():
             raise OSError(f'Collapsing failed: few-group structure should \
                           have less than {H} group')
         if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
-            raise OSError('Collapsing failed: few-group structure  \
-                          boundaries do not match with multi-group \
-                          one')
+            raise OSError('Collapsing failed: few-group structure'
+                          'boundaries do not match with multi-group'
+                          'one')
         for ig, g in enumerate(fewgrp):
             if g not in multigrp:
                 raise OSError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
@@ -1009,7 +1009,10 @@ class NEMaterial():
                         collapsed[key] = np.zeros(dims)
 
                     if len(dims) == 1:
-                        collapsed[key][g] = flx[iS:iE].dot(v[iS:iE])/NC
+                        if key == 'Diffcoef':
+                            v = self.Transpxs
+                            v = 1/3/v
+                        collapsed[key][g] = np.divide(flx[iS:iE].dot(v[iS:iE]), NC, where=NC!=0)
                     else:
                         # --- scattering
                         iS2 = 0
@@ -1021,7 +1024,7 @@ class NEMaterial():
                             iE2 = iE2[-1][0]+iS2
                             s = v[iS:iE, iS2:iE2].sum(axis=0)
                             NCS = flx[iS2:iE2].sum()
-                            collapsed[key][g][g2] = flx[iS2:iE2].dot(s)/NCS
+                            collapsed[key][g][g2] = np.divide(flx[iS2:iE2].dot(s), NCS, where=NCS!=0)
                             iS2 = iE2
                 # --- fission-related data
                 elif key in collapse_xsf:
@@ -1042,14 +1045,15 @@ class NEMaterial():
                         if g == 0:
                             collapsed[key] = np.zeros((G, ))
 
-                        if 'Chi' in key:
+                        if key in ['Chit', 'Chip']:
                             collapsed[key][g] = v[iS:iE].sum()
                         else:
-                            collapsed[key][g] = fissrate.dot(v[iS:iE])/FRC
+                            collapsed[key][g] = np.divide(fissrate.dot(v[iS:iE]), FRC, where=FRC!=0)
                 else:
                     continue
             iS = iE
-        collapsed['Diffcoef'] = 1/(3*collapsed['Transpxs'])
+
+        collapsed['Transpxs'] = 1/(3*collapsed['Diffcoef'])
         # overwrite data
         self.energygrid = fewgrp
         self.nE = G
@@ -1058,7 +1062,8 @@ class NEMaterial():
             if key in collapsed.keys():
                 self.__dict__[key] = collapsed[key]
         # ensure data consistency
-        self.datacheck(P1consistent=P1consistent)
+        self.datacheck()
+
 
     def isfiss(self):
         return self.Fiss.max() > 0
