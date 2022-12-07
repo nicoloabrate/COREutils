@@ -256,7 +256,7 @@ class Core:
         which = config[rows, cols]
         return which
 
-    def writecentermap(self, numbers=True, fname="centermap.txt"):
+    def writecentermap(self, numbers=True, fren=True, fname="centermap.txt"):
         """
         Write centermap to text file.
 
@@ -278,8 +278,12 @@ class Core:
         regions = []
         for key, coord in (self.Map.serpcentermap).items():
             x, y = coord
-            if numbers is False:
+            if not numbers:
                 key = typelabel[key-1, 0]
+            else:
+                if fren:
+                    key = self.Map.serp2fren[key]
+
             regions.append((key, x, y))
 
         # write region to external file
