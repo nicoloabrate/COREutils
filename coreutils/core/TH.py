@@ -57,7 +57,7 @@ class TH:
     def _init(self, THargs, CI):
         # parse inp args
         dim = CI.dim  # it could be useful in the future for 1D and 2D cases
-        CZassemblynames = THargs['cznames']
+        CZassemblynames = THargs['CZnames']
         CZconfig = THargs['CZconfig']
         THconfig = THargs['THconfig']
         THdata = THargs['THdata']
@@ -67,9 +67,12 @@ class TH:
         CZassemblynames = MyDict(dict(zip(CZassemblynames, assnum)))
         # define dict between strings and ints for assembly type
         self.CZassemblytypes = MyDict(dict(zip(assnum, CZassemblynames)))
-
+        if 'CZlabels' not in THargs.values():
+            self.CZlabels = self.CZassemblytypes
+        else:
+            self.CZlabels = MyDict(dict(zip(assnum, THargs['CZlabels'])))
         # define TH core with assembly types
-        CZcore = UnfoldCore(THargs['czfile'], THargs['rotation'], CZassemblynames).coremap
+        CZcore = UnfoldCore(THargs['CZfile'], THargs['rotation'], CZassemblynames).coremap
 
         # --- define THcore
         THassemblynames = THdata['assemblynames']
@@ -77,6 +80,10 @@ class TH:
         THassemblynames = MyDict(dict(zip(THassemblynames, assnum)))
         # define dict between strings and ints for assembly type
         self.THassemblytypes = MyDict(dict(zip(assnum, THassemblynames)))
+        if 'assemblylabels' not in THdata.values():
+            self.THassemblylabels = self.THassemblytypes
+        else:
+            self.THassemblylabels = MyDict(dict(zip(assnum, THdata['assemblylabels'])))
         THinp = THdata['filename']
         tmp = UnfoldCore(THinp, THargs['rotation'], THassemblynames)
         THcore = tmp.coremap
@@ -153,6 +160,23 @@ class TH:
                     if not hasattr(self, "THplot"):
                         self.THplot = {}
                     self.THplot['radplot'] = THargs["radplot"]
+        if "nelems" in THargs:
+            self.nVol = THargs["nelems"]
+            if "zmin" not in THargs or "zmax" not in THargs:
+                raise OSError("zmin and zmax args needed for TH mesh refinement!")
+            self.zmin = THargs["zmin"]
+            self.zmax = THargs["zmax"]
+            if "nelref" in THargs:
+                self.nVolRef = THargs["nelref"]
+                if "zmaxref" not in THargs or "zminref" not in THargs:
+                    raise OSError("Beginning and end of the mesh refinement zone are both needed!")
+                self.zmaxref = THargs["zmaxref"]
+                self.zminref = THargs["zminref"]
+                zcoord, axstep = meshTH1d(self.zmin, self.zmax, self.nVol, 
+                                          nvolref=self.nVolRef, zminref=self.zminref,
+                                          zmaxref=self.zmaxref)
+                self.zcoord = zcoord
+                self.axstep = axstep
 
     def from_dict(self, inpdict):
         mydicts = ["assemblytypes", "assemblylabel"]
@@ -296,3 +320,73 @@ class TH:
     @property
     def nReg(self):
         return len(self.regions.keys())
+
+
+def meshTH1d(zmin, zmax, nvol, nvolref=None, 
+           zminref=None, zmaxref=None):
+    """provide baricenter of each nodes between zmin and zmax with optional refinement.
+        This method is based on the subroutine mesh.f90 of FRENETIC.
+
+    Parameters
+    ----------
+    zmin : float
+        Minimum axial coordinate.
+    zmax : float
+        Maximum axial coordinate.
+    nvol : integer
+        Number of axial volumes.
+    nvolref : integer, optional
+        Number of volumes to be used in the refined region.
+    zminref : float
+        Minimum axial coordinate in the refined region.
+    zmaxref : float
+        Maximum axial coordinate in the refined region.
+
+    Returns
+    -------
+    centers : np.array
+        Centers of each axial cell
+    
+    """
+    if nvolref is not None:
+        refinement = True
+
+    # allocation
+    zcoord = np.zeros((nvol,), dtype=float)
+    axstep = np.zeros((nvol,), dtype=float)
+    zltot = zmax-zmin
+
+    if refinement:
+        # variable definition
+        nvol1 = nvol-nvolref
+        zlref = zmaxref-zminref
+        zlout = zltot-zlref
+        # build mesh
+        axstep[0] = zminref/np.floor(nvol1*(zminref/zlout))
+        zcoord[0] = 0.0 + axstep[0]/2.0
+        iz = 0
+        while zcoord[iz]+axstep[iz]/2.+1E-10 <= zminref:
+            z0 = zcoord[iz]
+            axstep[iz+1] = zminref/np.floor(nvol1*(zminref/zlout))
+            zcoord[iz+1] = z0 + axstep[iz+1]/2.+axstep[iz]/2.
+            iz += 1
+        while zcoord[iz]+axstep[iz]/2.+1E-10 <= zmaxref:
+            z0 = zcoord[iz]
+            axstep[iz+1] = zlref/nvolref
+            zcoord[iz+1] = z0 + axstep[iz+1]/2.+axstep[iz]/2.
+            iz += 1
+        while zcoord[iz]+axstep[iz]/2.+1E-10 <= zltot:
+            z0 = zcoord[iz]
+            axstep[iz+1] = (zltot-zmaxref)/(np.ceil(nvol1*(zltot-zmaxref)/zlout))
+            zcoord[iz+1] = z0 + axstep[iz+1]/2.+axstep[iz]/2.
+            iz += 1
+    else:
+        # build mesh
+        axstep[0] = zltot/nvol
+        zcoord[0] = 0.0 + axstep[0]/2.0
+        for iz in range(1, nvol+1):
+            z0 = zcoord[iz-1]
+            axstep[iz] = zltot/nvol
+            zcoord[iz] = z0 + axstep[iz]/2
+
+    return zcoord, axstep

@@ -435,9 +435,9 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 if whichconf == 'NE':
                     SAslabels = core.NE.assemblylabel
                 elif whichconf == 'CZ':
-                    SAslabels = core.TH.CZassemblylabel
+                    SAslabels = core.TH.CZlabels
                 elif whichconf == 'TH':
-                    SAslabels = core.TH.THassemblylabel
+                    SAslabels = core.TH.THassemblylabels
 
                 atype = core.getassemblytype(k, config)
                 asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges, L*scale,
@@ -507,7 +507,6 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                         txt = fmt % tallies[idx]
                         plt.text(x*scale, y*scale, txt, ha='center',
                                 va='center', color=txtcol, fontsize=fontsize)
-                    
         else:
             # add labels on top of the polygons
             for key, coord in (core.Map.serpcentermap).items():

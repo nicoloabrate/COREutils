@@ -16,8 +16,8 @@ from collections import OrderedDict, UserDict
 CImandatory = ('dim', 'shape', 'pitch', 'Tc', 'Tf') # 'pitch' only if shape!='1D', 'cuts' only in '1D'
 NEmandatory = ('filename', 'assemblynames', 'rotation',
                'energygrid', 'cuts')
-THmandatory = ('czfile', 'massflowrates', 'temperatures', 'rotation',
-               'pressures', 'cznames', 'THdata')
+THmandatory = ('CZfile', 'massflowrates', 'temperatures', 'rotation',
+               'pressures', 'CZnames', 'THdata')
 # set to value in dict if this key is missing
 setToValue = {
                 'CI': {
@@ -42,8 +42,16 @@ setToValue = {
                 'TH': {
                         'fren': True,
                         'replace': None,
+                        'nelems': None,
+                        'nelref': None,
+                        'zminref': None,
+                        'zmaxref': None,
+                        'zmin': None,
+                        'zmax': None,
                         'THconfig': None,
                         'CZconfig': None,
+                        'CZlabels': None,
+                        'thlabels' : None,
                         'boundaryconditions': None,
                        }
               } 
@@ -263,10 +271,10 @@ def __parseTH(inp):
             pass
         else:
             # check mandatory args not needed for 1D case
-            if k in ['cznames']:
+            if k in ['CZnames']:
                 # in case of misplelling
-                if 'cznames' in inp.keys():
-                    THargs[k] = inp['cznames']
+                if 'CZnames' in inp.keys():
+                    THargs[k] = inp['CZnames']
                 else:
                     raise OSError(f'Mandatory {k} key missing in TH input file!')
             else:

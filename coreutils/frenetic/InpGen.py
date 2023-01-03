@@ -233,7 +233,7 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
         auxTH(core, AUXpathTH)
 
 def auxNE(core, AUXpathNE):
-    plotNE = core.NE.NEplot
+    plotNE = core.NE.plot if hasattr(core.NE, "plot") else None
     # plot configurations
     if core.dim == 3:
         offset = core.Map.fren2serp[1]
@@ -265,9 +265,9 @@ def auxNE(core, AUXpathNE):
                             whichconf="NE", dictname=asslabel,
                             legend=True, asstype=True, figname=figname)
             # --- user-defined custom figures
-            if "NEplot" in core.NE.__dict__.keys():
-                if "radplot" in core.NE.NEplot.keys():
-                    for iconf, conf in enumerate(core.NE.NEplot["radplot"]):
+            if "plot" in core.NE.__dict__.keys():
+                if "radplot" in core.NE.plot.keys():
+                    for iconf, conf in enumerate(core.NE.plot["radplot"]):
                         labeldict = None
                         asstype = True
                         figname = f'NE-rad-custom{iconf}.{fmt}'
@@ -486,7 +486,9 @@ def makecommoninput(core, template=None):
 
     data = {'$NH': NH, '$NR': NR, '$NL': NL, '$NDIFF': NDIFF,
             '$TEND': TimeEnd, '$ISNETH': isNETH,
-            '$PITCH': PITCH/100}
+            '$PITCH': PITCH/100, '$NVOL': core.TH.nVol, 
+            '$NVREF': core.TH.nVolRef, '$XBREFI': core.TH.zminref,
+            '$XEREFI': core.TH.zmaxref, '$HEIGHT': core.TH.zmax-core.TH.zmin}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_common_input.dat')
