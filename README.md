@@ -1,29 +1,31 @@
-# README #
+ COREutils
+==========
 
-This README would normally document whatever steps are necessary to get your application up and running.
+COREutils is a python package allowing the construction of objects representing the core of a nuclear reactor (at the assembly level, assuming that the pin level is spatially homogenised). The resulting object can then be used to generate the input for other codes (like FRENETIC or FreeFEM++).
 
-### What is this repository for? ###
+The COREutils package is composed of the following sub-packages:
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+* *core*, where the geometrical, neutronic and thermal-hydraulic parameters are read from an input file in .json format and used to build the core object
+* *frenetic*, where the core object is used to build the neutronic and thermal-hydraulic input.
+* *freefem*, where the core object is used to build the neutronic input.
+* *tools*, which contains some classes for plotting and saving the core object.
 
-### How do I get set up? ###
+The structure of the code should enable to easily extend its functionality by writing an interface class to translate the core object and its physical properties to the input of other codes.
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+## 🔧 Installation
 
-### Contribution guidelines ###
+To install COREutils, run the following commands:
 
-* Writing tests
-* Code review
-* Other guidelines
+`git clone https://nicolo_abrate@bitbucket.org/nemofissiondivision/coreutils.git`
 
-### Who do I talk to? ###
+## ⚖️ License
 
-* Repo owner or admin
-* Other community or team contact
+This package comes with the MIT license.
+
+## 📘 Documentation
+
+The package documentation can be found inside COREutils itself.
+
+## 📞 Contacts
+
+* [**Nicolo' Abrate**](http://www.denerg.polito.it/personale/scheda/(nominativo)/nicolo.abrate) - nicolo.abrate@polito.it
