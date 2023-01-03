@@ -18,8 +18,8 @@ sys.path.append(os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'coreutils'
-copyright = "2020, Nicolo' Abrate, Giuseppe Francesco Nallo, Domenico Valerio"
-author = "Nicolo' Abrate, Giuseppe Francesco Nallo, Domenico Valerio"
+copyright = "2020, Nicolò Abrate"
+author = "Nicolò Abrate"
 
 # The full version, including alpha/beta/rc tags
 release = '1.0.0'

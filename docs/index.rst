@@ -12,6 +12,7 @@ Welcome to coreutils' documentation!
 
    introduction
    core
+   tools
    frenetic/index
    freefem/index
 
