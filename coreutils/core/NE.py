@@ -230,13 +230,13 @@ class NE:
 
         # --- ADD OPTIONAL ARGUMENTS
         if "axplot" in NEargs and NEargs["axplot"] is not None:
-            if not hasattr(self, "NEplot"):
-                self.NEplot = {}
-            self.NEplot['axplot'] = NEargs["axplot"]
+            if not hasattr(self, "plot"):
+                self.plot = {}
+            self.plot['axplot'] = NEargs["axplot"]
         if "radplot" in NEargs and NEargs["radplot"] is not None:
-            if not hasattr(self, "NEplot"):
-                self.NEplot = {}
-            self.NEplot['radplot'] = NEargs["radplot"]
+            if not hasattr(self, "plot"):
+                self.plot = {}
+            self.plot['radplot'] = NEargs["radplot"]
 
     def from_dict(self, inpdict):
         mydicts = ["assemblytypes", "regions", "zcoord", "assemblylabel"]
