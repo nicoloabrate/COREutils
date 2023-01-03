@@ -16,6 +16,14 @@ from numpy import int8, int16, int32, int64, float16, float32, float64, \
                   complex128, zeros, asarray, bytes_
 
 
+_float_types = (float, float16, float32, float64, complex, complex128)
+_int_types = (int, int8, int16, int32, int64)
+_scalar_types = (*_int_types, *_float_types, bool)
+_iter_types = (ndarray, list, dict, tuple, OrderedDict)
+_types = (*_scalar_types, *_iter_types, str, bytes_,
+            h5py._hl.dataset.Dataset, )
+_str2type = {i.__name__: i for i in _types}
+
 class read():
     """
     Class that reads a .hdf5/.h5 file and stores it into an object.
@@ -23,15 +31,6 @@ class read():
     h5name : str
         HDF5 file name that is parsed.
     """
-
-    _float_types = (float, float16, float32, float64, complex, complex128)
-    _int_types = (int, int8, int16, int32, int64)
-    _scalar_types = (*_int_types, *_float_types, bool)
-    _iter_types = (ndarray, list, dict, tuple, OrderedDict)
-    _types = (*_scalar_types, *_iter_types, str, bytes_,
-              h5py._hl.dataset.Dataset, )
-    _str2type = {i.__name__: i for i in _types}
-
     def __init__(self, h5name, metadata=True):
         """
         Read .hdf5/.h5 formatted files and store in object.
@@ -136,7 +135,7 @@ class read():
                 except  NameError:
                     pytype = None
         # if type(item).__name__ in read._str2type:
-        if pytype in read._str2type.values():
+        if pytype in _str2type.values():
             if isinstance(item, h5py._hl.dataset.Dataset):
                 if pytype is str:
                     if item.shape == ():
@@ -147,9 +146,9 @@ class read():
                             val.append(i)
                         val = asarray(val)
                 else:
-                    if pytype in read._scalar_types:
+                    if pytype in _scalar_types:
                         val = array(item, dtype=pytype)[()]
-                    elif pytype in  read._iter_types:
+                    elif pytype in  _iter_types:
                         dt = item.dtype
                         if len(item.shape) == 0:
                             val = asarray(item).item()
@@ -158,9 +157,9 @@ class read():
                             item.read_direct(val)
                     else:
                         raise TypeError(f'Cannot read data {item} with type {type(item)}!')
-            elif pytype in read._scalar_types:
+            elif pytype in _scalar_types:
                 val = pytype(item)
-            elif pytype in read._iter_types:
+            elif pytype in _iter_types:
                 dt = item.dtype
                 if len(item.shape) == 0:
                     val = asarray(item).item()
@@ -346,7 +345,7 @@ class write():
         grptype = type(grp)
         grp = str(grp) if not isinstance(grp, str) else grp
         dt = type(dic).__name__
-        if type(dic).__name__ not in read._str2type.keys():
+        if type(dic).__name__ not in _str2type.keys():
             if dic is not None:
                 dic = dic.__dict__
             else:
@@ -431,7 +430,7 @@ class write():
                 #         write.dict2h5(fh5[dataname], i, obj.__dict__)
                 #     fh5[dataname][str(i)].attrs['pytype'] = str(objtype)
                 # fh5[dataname].attrs['pytype'] = str(type(iterable))
-            elif ittype in [*read._int_types, *read._float_types]:
+            elif ittype in [*_int_types, *_float_types]:
                 fh5.create_dataset(dataname, data=iterable, chunks=True,
                                    compression="gzip", compression_opts=4)
                 fh5[dataname].attrs['pytype'] = str(type(iterable))
@@ -473,7 +472,7 @@ class write():
             _description_
         """
         # --- float and int
-        if isinstance(item, (int64, float64, bytes, int, float)):
+        if isinstance(item, (*_int_types, *_float_types, bytes)):
             fh5[group].create_dataset(str(key), data=item)
         # --- string
         elif isinstance(item, str):
