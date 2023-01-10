@@ -31,15 +31,37 @@ class Core:
     """
     Define NE, TH and CZ core configurations.
 
+    Parameters
+    ----------
+    inpjson: string
+        Path to the input file in .json format.
+
     Attributes
     ----------
     AssemblyGeom : obj
         Object with assembly geometrical features.
     Map : obj
         Object mapping the core assemblies with the different numerations.
+    NAss: int
+        Number of assemblies.
     NE : obj
-        Axial regions defined for NE purposes.
-
+        Object for the NEutronic configuration.
+    TH:
+        Object for the Thermo-Hydraulic configuration.
+    Tc: np.array
+        Array with coolant temperatures for NE data.
+    Tf: np.array
+        Array with fuel temperatures for NE data.
+    TfTc: np.array
+        Array with fuel and coolant temperatures for NE data.
+    TimeEnd: float
+        End simulation time in seconds.
+    dim: int
+        Number of spatial dimensions.
+    power: float
+        Total power in Watt.
+    trans: bool
+        Boolean for transient case.
 
     Methods
     -------
@@ -70,6 +92,28 @@ class Core:
             raise OSError("Input must .h5 or .json file!")
 
     def from_json(self, inpjson, P1consistent=False):
+        """Generate object from .json file.
+
+        Parameters
+        ----------
+        inpjson : string
+            Path to .json input file
+
+        Raises
+        ------
+        OSError
+            If input file is not in .json format
+        OSError
+            If input rotation angle is != 60 for hexagonal
+            assemblies
+        OSError
+            If NE input is not provided
+        OSError
+            If CZ and NE assembly map are not consistent
+        OSError
+            If CZ and TH assembly map are not consistent
+
+        """
         if ".json" not in inpjson:
             raise OSError("Input file must be in .json format!")
         # -- parse input file
@@ -213,6 +257,9 @@ class Core:
         ----------
         h5name : str
             Path to h5 file.
+
+        Returns:
+            None
         """
         h5f = myh5.read(h5name, metadata=False)
         for k, v in h5f.core.items():
@@ -235,13 +282,15 @@ class Core:
         ----------
         assemblynumber : int
             Number of the assembly of interest
+        config: np.array
+            Array defining the assembly arrangement with integers
         isfren : bool, optional
-            Flag for FRENETIC numeration. The default is False.
+            Flag for FRENETIC numeration, by default ``False``
 
         Returns
         -------
         which : int
-            Type of assembly.
+            Type of assembly corresponding to ``assemblynumber``.
 
         """
         if self.dim == 1:
@@ -257,16 +306,17 @@ class Core:
         return which
 
     def writecentermap(self, numbers=True, fren=True, fname="centermap.txt"):
-        """
-        Write centermap to text file.
+        """Write assembly number and x and y coordinates of centers to text file.
 
         Parameters
         ----------
         numbers : bool, optional
-            Write assembly numbers in the first columns. The default is
+            Write assembly numbers in the first columns, by default
             ``True``. If ``False``, the assembly type are written instead.
+        fren : bool, optional
+            Flag for FRENETIC numeration, by default ``False``
         fname : str, optional
-            Centermap file name. The default is "centermap.txt".
+            Centermap file name, by default "centermap.txt".
 
         Returns
         -------
@@ -301,9 +351,13 @@ class Core:
         ----------
         atype : int
             Desired assembly type.
+        config: np.array
+            Array defining the assembly arrangement with integers
         match : bool, optional
             If ``True``, it takes the assemblies matching with atype. If
-            ``False``, it takes all the others. The default is ``True``.
+            ``False``, it takes all the others, by default ``True``.
+        isfren : bool, optional
+            Flag for FRENETIC numeration, by default ``False``
 
         Returns
         -------
@@ -328,21 +382,28 @@ class Core:
     def writecorelattice(self, flatten=False, fname="corelattice.txt",
                          serpheader=False, string=True, whichconf="NE",
                          numbers=False, fren=True, time=0):
-        """
-        Write core lattice to txt file.
+        """Write core lattice to txt file.
 
         Parameters
         ----------
         flatten : bool, optional
-            Flag to print matrix or flattened array. The default is ``False``.
+            Flag to print matrix or flattened array, by default ``False``.
         fname : str, optional
-            File name. The default is "corelattice.txt".
+            File name, by default "corelattice.txt".
         serpheader : bool, optional
             Serpent 2 code instructions for core lattice geometry
-            header. The default is ``False``.
+            header, by default ``False``.
+        string: bool
+            Format of the file entries, by default ``True``.
+        whichconf: string
+            Type of configuration, by default ``"NE"``.
         numbers : bool, optional
             Print assembly numbers instead of assembly names in the core 
             lattice.
+        fren : bool, optional
+            Flag for FRENETIC numeration, by default ``True``
+        time: float
+            Time instant of the desired configuration, in seconds
 
         Returns
         -------
@@ -408,16 +469,3 @@ class Core:
                     comments=comm)
         else:
             return typelabel
-
-    def to_h5(self, name):
-
-        LoaderManager.register_class(
-            Core,                # MyClass type object this loader handles
-            b'Core',             # byte string representing the name of the loader 
-            create_group, # the create dataset function defined in first example above
-            None,                   # usually None
-            CoreContainer,          # the PyContainer to be used to restore content of MyClass
-            True,                   # Set to False to force explicit storage of MyClass instances in any case 
-            None                    # if set to None loader is enabled unconditionally
-            )
-        hkl.dump(self, f'{name}.h5', mode='w')

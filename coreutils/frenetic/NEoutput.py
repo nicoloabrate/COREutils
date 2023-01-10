@@ -28,7 +28,7 @@ from matplotlib import rcParams
 
 class NEoutput:
     """
-    Class to read profiles computed by FRENETIC.
+    Class to read NE profiles computed by FRENETIC.
     """
 
     # default keys for integral parameters (namelist)
@@ -62,30 +62,30 @@ class NEoutput:
     post_process_keys = ['precursTot', 'precurspTot']
 
     distrout_attr = {'fluxadj': 'neutron adjoint flux',
-                    'fluxadjp': 'photon adjoint flux',
-                    'fluxdir': 'neutron direct flux',
-                    'fluxdirp': 'photon direct flux',
-                    'powerfis': 'fission power density',
-                    'powerneu': 'KERMA power density',
-                    'powerpho': 'photon power density',
-                    'powertot': 'total power density',
-                    'precurs': 'delayed neutron precursor concentrations',
-                    'precursp': 'delayed photon precursor concentrations',
-                    'rrd_efis': 'neutron fission energy production rate density',
-                    'rrd_fis': 'neutron fission reaction rate density',
-                    'rrd_ker': 'neutron kerma energy production rate density',
-                    'rrd_kerp': 'photon kerma energy production rate density',
-                    'rrd_lkg': 'neutron leakage rate density',
-                    'rrd_lkgp': 'photon leakage rate density',
-                    'rrd_nfis': 'neutron fission neutron production rate density',
-                    'rrd_sct': 'neutron scattering reaction rate density',
-                    'rrd_sctp': 'photon scattering reaction rate density',
-                    'rrd_src': 'neutron source emission density',
-                    'rrd_srcp': 'photon source emission density',
-                    'rrd_tot': 'neutron total reaction rate density',
-                    'rrd_totp': 'photon total reaction rate density',
-                    'tempfuel': 'coolant temperature',
-                    'tempcool': 'fuel temperature'}
+                     'fluxadjp': 'photon adjoint flux',
+                     'fluxdir': 'neutron direct flux',
+                     'fluxdirp': 'photon direct flux',
+                     'powerfis': 'fission power density',
+                     'powerneu': 'KERMA power density',
+                     'powerpho': 'photon power density',
+                     'powertot': 'total power density',
+                     'precurs': 'delayed neutron precursor concentrations',
+                     'precursp': 'delayed photon precursor concentrations',
+                     'rrd_efis': 'neutron fission energy production rate density',
+                     'rrd_fis': 'neutron fission reaction rate density',
+                     'rrd_ker': 'neutron kerma energy production rate density',
+                     'rrd_kerp': 'photon kerma energy production rate density',
+                     'rrd_lkg': 'neutron leakage rate density',
+                     'rrd_lkgp': 'photon leakage rate density',
+                     'rrd_nfis': 'neutron fission neutron production rate density',
+                     'rrd_sct': 'neutron scattering reaction rate density',
+                     'rrd_sctp': 'photon scattering reaction rate density',
+                     'rrd_src': 'neutron source emission density',
+                     'rrd_srcp': 'photon source emission density',
+                     'rrd_tot': 'neutron total reaction rate density',
+                     'rrd_totp': 'photon total reaction rate density',
+                     'tempfuel': 'coolant temperature',
+                     'tempcool': 'fuel temperature'}
 
     distrout_dim = {'fluxadj': ('ntim', 'ngro', 'nelz', 'nhex'),
                     'fluxadjp': ('ntim', 'ngrp', 'nelz', 'nhex'),
@@ -146,8 +146,7 @@ class NEoutput:
         """
         self.casepath = path
         self.NEpath = os.path.join(path, 'NE')
-        self.THpath = os.path.join(path, 'TH')
-        # look for core file
+        # looking for core file
         self.core = Core(os.path.join(path, 'core.h5'))
 
         self.integralParameters = NEoutput.intout
@@ -202,14 +201,30 @@ class NEoutput:
 
         Parameters
         ----------
-        path : TYPE
-            DESCRIPTION.
-        which : TYPE
-            DESCRIPTION.
+        which: string
+            Name of the variable to be parsed
+        hex: integer or iterable, optional
+            Number of assembly, by default None.
+        t: float or iterable, optional
+            Time instant(s), by default None.
+        z: float or iterable, optional
+            Axial coordinate(s), by default None.
+        pre: integer or iterable, optional
+            Precursor families, by default None.
+        gro: integer or iterable, optional
+            Neutron energy group(s), by default None.
+        grp: integer or iterable, optional
+            Photon energy group(s), by default None.
+        prp: integer or iterable, optional
+            Photon precursor family, by default None.
+        oldfmt: bool, optional
+            Flag to read output in the old txt format. 
+            Default is False.
 
         Returns
         -------
-        None
+        profile: array
+            Output profile requested.
         """
         # look for aliases, e.g., `keff` instead of `eigenvalue dir.`
         tot = False
@@ -275,8 +290,8 @@ class NEoutput:
                 if len(self.core.NE.time) == 1:
                     t = [0]  # time instant, not python index!
             # "times" refers to all time instants
-            nTime = len(self.core.NE.time)
-            if nTime == 1:
+            nTimeConfig = len(self.core.NE.time)
+            if nTimeConfig == 1:
                 times = None
             else:  # parse time from h5 file
                 if oldfmt:
@@ -370,16 +385,16 @@ class NEoutput:
                xlims=None, ylims=None, ylabel=None, geometry=None, oldfmt=False,
                style='sty1D.mplstyle', legend=True, **kwargs):
         """
-        Plot time/axial profile of integral parame. or distribution in hex.
+        Plot time/axial profile of integral param. or distribution in hex.
 
         Parameters
         ----------
         which : string
             Profile name according to FRENETIC namelist.
         zt : ndarray, optional
-            Axial or time grid. The default is None.
+            Axial or time grid, by default None.
         figname : TYPE, optional
-            Name assigned to the figure for saving. The default is None.
+            Name assigned to the figure for saving, by default None.
 
         Returns
         -------
@@ -432,7 +447,7 @@ class NEoutput:
                     idx = v.index(which)
                     uom = self.integralParameters_measure[k][idx]
         # --- parse profile
-        prof = self.get(which, gro=gro, t=t, z=z, grp=grp, pre=pre, prp=prp)
+        prof = self.get(which, gro=gro, hex=hex, t=t, z=z, grp=grp, pre=pre, prp=prp)
         # sum along axes, if total distribution is requested
         if tot:
             dims = self.distrout_dim[which]
@@ -446,8 +461,8 @@ class NEoutput:
             plotvstime = True
         # --- select independent variable
         # it can be time or axial coordinate
-        nTime = len(self.core.NE.time)
-        if nTime == 1:
+        nTimeConfig = len(self.core.NE.time)
+        if nTimeConfig == 1:
             times = None # np.array([0])
         else:  # parse time from h5 file
             if not oldfmt:
@@ -467,7 +482,7 @@ class NEoutput:
 
         if t is None:
             t = [0]  # initial condition
-        if isintegral and nTime == 1:
+        if isintegral and nTimeConfig == 1:
             raise NEOutputError("Cannot plot integral parameter in steady state!")
 
         ax = plt.gca() if ax is None else ax
@@ -505,7 +520,7 @@ class NEoutput:
             igro, igrp, ipre, iprp, idt, idz = self._to_index(igro, igrp, ipre, iprp,
                                                               idt, idz)
 
-            if nTime > 1 and plotvstime:  # plot against time
+            if nTimeConfig > 1 and plotvstime:  # plot against time
                 x = times
                 dim2plot = 'ntim'
                 idx = dims.index('ntim')
@@ -610,43 +625,43 @@ class NEoutput:
         Parameters
         ----------
         label : TYPE, optional
-            DESCRIPTION. The default is False.
+            DESCRIPTION, by default False.
         figname : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         fren : TYPE, optional
-            DESCRIPTION. The default is False.
+            DESCRIPTION, by default False.
         which : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         what : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         usetex : TYPE, optional
-            DESCRIPTION. The default is False.
+            DESCRIPTION, by default False.
         fill : TYPE, optional
-            DESCRIPTION. The default is True.
+            DESCRIPTION, by default True.
         axes : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         cmap : TYPE, optional
-            DESCRIPTION. The default is 'Spectral_r'.
+            DESCRIPTION, by default 'Spectral_r'.
         thresh : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         cbarLabel : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         xlabel : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         ylabel : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         loglog : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         logx : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         logy : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         title : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION, by default None.
         scale : TYPE, optional
-            DESCRIPTION. The default is 1.
+            DESCRIPTION, by default 1.
         fmt : TYPE, optional
-            DESCRIPTION. The default is "%.2f".
+            DESCRIPTION, by default "%.2f".
         **kwargs : TYPE
             DESCRIPTION.
 
@@ -889,7 +904,24 @@ class NEoutput:
         return igro, igrp, ipre, iprp, idt, idz
 
     def _build_label(self, s, dims, dim2plot, usrdict):
+        """Build legend label.
 
+        Parameters
+        ----------
+        s : list
+            Slice for the np.array.
+        dims : list
+            List of dimensions.
+        dim2plot : string
+            Dimension to be plotted.
+        usrdict : dict
+            Dict mapping dimension name and lists.
+
+        Returns
+        -------
+        str
+            Label for the plot.
+        """
         label_dict = {'ngro': 'g', 'ngrp': 'g',
                       'pre': 'p', 'prp': 'p', 'nhex': 'n='}
         dim2plot_dict = {'ntim': 't', 'nelz': 'z'}

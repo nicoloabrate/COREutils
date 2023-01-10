@@ -42,49 +42,51 @@ alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
 
 collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 1))),
                *list(map(lambda z: "Sp"+str(z), range(0, 1))), 'Invv', 'Diffcoef']
-collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
+collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'FissEn']
 
 units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
         'Capt': 'cm^{-1}', 'Abs': 'cm^{-1}', 'Fiss': 'cm^{-1}',
         'NuSf': 'cm^{-1}', 'Remxs': 'cm^{-1}', 'Transpxs': 'cm^{-1}',
-        'Kappa': 'MeV', 'S': 'cm^{-1}', 'Nubar': '-', 'Invv': 's/cm',
-        'Difflenght': 'cm^2', 'Diffcoef': 'cm', 'Flx': 'a.u.'}
+        'FissEn': 'MeV', 'S': 'cm^{-1}', 'Nubar': '-', 'Invv': 's/cm',
+        'Difflenght': 'cm', 'Diffcoef': 'cm', 'Flx': 'a.u.'}
+
 xslabels = {'Chid': 'delayed fiss. emission spectrum', 'Chit': 'total fiss. emission spectrum',
             'Chip': 'prompt fiss. emission spectrum', 'Tot': 'Total xs',
             'Capt': 'Capture xs', 'Abs': 'Absorption xs', 'Fiss': 'Fission xs',
             'NuSf': 'Fiss. production xs', 'Remxs': 'Removal xs', 'Transpxs': 'Transport xs',
-            'Kappa': 'Fiss. energy', 'S': 'Scattering xs', 'Nubar': 'neutrons by fission',
+            'FissEn': 'Fiss. energy', 'S': 'Scattering xs', 'Nubar': 'neutrons by fission',
             'Invv': 'Inverse velocity', 'Difflenght': 'Diff. length', 'Diffcoef': 'Diff. coeff.',
             'Flx': 'Flux spectrum'}
 
 def readSerpentRes(datapath, energygrid, T, beginswith,
                    egridname=False):
-    """Read Serpent res file with Serpent tools
+    """Read Serpent res file with the serpentTools package
 
     Parameters
     ----------
     datapath : str
         Absolute path to NE data
-    T : tuple or `None`
-        Temperatures of fuel and coolant. If ``None``, temperature 
-        dependence is ignored.
+    energygrid: list
+        List containing the energy group boundaries.
+    T: tuple
+        Temperatures of fuel and coolant, in this order.
     beginswith : str
         Prefix of whole name of the file to be read. It can be the name
         of the file, without extension.
+    egridname: str
+        Name of the energy grid.
 
     Returns
     -------
-    res
-        dict of serpentTools parser object
+    res: dict
+        dict of serpentTools parser object whose keys are the fuel and coolant temperatures.
 
     Raises
     ------
     OSError
-        [description]
+        If there is an issue with the NEdata default path inside ``coreutils``.
     OSError
-        [description]
-    OSError
-        [description]
+        If ``serpent`` directory does not exist in the ``datapath`` path.
     """
     # -- serpentTools settings
     st.settings.rc['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod',
@@ -135,20 +137,29 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
 
 
 def Homogenise(materials, weights, mixname, P1consistent=False):
-    """
-    Homogenise multi-group parameters.
+    """Homogenise multi-group parameters.
 
     Parameters
     ----------
-    w : dict
+    materials : dict
+        Dict of ``NEMaterial`` objects to be mixed. The keys are the 
+        name of the materials.
+    weights : dict
+        Dict containing the weights to mix material objects. The keys are the 
+        name of the materials.
+    mixname : str
+        Name of the mixed material.
+    P1consistent : bool, optional
+        Boolean to choose the P1 consistent formalism, by default ``False``
 
     Returns
     -------
-    
+    homogmat: ``NEMaterial``
+        Object containing the homogenised material
     """
     collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(2))),
                     *list(map(lambda z: "Sp"+str(z), range(2))), 'Invv', 'Transpxs']
-    collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
+    collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'FissEn']
     inherit = ['NPF', 'nE', 'egridname', 'beta', 'beta_tot', 'energygrid',
                'lambda', 'lambda_tot', 'L']
     # compute normalisation constants
@@ -189,7 +200,7 @@ def Homogenise(materials, weights, mixname, P1consistent=False):
                 else:
                     notfiss = False
 
-                if key in ['Nubar', 'Kappa']:
+                if key in ['Nubar', 'FissEn']:
                     if i == 0:
                         homogmat.__dict__[key] = w*mat[key]*flx*mat['Fiss']
                     elif notfiss:
@@ -214,7 +225,7 @@ def Homogenise(materials, weights, mixname, P1consistent=False):
                 continue
     # normalise group constants
     hd = homogmat.__dict__
-    for key in ['Nubar', 'Kappa']:
+    for key in ['Nubar', 'FissEn']:
         tmp = np.divide(hd[key], FISSRR, where=FISSRR!=0)
         hd[key] = tmp
     for key in ['Chit', 'Chip', 'Chid']:
@@ -228,52 +239,99 @@ def Homogenise(materials, weights, mixname, P1consistent=False):
     homogmat.datacheck(P1consistent=P1consistent)
     return homogmat
 
+
 class NEMaterial():
-    """Create material regions with multi-group constants."""
+    """Create material regions with multi-group constants.
+
+    Parameters
+    ----------
+    uniName: str
+        Universe name.
+    energygrid: iterable
+        Energy group structure containing nE+1 group boundaries where nE is the
+        number of energy groups.
+    datapath: str, optional
+        Path to the file containing the data, by default ``None``. If ``None``,
+        data are taken from the local database.
+    egridname : str, optional
+        Name of the energy group structure, by default ``None``.
+    h5file: object
+        h5 group from .h5 files.
+    reader: str``
+        Type or reader. It can be ``'serpent'``, ``'json'`` or ``'txt'``.
+    serpres: :class:`serpentTools.ResultsReader`
+        Object created parsing the _res.m Serpent file with ``serpentTools``
+    basename : bool or str
+        if not ``False``, base name is used to compose the filenames, which 
+        needs to be in the form <basename>_Tf_XXX_Tc_XXX. 
+    temp: tuple
+        if ``basename`` is not None, directories in the form 
+        "Tf_{}_Tc_{}" are searched  and "Tf_{}_Tc_{}" suffix 
+        is attached to the file name
+    datacheck: bool, optional
+        Flag to check and ensure data consistency, by default ``True``.
+    init: bool, optional
+        Flag to initialise the object as empty, by default ``False``
+    P1consistent : bool, optional
+        Boolean to choose the P1 consistent formalism, by default ``False``
+
+    Attributes
+    ----------
+    nE: int
+        Number of energy groups.
+    egridname: str
+        Name of the energy grid.
+    energygrid: list
+        List of energy group boundaries.
+    UniName: str
+        Name of the material.
+    NPF: int
+        Number of neutron precursors families.
+    L: int
+        Scattering anisotropy order
+    Tot: np.array
+        1D array of length ``nE`` with the total cross section in cm^-1.
+    Abs: np.array
+        1D array of length ``nE`` with the absorption cross section in cm^-1.
+    Capt: np.array
+        1D array of length ``nE`` with the capture cross section in cm^-1.
+    Fiss: np.array
+        1D array of length ``nE`` with the fission cross section in cm^-1.
+    Remxs: np.array
+        1D array of length ``nE`` with the removal cross section in cm^-1.
+    Transpxs: np.array
+        1D array of length ``nE`` with the transport cross section in cm^-1.
+    NuSf: np.array
+        1D array of length ``nE`` with the fission production cross section in cm^-1.
+    Diffcoef: np.array
+        1D array of length ``nE`` with the diffusion coefficient in cm.
+    Difflength: np.array
+        1D array of length ``nE`` with the diffusion length in cm.
+    S0: np.array
+        2D array of size ``(nE, nE)`` with the scattering matrix cross section in cm^-1.
+    Chit: np.array
+        1D array of size ``nE`` with the total fission emission spectrum.
+    Chip: np.array
+        1D array of size ``nE`` with the prompt fission emission spectrum.
+    Chid: np.array
+        1D array of size ``nE`` with the delayed fission emission spectrum.
+    Nubar: np.array
+        1D array of size ``nE`` with the number of neutrons emitted by fission.
+    Invv: np.array
+        1D array of size ``nE`` with the inverse of the neutron velocity in s/cm.
+    lambda: np.array
+        1D array of size ``NPF`` with the decay constants of the precursors.
+    beta: np.array
+        1D array of size ``NPF`` with the delayed neutron fracitons.
+    Flx: np.array
+        1D array of size ``nE`` with the flux energy spectrum in arbitrary units.
+
+    
+    """
 
     def __init__(self, uniName=None, energygrid=None, datapath=None,
                  egridname=None, h5file=None, reader='json', serpres=None,
                  basename=False, temp=False, datacheck=True, init=False, P1consistent=False):
-        """
-        Initialise object.
-
-        Parameters
-        ----------
-        uniName : str
-            Universe name.
-        energygrid : iterable
-            Energy group structure.
-        datapath : str, optional
-            Path to the file containing the data. If ``None``,
-            data are taken from the local database.
-            The default is None.
-        egridname : str, optional
-            Name of the energy group structure. The default is ``None``.
-        h5file: object
-            h5 group from .h5 files.
-        reader : str
-            Type or reader. It can be 'serpent', 'json' or 'txt'.
-        serpres : object
-            Object created parsing the _res.m Serpent file with 
-            serpentTools
-        basename : bool or str
-            if not ``False``, base name is used to compose the filenames, which 
-            needs to be in the form <basename>_Tf_XXX_Tc_XXX. 
-        temp : tuple
-            if ``basename`` is not None, directories in the form 
-            "Tf_{}_Tc_{}" are searched  and "Tf_{}_Tc_{}" suffix 
-            is attached to the file name
-        
-        Raises
-        ------
-        OSError
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
-        """
         if h5file:
             if isinstance(h5file, dict):
                 for k, v in h5file.items():
@@ -352,7 +410,7 @@ class NEMaterial():
 
                     if temp:
                         dirTfTc = f"Tf_{Tf}_Tc_{Tc}"
-                        dirTcTf = f"Tc_{Tc}_Tf_{Tf}"                                   
+                        dirTcTf = f"Tc_{Tc}_Tf_{Tf}"
                         if Path(path.join(tpath, dirTfTc)).exists():
                             spath = path.join(tpath, dirTfTc, filename)
                         elif Path(path.join(tpath, dirTcTf)).exists():
@@ -400,7 +458,7 @@ class NEMaterial():
 
         Parameters
         ----------
-        filename : str
+        path: str
             Path to json file.
 
         Returns
@@ -417,7 +475,27 @@ class NEMaterial():
                 self.__dict__[k] = v
 
     def _readserpentres(self, serpres, uniName, nE, egridname):
+        """Transform :class:`serpentTools.ResultsReader` object 
+            into :class:``coreutils.NEMaterial`` object.
 
+        Parameters
+        ----------
+        serpres : dict
+            Dictionary of :class:`serpentTools.ResultsReader` objects.
+        uniName : str
+            Name of the material.
+        nE: int
+            Number of energy groups.
+        egridname: str
+            Name of the energy grid.
+
+        Raises
+        ------
+        OSError
+            If the material indicated by ``UniName`` is not available.
+        OSError
+            If the number of energy groups indicated by ``nE`` is not available.
+        """        
         data = None
         for res in serpres.values():
             try:
@@ -434,13 +512,15 @@ class NEMaterial():
 
         selfdic = self.__dict__
         for my_key in serp_keys:
-
             if my_key.startswith('infS') or my_key.startswith('infSp'):
                 vals = np.reshape(data.infExp[my_key], (nE, nE), order='F')
             else:
                 vals = data.infExp[my_key]
 
-            selfdic[my_key.split('inf')[1]] = vals
+            if 'Kappa' in my_key:
+                selfdic['FissEn'] = vals
+            else:
+                selfdic[my_key.split('inf')[1]] = vals
 
         # kinetics parameters
         selfdic['beta'] = res.resdata['fwdAnaBetaZero'][::2]
@@ -474,7 +554,7 @@ class NEMaterial():
             * Chid: delayed emission spectrum [-]
             * Nsf: fission production cross section [cm^-1]
             * Nubar: neutron multiplicities [-]
-            * Kappa: average fission deposited heat [MeV]
+            * FissEn: average fission deposited heat [MeV]
             * Invv: particle inverse velocity [s/cm]
             * S0, S1, S2,... : scattering matrix cross section [cm^-1]
             * Sp0, Sp1, Sp2,... : scattering production matrix cross section
@@ -534,8 +614,7 @@ class NEMaterial():
                     selfdic[key] = np.asarray(data)
 
     def getxs(self, key, pos1=None, pos2=None):
-        """
-        Get material data (for a certain energy group, if needed).
+        """Get material data (for a certain energy group, if needed).
 
         Parameters
         ----------
@@ -576,19 +655,43 @@ class NEMaterial():
 
         return vals
 
-    def plot(self, what, dep_group=None, family=1, ax=None, figname=None,
+    def plot(self, what, depgro=False, family=1, ax=None, figname=None,
              normalise=True, **kwargs):
+        """Plot multi-group data from the object.
 
+        Parameters
+        ----------
+        what : str
+            Data to be plotted.
+        depgro : int, optional
+            Departure energy group, by default ``False``. This argument is needed to plot
+            the scattering cross section.
+        family : int, optional
+            Number of neutron precursor family, by default 1
+        ax : `matplotlib.axes.Axes`, optional
+            Ax on which to plot the data, by default `None`. If not provided,
+            a new figure is created.
+        figname : str, optional
+            Figure name with its extension, by default ``None``
+        normalise : bool, optional
+            Normalisation flag, by default ``True``
+
+        Raises
+        ------
+        OSError
+            If the ``depgro`` argument is not provided when the data to be plotted
+            is the scattering matrix.
+        """        
         E = self.energygrid
         ax = ax or plt.gca()
         xs = self.__dict__[what]
         whatlabel = xslabels[what]
         if 'S' in what:
-            if dep_group:
-                xs = xs[dep_group, :]
-                whatlabel = f'{xslabels[what]} from g={dep_group}'
+            if depgro:
+                xs = xs[depgro, :]
+                whatlabel = f'{xslabels[what]} from g={depgro}'
             else:
-                raise OSError('Material.plot: dep_group variable needed!')
+                raise OSError('Material.plot: depgro variable needed!')
         elif what == 'Chid':
             xs = xs[family-1, :]
         elif what == 'Flx':
@@ -627,16 +730,25 @@ class NEMaterial():
             plt.savefig(f"{figname}.png")
 
     def perturb(self, what, howmuch, depgro=None, sanitycheck=True, P1consistent=False):
-        """
-
-        Perturb material composition.
+        """Perturb material composition.
 
         Parameters
         ----------
-        what : TYPE
-            DESCRIPTION.
-        howmuch : TYPE
-            DESCRIPTION.
+        what : str
+            Type of perturbation. If ``what="density"``, the density of the 
+            material is perturbed, otherwise the other data can be perturbed by
+            indicating the data. For instance, ``what="Fiss"`` or ``what="Nubar"`.
+        howmuch : list or float
+            Magnitude of the perturbation. If list, its length must be equal to
+            ``nE``, and the perturbation is applied to each group. If it is a float,
+            the perturbation is applied to the material density. 
+        depgro : int, optional
+            Departure energy group, by default ``False``. This argument is needed to perturb
+            the scattering cross section.
+        sanitycheck: bool, optional
+            Flag to check and ensure data consistency, by default ``True``.
+        P1consistent : bool, optional
+            Boolean to choose the P1 consistent formalism, by default ``False``
 
         Returns
         -------
@@ -713,8 +825,12 @@ class NEMaterial():
             self.datacheck(P1consistent=P1consistent)
 
     def datacheck(self, P1consistent=False):
-        """
-        Check data consistency and add missing data.
+        """Check data consistency and add missing data.
+
+        Parameters
+        ----------
+        P1consistent : bool, optional
+            Boolean to choose the P1 consistent formalism, by default ``False``
 
         Returns
         -------
@@ -792,10 +908,10 @@ class NEMaterial():
                       'Forcing normalisation...')
             # ensure pdf normalisation
             self.Chit /= self.Chit.sum()
-            if "Kappa" not in self.__dict__.keys():
-                self.Kappa = np.array([200]*self.nE)
+            if "FissEn" not in self.__dict__.keys():
+                self.FissEn = np.array([200]*self.nE)
         else:
-            self.Kappa = np.array([0]*self.nE)
+            self.FissEn = np.array([0]*self.nE)
 
         kincons = True
         for s in kinetics:
@@ -863,65 +979,14 @@ class NEMaterial():
                 self.Chit = np.zeros((self.nE, ))
                 self.Chip = np.zeros((self.nE, ))
                 self.Chid = np.zeros((self.NPF, self.nE))
-  
-    def void(self, keepXS=None, sanitycheck=True):
-        """
-        Make region void except for some group-wise user-specified reaction.
+
+    def to_json(self, fname=None):
+        """Dump object to json file.
 
         Parameters
         ----------
-        what : str
-            DESCRIPTION.
-        where : ndarray
-            DESCRIPTION.
-        howmuch : float
-            DESCRIPTION.
-        system : object
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
-        """
-        # add anisotropic XS
-        for ll in range(self.L):
-            new = f'S{ll}'
-            newP = f'Sp{ll}'
-            if new not in alldata:
-                alldata.append(new)
-            if newP not in alldata:
-                alldata.append(newP)
-
-        allkeys = False
-        if isinstance(keepXS, dict):
-            if 'all' in keepXS['reaction']:
-                allkeys = True
-                keepXS['reaction'] = []
-
-        mydic = self.__dict__
-        for what in mydic.keys():
-            if allkeys:
-                keepXS['reaction'].append(what)
-            if what in alldata:
-                if isinstance(keepXS, dict):
-                    # keep or reject whole reaction channel
-                    if what in keepXS['reaction']:
-                        if 'energy' in keepXS.keys():
-                            if keepXS['energy'] == 'all':
-                                pass
-                            else:
-                                for g in range(self.nE):
-                                    if g+1 not in keepXS['energy']:
-                                        mydic[what][g] = 0
-                    else:
-                        mydic[what][:] = 0
-                else:
-                    mydic[what][:] = 0
-
-    def to_json(self, fname=None):
-        """
-        Dump object to json file.
+        fname: str, optional
+            Filename, by default ``None``.
 
         Returns
         -------
@@ -942,13 +1007,19 @@ class NEMaterial():
             json.dump(tmp, f, sort_keys=True, indent=10)
 
     def collapse(self, fewgrp, spectrum=None, egridname=None, P1consistent=False):
-        """
-        Collapse in energy the multi-group data.
+        """Collapse in energy the multi-group data.
 
         Parameters
         ----------
         fewgrp : iterable
             Few-group structure to perform the collapsing.
+        spectrum: array, optional
+            Spectrum to perform the energy collapsing, by default ``None``. If ``None``,
+            the ``Flx`` attribute is used as a weighting spectrum.
+        egridname: str, optional
+            Name of the energy grid, by default ``None``.
+        P1consistent : bool, optional
+            Boolean to choose the P1 consistent formalism, by default ``False``
 
         Raises
         ------
@@ -1064,187 +1135,38 @@ class NEMaterial():
         # ensure data consistency
         self.datacheck()
 
-
     def isfiss(self):
+        """Assess whether the material is fissile"""
         return self.Fiss.max() > 0
-
-class NEMix(NEMaterial):
-    # TODO check this actually works!
-    """Create regions mixing other materials."""
-
-    def __init__(self, *, universes, densities=None, energygrid, datapath=None,
-                 egridname=None, reader='json', mixname=None, P1consistent=False):
-        """
-        Initialise object.
-
-        Parameters
-        ----------
-        uniName : str
-            Universe name.
-        energygrid : iterable
-            Energy group structure.
-        datapath : str, optional
-            Path to the file containing the data. If None,
-            data are taken from the local database.
-            The default is None.
-        egridname : str, optional
-            Name of the energy group structure. The default is None.
-
-        Raises
-        ------
-        OSError
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
-        """
-        nE = len(energygrid)-1
-        egridname = egridname if egridname else f"{nE}G"
-
-        if densities is not None:
-            if len(universes) != len(densities):
-                raise OSError('Number of regions and number of densities mismatch')
-        else:
-            densities = np.ones(len(universes))
-
-        idx = 0
-        nMat = len(universes)
-        materials = dict(zip(universes, densities))
-        xsf = {}
-        fissionprod = np.zeros((nE, nMat))
-        totfissxs = np.zeros((nE, ))
-        betatot = np.zeros((nMat, ))
-        beta = []
-        for k, v in materials.items():
-            xsf[k] = {}
-            if datapath is not None:
-                kpath = datapath[k]
-            else:
-                kpath = None
-
-            mat = NEMaterial(uniName=k, energygrid=energygrid, datapath=kpath,
-                           egridname=egridname, reader=reader)
-            # density multiplication and summation
-            for s in mat.__dict__.keys():
-                if s in collapse_xs:
-                    if idx == 0:
-                        self.__dict__[s] = densities[idx]*mat.__dict__[s]
-                    else:
-                        self.__dict__[s] += densities[idx]*mat.__dict__[s]
-
-            fissionprod[:, idx] = mat.Nubar*mat.Fiss
-            totfissxs += mat.Fiss
-            xsf[k]['Fiss'] = mat.Fiss
-            for s in collapse_xsf:
-                xsf[k][s] = mat.__dict__[s]
-                self.__dict__[s] = np.zeros(mat.__dict__[s].shape)
-
-            if 'beta' in mat.__dict__.keys():
-                NPF = mat.NPF
-                self.beta = np.zeros((NPF, ))
-                self.Chid = np.zeros((NPF, nE))
-                beta.append(mat.beta)
-            if 'lambda' in mat.__dict__.keys():
-                self.__dict__['lambda'] = np.zeros((mat.NPF, ))
-                xsf[k]['lambda'] = mat.__dict__['lambda']
-
-            idx += 1
-
-        beta = np.asarray(beta)
-        if self.Fiss.max() > 0:
-            for i, k in enumerate(materials.keys()):
-                fiss = xsf[k]['Fiss']
-                nuba = xsf[k]['Nubar']
-                # mix Nubar
-                self.Nubar += fiss*nuba
-                # mix emission spectra            
-                self.Chit += xsf[k]['Chit']*np.sum(fiss*nuba)
-                if beta.max() > 0:
-                    self.beta += beta[i, :]*np.sum(fiss*nuba)
-                    betatot[i] = beta[i, :].sum()
-                    self.Chip += xsf[k]['Chip']*np.sum(fiss*nuba*(1-betatot[i]))
-                    for f in range(NPF):
-                        self.Chid[f, :] += xsf[k]['Chid'][f, :]*np.sum(fiss*nuba*beta[i, f])
-                if 'lambda' in xsf[k].keys():
-                    self.__dict__['lambda'] = xsf[k]['lambda']
-                # mix fission heat
-
-            self.Nubar = self.Nubar/totfissxs
-            self.beta = self.beta/fissionprod.sum()
-            self.Chit = self.Chit/fissionprod.sum()
-            self.Chip = self.Chip/(fissionprod*(1-betatot)).sum()
-            # FIXME Fission energy is missing!
-            for f in range(NPF):
-                self.Chid[f, :] = self.Chid[f, :]/(fissionprod*beta[:, f]).sum()
-      
-        # # TODO FIXME
-        # if self.Fiss.max() > 0:
-        #     for s in collapse_xsf:
-        #         nu = mat.__dict__['Nubar'] if 'Chi' in s else 1
-        #         self.__dict__[s] = self.__dict__[s]/np.sum(mat.__dict__['Fiss']*nu)
-
-        if mixname is None:
-            mixname = '_'.join(universes)
-
-        self.nE = nE
-        self.egridname = egridname
-        self.energygrid = energygrid
-        self.UniName = mixname
-
-        try:
-            self.NPF = (self.beta).size
-        except AttributeError:
-            print('Kinetic parameters not available!')
-            self.NPF = None
-
-        # --- complete data and perform sanity check
-        L = 0
-        datastr = list(self.__dict__.keys())
-        # //2 since there are 'S' and 'Sp'
-        S = sum('S' in s for s in datastr)//2
-        self.L = S if S > L else L  # get maximum scattering order
-        self.datacheck(P1consistent=P1consistent)
 
 
 class CZMaterialData:
     """
-    Assign material data TH to reactor core.
+    Assign TH material data to the reactor core.
+
+    Parameters
+    ----------
+    mflow: list
+        List with mass flow rates, one for each cooling zone.
+    pressures: list
+        List with pressures, one for each cooling zone.
+    temperatures: list
+        List with temperatures, one for each cooling zone.
+    CZassemblynames: list
+        List with cooling zone names, sorted consistently with the
+        physical parameter lists.
 
     Attributes
     ----------
-    THdata : dict
-        Dictionary storing objects with macro-group constants parsed by
-        serpentTools.
-    THtemp : list
-        List with tuples (Tf, Tc).
-
-    Methods
-    -------
-    ``None``
+    mflow: dict
+        Dict with mass flow rates. The keys are the cooling zone.
+    pressures: dict
+        Dict with pressures. The keys are the cooling zone.
+    temperatures: dict
+        Dict with temperatures. The keys are the cooling zone.
     """
 
     def __init__(self, mflow, pressures, temperatures, CZassemblynames):
-        """
-        Initialise object.
-
-        Parameters
-        ----------
-        mflow: list
-            List with mass flow rates, one for each cooling zone.
-        pressures: list
-            List with pressures, one for each cooling zone.
-        temperatures: list
-            List with temperatures, one for each cooling zone.
-        CZassemblynames: list
-            List with cooling zone names, sorted consistently with the
-            physical parameter lists.
-
-        Returns
-        -------
-        ``None``
-        """
         # check length consistency
         if mflow is not None:
             if len(mflow) != len(CZassemblynames):
@@ -1266,6 +1188,7 @@ class CZMaterialData:
                               "with the number of the cooling zones!")
             else:
                 self.pressures = dict(zip(CZassemblynames, pressures))
+
 
 class NEMaterialError(Exception):
     pass

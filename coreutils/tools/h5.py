@@ -40,7 +40,7 @@ class read():
         h5name : string
             File where data are stored.
         metadata : bool, optional
-            bool to choose if metadata are parsed or ignored. Default is
+            bool to choose if metadata are parsed or ignored, by default
             ``True``.
 
         Returns
@@ -265,7 +265,7 @@ class write():
         compression : bool, optional
             Flag to save compressed HDF5.
         overwrite : bool, optional
-            Flag to overwrite HDF5. Default is ``True``.
+            Flag to overwrite HDF5, by default ``True``.
 
         Returns
         -------
@@ -462,9 +462,9 @@ class write():
         item : object
             Item to be dumped
         attributes : object, optional
-            attributes object, by default None
+            attributes object, by default `None`
         skip : iterable, optional
-            list of sub-items to be skipped, by default None
+            list of sub-items to be skipped, by default `None`
 
         Raises
         ------

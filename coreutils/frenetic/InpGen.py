@@ -49,13 +49,13 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
     json : str
         Absolute path of the ``.json`` input file.
     casename : str, optional
-        File path where the case directory is located. Default is ``None``.
+        File path where the case directory is located, by default ``None``.
         In this case, the name of the FRENETIC case is 'case1'.
     templates : dict, optional
-        File path where the template files are located. Default is ``None``.
+        File path where the template files are located, by default ``None``.
         In this case, the default template is used.
     H5fmt : bool, optional
-        Set ``True`` to print NE data also in txt format. Default is ``False``.
+        Set ``True`` to print NE data also in txt format, by default ``False``.
 
     Returns
     -------
@@ -92,7 +92,6 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
     move('coreutils_info.txt', join(AUXpath, 'coreutils_info.txt'))
 
     # --- save core object to root directory
-    # core.to_h5('core')
     corefname = 'core.h5'
     grp_name = 'core'
     myh5.write(core, grp_name, corefname, chunks=True, compression=True,
@@ -441,10 +440,10 @@ def makecommoninput(core, template=None):
     core : obj
         Core object created with Core class.
     template : str, optional
-        File path where the template file is located. Default is ``None``.
+        File path where the template file is located, by default ``None``.
         In this case, the default template is used.
     tEnd : float, optional
-        Final time instant for FRENETIC simulation. Default is ``None``.
+        Final time instant for FRENETIC simulation, by default ``None``.
     Returns
     -------
     ``None``
@@ -523,7 +522,7 @@ def mkdir(dirname, indirs=None):
     dirname : string
         directory name
     indirs : list, optional
-        List of directories where the new directory is created. Default is
+        List of directories where the new directory is created, by default
         ``None``
 
     Returns

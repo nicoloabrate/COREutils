@@ -16,54 +16,52 @@ class Map:
     """
     Build the nuclear reactor core geometry map defined in a file.
 
+    Parameters
+    ----------
+    geinp: str or np.array
+        If ``str`` it is the <Path/filename> of the input file containing the
+        geometry arrangement of the core, if ``np.array`` the geometry
+        arrangement is already defined by the user.
+    rotangle: int
+        rotation angle over which the arrangement is symmetrically rotated.
+        The rotation angle should be passed in degree (only 0,60,45,90,180
+        values are allowed). With rotangle=0 no rotation occurs.
+    AssRadGeom : ``AssemblyGeometry``
+        Assembly radial geometry object.
+    regionsdict: dict
+    inp: np.array
+        2D array representing the reactor core sector defined in input.
+        The entries represent the assembly types.
+    inpdict: dict
+        Input dictionary, by default ``False``
+
+
     Attributes
     ----------
-    inp : ndarray
-
-    type : ndarray
-
-    rotation_angle : int
+    inp: np.array
+        2D array representing the reactor core sector defined in input.
+        The entries represent the assembly types.
+    type: np.array
+        The geometry arrangement of the core.
+    rotation_angle: int
         Rotation angle employed to unfold the input geometry
-    Nx : int
+    Nx: int
         Number of assemblies along x
-    Ny : int
+    Ny: int
         Number of assemblies along y
-    fren2serp : dict
-        Dictionary mapping FRENETIC numeration to Serpent 2 one.
-    serp2fren : dict
-        Dictionary mapping Serpent 2 numeration to FRENETIC one.
-    serpcentermap : dict
+    fren2serp: dict
+        Dictionary mapping the assemblies according to the FRENETIC numeration 
+        to the one employed by Serpent 2.
+    serp2fren: dict
+        Dictionary mapping the assemblies according to the Serpent 2 numeration 
+        to the one employed by FRENETIC.
+    serpcentermap: dict
         Dictionary mapping assembly number to its center coordinates.
 
-    Methods
-    -------
-    ``None``
     """
 
     def __init__(self, geinp=None, rotangle=None, AssRadGeom=None,
                  regionsdict=None, inp=None, inpdict=None):
-        """
-        Initialise the object.
-
-        Parameters
-        ----------
-        geinp: str or ndarray
-            If ``str`` <Path/filename> of the input file containing the
-            geometry arrangement of the core, if ``ndarray`` the geometry
-            arrangement is already defined by the user.
-        rotangle: int
-            rotation angle over which the arrangement is symmetrically rotated.
-            The rotation angle should be passed in degree (only 0,60,45,90,180
-            values are allowed).
-            With rotangle=0 no rotation occurs.
-        AssRadGeom : obj
-            Assembly radial geometry object.
-
-        Returns
-        -------
-        ``None``
-
-        """
         if inpdict is None:
             self._init(geinp, rotangle, AssRadGeom, regionsdict, inp)
         else:
@@ -75,7 +73,6 @@ class Map:
             core = UnfoldCore(geinp, rotangle, regionsdict)
             self.inp = core.inp
             self.type = core.coremap
-
         else:
             self.inp = inp
             self.type = geinp
@@ -109,7 +106,7 @@ class Map:
 
         Parameters
         ----------
-        sext : int
+        sext: int
             Sextant number. The first sextant is obtained drawing an angle of 60 degrees in the quadrant x>0, y>0. Then the
             others are obtained moving counter-clockwise.
         """
@@ -120,16 +117,28 @@ class Map:
         return whichSA
 
     def _from_dict(self, inpdict):
+        """Parse object from dictionary.
+
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
         for k, v in inpdict.items():
             setattr(self, k, v)
 
     def __findcenters(self, AssRadGeom):
-        """
-        Compute x and y coordinates of the centers of each assembly.
+        """Compute x and y coordinates of the centers of each assembly.
+        
+        Parameters
+        ----------
+        AssRadGeom: ``AssemblyGeometry``
+            Assembly radial geometry object.
 
         Returns
         -------
-        coord : tuple
+        coord: tuple
             Tuple of x and y coordinates of the centers of each assembly.
 
         """
@@ -206,16 +215,16 @@ class Map:
         return coord
 
     def __drawserpmap(self, AssRadGeom):
-        """
-        Define the core map  according to Serpent 2 code ordering.
+        """Define the core map  according to Serpent 2 code ordering.
 
         Parameters
         ----------
-        ``None``
+        AssRadGeom: ``AssemblyGeometry``
+            Assembly radial geometry object.
 
         Returns
         -------
-        serpmap : ndarray
+        serpmap : np.array
             Array with assembly numbers
 
         """
@@ -240,16 +249,16 @@ class Map:
         return sermap
 
     def __drawfrenmap(self):
-        """
-        Define the core map  according to FRENETIC code ordering.
+        """Define the core map  according to FRENETIC code ordering.
 
         Parameters
         ----------
-        ``None``
+        AssRadGeom: ``AssemblyGeometry``
+            Assembly radial geometry object.
 
         Returns
         -------
-        frenmap : ndarray
+        frenmap : np.array
             Array with assembly numbers
 
         """

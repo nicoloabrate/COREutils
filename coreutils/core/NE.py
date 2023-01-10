@@ -258,7 +258,7 @@ class NE:
         repl : dict
             Dictionary with SA name as key and list of SAs to be replaced as value
         isfren : bool, optional
-            Flag for FRENETIC numeration. The default is ``False``.
+            Flag for FRENETIC numeration, by default ``False``.
 
         Returns
         -------
@@ -299,7 +299,6 @@ class NE:
 
             self.config[float(time)] = newcore
 
-
     def replace(self, core, rpl, time, isfren=False, action='repl', P1consistent=False):
         """
         Replace full assemblies or axial regions.
@@ -315,7 +314,7 @@ class NE:
         Parameters
         ----------
         isfren : bool, optional
-            Flag for FRENETIC numeration. The default is ``False``.
+            Flag for FRENETIC numeration, by default ``False``.
 
         Returns
         -------
@@ -624,7 +623,6 @@ class NE:
         #         repl = {"which": [assbly], "with": [prtreg], "where": [zpert]}
         #         self.replace(core, repl, time, isfren=isfren, action=action, P1consistent=P1consistent)
 
-
     def perturb(self, core, prt, time=0, sanitycheck=True, isfren=True,
                 action='pert', P1consistent=False):
         """
@@ -785,7 +783,7 @@ class NE:
         transconfig : dict
             Dictionary with details on translation transformation
         isfren : bool, optional
-            Flag for FRENETIC numeration. The default is ``False``.
+            Flag for FRENETIC numeration, by default ``False``.
 
         Returns
         -------

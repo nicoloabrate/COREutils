@@ -41,11 +41,6 @@ class TH:
     time : list
         Neutronics time instants when configuration changes.
 
-    Methods
-    -------
-    perturbBCs :
-        Replace assemblies with user-defined new or existing type.
-
     """
     def __init__(self, THargs=None, CI=None, inpdict=None):
 
@@ -124,28 +119,6 @@ class TH:
                     if "replace" in config[time]:
                         self.replaceSA(CI, config[time]["replace"], time, configtype=configtype, isfren=True)
 
-        # # --- build time-dependent core configuration
-        # if CZconfig is not None:
-        #     for time in CZconfig.keys():
-        #         if time != '0':
-        #             t = float(time)
-        #             # increment time list
-        #             self.time.append(t)
-        #         else:
-        #             # set initial condition
-        #             t = 0
-        #         # check operation
-        #         if CZconfig[time] == {}:  # enforce constant properties
-        #             nt = self.time.index(float(time))
-        #             now = self.time[nt-1]
-        #             self.CZconfig[float(time)] = self.CZconfig[now]
-
-        #         if "perturbBCs" in config[time]:
-        #             self.perturb(CI, CZconfig[time]["perturb"], time, configtype="CZ", isfren=NEfren)
-
-        #         if "replace" in config[time]:
-        #             self.replaceSA(CI, CZconfig[time]["replace"], time, configtype="CZ", isfren=NEfren)
-
         # assign material properties
         cz = CZMaterialData(THargs['massflowrates'], THargs['pressures'], 
                             THargs['temperatures'], self.CZassemblytypes.values())
@@ -195,7 +168,7 @@ class TH:
         repl : dict
             Dictionary with SA name as key and list of SAs to be replaced as value
         isfren : bool, optional
-            Flag for FRENETIC numeration. The default is ``False``.
+            Flag for FRENETIC numeration, by default ``False``.
 
         Returns
         -------
@@ -255,7 +228,7 @@ class TH:
         asslst : list
             List of assemblies to be replaced.
         isfren : bool, optional
-            Flag for FRENETIC numeration. The default is ``False``.
+            Flag for FRENETIC numeration, by default ``False``.
 
         Returns
         -------

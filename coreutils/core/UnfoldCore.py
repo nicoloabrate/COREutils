@@ -23,16 +23,6 @@ class UnfoldCore:
         2D array representing the reactor core sector defined in input.
         The entries represent the assembly types
 
-    Methods
-    -------
-    rot45(coremap, N):
-        Perform a counterclockwise 45° rotation.
-    rot60(coremap):
-        Perform a counterclockwise 60° rotation.
-    rot90(coremap, N):
-        Perform a counterclockwise 90° rotation.
-    rot180(coremap, N):
-        Perform a counterclockwise 180° rotation.
     """
 
     def __init__(self, inpge, rotangle, regionsdict):
@@ -124,19 +114,18 @@ class UnfoldCore:
 
     @staticmethod
     def rot45(coremap, N):  # square geometry
-        """
-        Perform a counterclockwise 45° rotation.
+        """Perform a counterclockwise 45° rotation.
 
         Parameters
         ----------
-        coremap: array[int]
+        coremap: np.array[int]
             2D array representing a 45° portion of the reactor core
         N: int
             number of nonzero elements in the file
 
         Returns
         -------
-        coremap: array[int]
+        coremap: np.array[int]
             2D array representing the whole reactor core
         """
         # use numpy methods to perform rotation and generate 1/4 of the core

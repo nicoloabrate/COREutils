@@ -11,7 +11,18 @@ from coreutils.tools.utils import MyDict
 
 class AssemblyGeometry:
     """
-    Define geometrical quantities for an assembly in the x-y plane.
+    Define an assembly object in the x-y plane.
+
+    Parameters
+    ----------
+    pitch: float, optional
+        Pitch of the assembly, by default ``None``. If ``None``, it 
+        assumed that the object is parsed from a dictionary.
+    asstype: string, optional
+        It can be "H" (hexagonal) or "S" (squared), by default ``None``.
+        If ``None``, it assumed that the object is parsed from a dictionary.
+    inpdict: dict, optional
+        Object stored as a dict, by default ``None``.
 
     Attributes
     ----------
@@ -33,19 +44,6 @@ class AssemblyGeometry:
     """
 
     def __init__(self, pitch=None, asstype=None, inpdict=None):
-        """
-        Define geometrical quantities for an assembly in the x-y plane.
-
-        Parameters
-        ----------
-        pitch: float
-            Assembly pitch inside the core
-
-        Returns
-        -------
-        ``None``
-
-        """
         if inpdict is None:
             self._init(pitch, asstype)
         else:
@@ -77,17 +75,26 @@ class AssemblyGeometry:
 
         Parameters
         ----------
-        height : float
+        height: float
             Axial width considered for the volume.
 
         Returns
         -------
-        volume : float
+        volume: float
             Volume of the assembly slice
         """
-        return self.area*height
+        volume = self.area*height
+        return volume
 
     def _from_dict(self, inpdict):
+        """Parse object from dictionary.
+
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
         for k, v in inpdict.items():
             if isinstance(v, bytes):
                 v = v.decode()
@@ -96,36 +103,81 @@ class AssemblyGeometry:
 
 class AxialConfig:
     """
-    Define the axial core configuration at time instant.
+    Define the NE axial core configuration at a certain time instant.
+
+    Parameters
+    ----------
+    cuts : dict, optional
+        Cuts defining different material regions, by default ``None``
+    splitz : list, optional
+        List with the number of elements per axial region, by default ``None``
+    labels : list, optional
+        List of region labels, by default ``None``
+    NE_dim : int, optional
+        Number of spatial dimensions of the model, by default 3
+    inpdict : _type_, optional
+        Input dictionary with the object (if read outside this class), by default None
+    assemblynames : list, optional
+        List with names of the various assembly type, by default None
+
 
     Attributes
     ----------
-    cuts : dict
+    cuts : ordered dict
         Dictionary with values ``AxialCuts`` objects assigned to assembly type
     zcuts : list
         List of cuts common to the whole reactor
+    nZ: int
+        Number of zcuts.
+    cutsregions: ordered dict
+        Dict containing the regions composing the various cuts
+        of each assembly type. It is useful to identify the 
+        regions involved in the the spatial homogenisation.
+    cutslabels: ordered dict
+        Dict containing the labels of the regions composing the various cuts
+        of each assembly type. It is useful to identify the 
+        regions involved in the the spatial homogenisation.
+    cutsweights: ordered dict
+        Dict containing the weight of each regions composing 
+        the various cuts of each assembly type. 
+        It is useful to identify the percentage of each
+        regions involved in the the spatial homogenisation.
+    regions: ordered dict
+        Dict mapping the number identifying each region (integer) 
+        with its name (string)
+    labels: ordered dict
+        Dict mapping the name of each region with its own label. More
+        regions could share the same label.
+    config_str: ordered dict
+        Dict containing the axial regions (as string)
+        inside each assembly type (dict keys).
+    config: ordered dict
+        Dict containing the number of axial regions
+        inside each assembly type (dict keys).
+    homogenised: bool
+        Flag to indicate if regions are homogenised.
+    splitz: np.array
+        Number of elements in each axial region. The array has length
+        equal to the number of zcuts -1.
+    AxNodes: np.array
+        Axial coordinates. The array has length
+        equal to the sum of all the numbers in 
+        splitz.
+    dz: np.array
+        Height of each axial element. The array has length
+        equal to the sum of all the numbers in 
+        splitz.
 
     Methods
     -------
-    ``None``
+    nReg: returns the number of regions.
+    mapFine2Coarse: returns the regions, labels and weights for 
+        the axial regions involved in the spatial homogenisation. 
 
     """
 
     def __init__(self, cuts=None, splitz=None, labels=None,
                  NE_dim=3, inpdict=None, assemblynames=None):
-        """
-        Define axial configuration
-
-        Parameters
-        ----------
-        cuts : dict
-            Dictionary with axial cuts.
-
-        Returns
-        -------
-        ``None``
-
-        """
         if inpdict is None:
             self._init(cuts, splitz, labels=labels, NE_dim=NE_dim,
                        assemblynames=assemblynames)
@@ -133,19 +185,6 @@ class AxialConfig:
             self._from_dict(inpdict)
 
     def _init(self, cuts, splitz, labels=None, NE_dim=3, assemblynames=None):
-        """Initialise with input data
-
-        Parameters
-        ----------
-        cuts : _type_
-            _description_
-        splitz : _type_
-            _description_
-        labels : _type_, optional
-            _description_, by default None
-        NE_dim : int, optional
-            _description_, by default 3
-        """
         if isinstance(splitz, list):
             splitz = np.asarray(splitz)
         
@@ -262,6 +301,14 @@ class AxialConfig:
             self.dz = mesh[1:]-mesh[:-1]
 
     def _from_dict(self, inpdict):
+        """Parse object from dictionary.
+
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
         mydicts = ['regions', 'labels', 'config', 
                     'config_str', 'cutsregions', 'cutslabels',
                     'cutsweights']
@@ -277,19 +324,26 @@ class AxialConfig:
 
     @property
     def nReg(self):
+        """Returns the number of NE axial regions.
+
+        Returns
+        -------
+        int
+            Number of NE regions in the object.
+        """
         return len(self.regions)
 
     @staticmethod
     def mapFine2Coarse(cuts, zcuts):
         """
-        Generate dictionaries with region names and weights for homogenisation.
+        Generate dictionaries with region names, labels and weights for homogenisation.
 
         Parameters
         ----------
-        cuts : _type_
-            _description_
-        zcuts : _type_
-            _description_
+        cuts : ordered dict
+            Dictionary with values ``AxialCuts`` objects assigned to assembly type
+        zcuts : list
+            List of cuts common to the whole reactor
 
         Returns
         -------
@@ -359,36 +413,38 @@ class AxialCuts:
     """
     Define the axial cuts for a certain type of assembly.
 
+    Parameters
+    ----------
+    up: list, optional
+        Upper z-coordinate, by default ``None``
+    lo: list, optional
+        Lower z-coordinate, by default ``None``
+    r: list, optional
+        String identifying the region within upz and lowz, by default ``None``
+    labels: list, optional
+        Label for the region within upz and lowz, by default ``None``
+    inpdict: dict, optional
+        Input dictionary containing the object (if it comes
+        from the outside), by default ``None``
+
     Attributes
     ----------
-    upz : float
+    upz: list
         Upper z-coordinate
-    loz : float
+    loz: list
         Lower z-coordinate
-    reg : str
+    reg: list
         String identifying the region within upz and lowz
-
+    labels: list
+        Label for the region within upz and lowz.
     Methods
     -------
-    ``None``
+    mesh1d: Compute nodes according to FRENETIC mesh1d.f90
 
     """
 
     def __init__(self, up=None, lo=None, r=None, labels=None,
                  inpdict=None):
-        """
-        Define geometrical quantities for a squared assembly
-
-        Parameters
-        ----------
-        asscuts : dict
-            List with regions and axial cuts.
-
-        Returns
-        -------
-        ``None``
-
-        """
         if inpdict is None:
             self._init(up, lo, r, labels)
         else:
@@ -428,11 +484,19 @@ class AxialCuts:
         self.labels = labels
 
     def _from_dict(self, inpdict):
+        """Parse object from dictionary.
+
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
         for k, v in inpdict.items():
             setattr(self, k, v)
 
     def mesh1d(split, mesh0):
-        """compute nodes according to FRENETIC mesh1d.f90
+        """Compute nodes according to FRENETIC mesh1d.f90
 
         Parameters
         ----------

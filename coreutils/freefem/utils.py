@@ -24,7 +24,7 @@ def readfeinput(fname, datamap, NG, matrixfmt=False):
     NG : TYPE
         DESCRIPTION.
     matrixfmt : TYPE, optional
-        DESCRIPTION. The default is False.
+        DESCRIPTION, by default False.
 
     Raises
     ------
@@ -112,7 +112,7 @@ def readfearray(fname, datamap):
     NG : TYPE
         DESCRIPTION.
     matrixfmt : TYPE, optional
-        DESCRIPTION. The default is False.
+        DESCRIPTION, by default False.
 
     Raises
     ------
@@ -147,7 +147,7 @@ def makesnapshot(parameters, which=None, ismat=False):
     parameters : TYPE
         DESCRIPTION.
     which : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
 
     Returns
     -------

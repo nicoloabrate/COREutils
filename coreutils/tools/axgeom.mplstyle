@@ -303,7 +303,7 @@ font.size:    18.0
 ## ***************************************************************************
 ## For more information on LaTeX properties, see
 ## https://matplotlib.org/tutorials/text/usetex.html
-text.usetex: True
+text.usetex: False
 text.latex.preamble:  \usepackage{libertinus}\usepackage{libertinust1math}
 
 ## The following settings allow you to select the fonts in math mode.
@@ -555,7 +555,7 @@ figure.figsize:    8, 5  # figure size in inches
                                        # elements fit on the figure. (Not
                                        # compatible with `autolayout`, above).
 #figure.constrained_layout.h_pad:  0.04167  # Padding around axes objects. Float representing
-#figure.constrained_layout.w_pad:  0.04167  # inches. Default is 3/72 inches (3 points)
+#figure.constrained_layout.w_pad:  0.04167  # inches, by default 3/72 inches (3 points)
 #figure.constrained_layout.hspace: 0.02     # Space between subplot groups. Float representing
 #figure.constrained_layout.wspace: 0.02     # a fraction of the subplot widths being separated.
 

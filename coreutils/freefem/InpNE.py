@@ -32,12 +32,12 @@ def writeNEdata(core, verbose=False, fmt=1):
         Core object created with Core class
     verbose : bool, optional
         Set to ``True`` in order to print also capture, nubar and scattering
-        production data. Default is ``False``
+        production data, by default ``False``
     inf : bool, optional
         Set to ``False`` to get B1 Serpent calculation mode for the
-        multi-group constants. Default is ``True``
+        multi-group constants, by default ``True``
     txtfmt : bool, optional
-        Set to ``True`` to print data also in .txt format. Default is ``False``
+        Set to ``True`` to print data also in .txt format, by default ``False``
 
     Returns
     -------
@@ -116,7 +116,7 @@ def writeNEdata(core, verbose=False, fmt=1):
                             # select matrix entry
                             r, c = where[tup]
                             if 'Esigf' in data:
-                                frendata[r, c] = NEdata[tup][reg].__dict__['Fiss'][g]*NEdata[tup][reg].__dict__['Kappa'][g]*1.60217653e-13                  
+                                frendata[r, c] = NEdata[tup][reg].__dict__['Fiss'][g]*NEdata[tup][reg].__dict__['FissEn'][g]*1.60217653e-13
                             else:
                                 frendata[r, c] = NEdata[tup][reg].__dict__[data][g]
                             # write data if all T tuples have been spanned
@@ -139,9 +139,9 @@ def writeNEdata(core, verbose=False, fmt=1):
                             fiss = reg.Fiss
                             xsdata = nubar*fiss
                         elif data == 'Esigf':
-                            kappa = reg.Kappa
+                            FissEn = reg.FissEn
                             fiss = reg.Fiss
-                            xsdata = kappa*fiss*1.60217653e-13
+                            xsdata = FissEn*fiss*1.60217653e-13
                     # save in txt file
                     if 'S0' in data:
                         tmp = np.array(xsdata.reshape(core.NE.nGro, core.NE.nGro), dtype=np.float)
@@ -240,9 +240,9 @@ def mysavetxt(fname, x, fmt="%.6e", delimiter=' '):
     x : ndarray
         Data to be written in txt.
     fmt : str, optional
-        Data output format. The default is "%.6e".
+        Data output format, by default "%.6e".
     delimiter : str, optional
-        Delimiter between data. The default is ' '.
+        Delimiter between data, by default ' '.
 
     Returns
     -------
@@ -272,9 +272,9 @@ def mysavetxt_noTemp(fname, x, fmt="%.6e", delimiter=' '):
     x : ndarray
         Data to be written in txt.
     fmt : str, optional
-        Data output format. The default is "%.6e".
+        Data output format, by default "%.6e".
     delimiter : str, optional
-        Delimiter between data. The default is ' '.
+        Delimiter between data, by default ' '.
 
     Returns
     -------

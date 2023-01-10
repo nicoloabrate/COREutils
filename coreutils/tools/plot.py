@@ -51,18 +51,18 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         List of int with assemblies to be plotted in the desired numeration
         convention (Serpent, FRENETIC, ...).
     time : float, optional
-        Time instant when core configuration is plotted. Default is 0.
+        Time instant when core configuration is plotted, by default 0.
     whichconf : str, optional
         Configuration to be plotted (NEutronics, THermal-hydraulics or
         Cooling Zones). Defaulit is "NE.config".
     label : bool, optional
-        Assembly labels. The default is ``False``.
+        Assembly labels, by default ``False``.
     dictname : dict, optional
-        Dictionary with user defined labels. The default is ``None``.
+        Dictionary with user defined labels, by default ``None``.
     figname : str, optional
-        Name to save the figure in .png format. The default is ``None``.
+        Name to save the figure in .png format, by default ``None``.
     fren : bool, optional
-        Boolean for FRENETIC numeration. The default is ``False``.
+        Boolean for FRENETIC numeration, by default ``False``.
     splitz : bool, optional
         Boolean for plotting user-defined nodal cuts stored in ``Core`` object.
         Default is ``False``.
@@ -70,15 +70,15 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         Boolean for plotting user-defined cuts stored in ``Core`` object.
         Default is ``None``.
     title : str, optional
-        Plot title. The default is ``None``.
+        Plot title, by default ``None``.
     scale : float, optional
-        Geometry scaling factor. The default is 1.
+        Geometry scaling factor, by default 1.
     floating : bool, optional
         Floating object flag. If ``True``, the assemblies are plotted without
         taking into account their position inside the core.
         The default is ``False``.
     legend : bool, optional
-        Legend flag. If ``True``, the legend is plotted. The default is
+        Legend flag. If ``True``, the legend is plotted, by default
         ``False``.
     **kwargs :
         KeyWord optional arguments for plotting.
@@ -288,41 +288,41 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
     Parameters
     ----------
     label : TYPE, optional
-        DESCRIPTION. The default is False.
+        DESCRIPTION, by default False.
     figname : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     fren : TYPE, optional
-        DESCRIPTION. The default is False.
+        DESCRIPTION, by default False.
     which : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     what : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     fill : TYPE, optional
-        DESCRIPTION. The default is True.
+        DESCRIPTION, by default True.
     axes : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     cmap : TYPE, optional
-        DESCRIPTION. The default is 'Spectral_r'.
+        DESCRIPTION, by default 'Spectral_r'.
     thresh : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     cbarLabel : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     xlabel : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     ylabel : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     loglog : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     logx : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     logy : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     title : TYPE, optional
-        DESCRIPTION. The default is None.
+        DESCRIPTION, by default None.
     scale : TYPE, optional
-        DESCRIPTION. The default is 1.
+        DESCRIPTION, by default 1.
     fmt : TYPE, optional
-        DESCRIPTION. The default is "%.2f".
+        DESCRIPTION, by default "%.2f".
     **kwargs : TYPE
         DESCRIPTION.
 

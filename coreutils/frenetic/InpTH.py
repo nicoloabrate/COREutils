@@ -58,7 +58,7 @@ def makeTHinput(core, template=None):
     core : obj
         Core object created with Core class.
     template : str, optional
-        File path where the template file is located. Default is ``None``.
+        File path where the template file is located, by default ``None``.
         In this case, the default template is used.
 
     Returns
@@ -101,7 +101,7 @@ def writeTHdata(core, template=None):
     core : obj
         Core object created with Core class.
     template : str, optional
-        File path where the template file is located. Default is ``None``.
+        File path where the template file is located, by default ``None``.
         In this case, the default template is used.
 
     Returns
