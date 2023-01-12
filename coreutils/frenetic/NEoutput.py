@@ -6,7 +6,6 @@ import h5py as h5
 import numpy as np
 import itertools
 from pathlib import Path
-from numbers import Real
 from numpy.linalg import norm
 import matplotlib.pyplot as plt
 from matplotlib.patches import RegularPolygon
@@ -700,7 +699,7 @@ class NEoutput:
                 tallies[:, i] = np.squeeze(_tmp)
 
         elif isinstance(what, str):  # single output
-            tallies = self.get(what, hex=which, t=t, z=z,
+            tallies = self.get(what, t=t, z=z,
                                pre=pre, gro=gro, grp=grp)
             tallies = np.squeeze(tallies)
         else:
@@ -736,7 +735,7 @@ class NEoutput:
                   grp=grp, 
                   label=label,
                   figname=figname,
-                  which=None,
+                  which=hex,
                   fren=True,
                   whichconf='NE',
                   asstype=False,

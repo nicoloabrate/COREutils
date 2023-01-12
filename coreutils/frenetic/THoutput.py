@@ -66,7 +66,7 @@ class THoutput:
     inout = ['DensOut', 'DensIn', 'EnthOut', 'EnthIn', 'PIn',
             # FIXME Tin should be TIn
              'Pout', 'TOut', 'Tin', 'VIn', 'Vout', 'mDotOut',
-             'mDotIn', 'Time']
+             'mDotin', 'Time']
 
     maximum = ['Tcoolant', 'Tpin_average', 'Tpin_center', 
                'Tpin_surface', 'pressure', 'zMax_pressure',
@@ -84,7 +84,7 @@ class THoutput:
                'TOut': ['Tout', 'tout'], 'Tin': ['Tin', 'tin'],
                'VIn': ['Vin', 'vin'], 'Vout': ['Vout', 'vout'],
                'mDotOut': ['mDotout', 'mdotout', 'mDotout'],
-               'mDotIn': ['mDotin', 'mdotin', 'mDotin'],
+               'mDotin': ['mDotin', 'mdotin', 'mDotin'],
                'Time': ['time']
               }
 
@@ -122,7 +122,7 @@ class THoutput:
                   'VIn': "inlet velocity",
                   'Vout': "outlet velocity",
                   'mDotOut': "outlet massflow",
-                  'mDotIn': "inlet massflow"}
+                  'mDotin': "inlet massflow"}
 
     # default profiles unit of measures
     inout_uom = {'DensOut': '[kg/m^3]', 'DensIn': '[kg/m^3]', 'EnthOut': 'J/(kg K)',
@@ -130,7 +130,7 @@ class THoutput:
                  # FIXME Tin should be TIn
                  'Pout': '[Pa]', 'TOut': '[K]', 'Tin': '[K]', 'VIn': '[m/s]', 
                  'Vout': '[m/s]', 'mDotOut': '[kg/s]',
-                 'mDotIn': '[kg/s]'}
+                 'mDotin': '[kg/s]'}
 
     distributions_uom = {'timeDistr': '[s]', 'T_coolant': '[K]', 
                          'T_pin_avg': '[K]', 'T_pin_ctr': '[K]', 
@@ -645,7 +645,7 @@ class THoutput:
                 tallies[:, i] = np.squeeze(_tmp)
 
         elif isinstance(what, str):  # single output
-            tallies = self.get(what, hex=hex, t=t, z=z)
+            tallies = self.get(what, t=t, z=z)
             tallies = np.squeeze(tallies)
         else:
             raise TypeError('Input must be str, dict or list!')
@@ -686,7 +686,7 @@ class THoutput:
 
         RadialMap(self.core, tallies=tallies, z=z, time=t, label=label,
                   figname=figname,
-                  which=None,
+                  which=hex,
                   fren=True,
                   whichconf='TH',
                   asstype=False,
