@@ -24,7 +24,18 @@ This package comes with the MIT license.
 
 ## 📘 Documentation
 
-The package documentation can be found inside COREutils itself.
+The package documentation can be found inside COREutils itself. The documentation can be compiled by the user in HTML or LaTeX formats by running the following instructions inside the main COREutils directory,
+
+`pip install -r docs/requirements.txt`
+
+For HTML:
+
+`sphinx-build -b html docs docs_html`
+
+For PDF:
+
+`sphinx-build -b latex docs docs_tex`
+
 
 ## 📞 Contacts
 
