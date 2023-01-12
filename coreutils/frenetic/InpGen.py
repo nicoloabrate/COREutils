@@ -1,11 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: InpGen.py
-
-Description: Set of methods for generating FRENETIC input files.
-
-"""
 import io
 import os
 import git
@@ -231,6 +223,7 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
     if TH:
         auxTH(core, AUXpathTH)
 
+
 def auxNE(core, AUXpathNE):
     plotNE = core.NE.plot if hasattr(core.NE, "plot") else None
     # plot configurations
@@ -387,6 +380,7 @@ def auxNE(core, AUXpathNE):
             print('Overwriting file {}'.format(f))
             move(f, join(AUXpathNE, f))
 
+
 def auxTH(core, AUXpathTH):
     # plotTH = core.TH.plotTH
     # plot configurations
@@ -430,6 +424,7 @@ def auxTH(core, AUXpathTH):
             os.remove(join(AUXpathTH, f))
             print('Overwriting file {}'.format(f))
             move(f, join(AUXpathTH, f))
+
 
 def makecommoninput(core, template=None):
     """
@@ -483,11 +478,18 @@ def makecommoninput(core, template=None):
 
     TimeEnd = core.TimeEnd if core.trans else 0
 
+    nVolRef = core.TH.nVolRef if hasattr(core, "TH") else 0
+    zmaxref = core.TH.zmaxref if hasattr(core, "TH") else 0
+    zminref = core.TH.zminref if hasattr(core, "TH") else 0
+    nVol = core.TH.nVol if hasattr(core, "TH") else 0
+    zmin = core.TH.zmin if hasattr(core, "TH") else 0
+    zmax = core.TH.zmax if hasattr(core, "TH") else 0
+
     data = {'$NH': NH, '$NR': NR, '$NL': NL, '$NDIFF': NDIFF,
             '$TEND': TimeEnd, '$ISNETH': isNETH,
-            '$PITCH': PITCH/100, '$NVOL': core.TH.nVol, 
-            '$NVREF': core.TH.nVolRef, '$XBREFI': core.TH.zminref,
-            '$XEREFI': core.TH.zmaxref, '$HEIGHT': core.TH.zmax-core.TH.zmin}
+            '$PITCH': PITCH/100, '$NVOL': nVol, 
+            '$NVREF': nVolRef, '$XBREFI': zminref,
+            '$XEREFI': zmaxref, '$HEIGHT': zmax-zmin}
 
     if template is None:
         tmp = pkg_resources.read_text(templates, 'template_common_input.dat')

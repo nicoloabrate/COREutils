@@ -1,11 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: Map.py
-
-Description: Class to define the nuclear reactor core geometry defined in an
-external text file.
-"""
 import numpy as np
 import itertools as it
 from numpy import pi, cos, sin

@@ -1,12 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: output.py
-
-Description: Class to read data from FRENETIC output files.
-"""
-
-from ast import alias
 import os
 import re
 from copy import deepcopy as cp

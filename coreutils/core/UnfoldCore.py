@@ -1,11 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: UnfoldCore.py
-
-Description: Class to unfold a reactor core sector over a rotation angle
-provided by the user.
-"""
 import numpy as np
 from copy import deepcopy
 

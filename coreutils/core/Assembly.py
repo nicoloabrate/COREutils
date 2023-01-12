@@ -1,11 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: Assembly.py
-
-Description: This file contains classes for some typical assembly geometries
-in a nuclear fission reactor.
-"""
 import numpy as np
 from coreutils.tools.utils import MyDict
 

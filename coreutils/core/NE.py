@@ -1,11 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: core.py
-
-Description: Class to define the neutronic configuration of a core.
-
-"""
 import os
 import re
 import sys

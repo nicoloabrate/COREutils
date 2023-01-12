@@ -1,11 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: FreneticInpGen.py
-
-Description: Set of methods for generating FRENETIC input files.
-
-"""
 import io
 from . import templates
 from coreutils.tools.utils import fortranformatter as ff
@@ -48,6 +40,7 @@ def writeCZdata(core):
                 data.append(f"{val:1.8e}")
             # write to file
             f.write(f'{",".join(data)} \n')
+
 
 def makeTHinput(core, template=None):
     """

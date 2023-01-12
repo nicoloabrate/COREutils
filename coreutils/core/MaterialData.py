@@ -1,10 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: MaterialData.py
-
-Description: Class that define core material (NE/TH/PH) data.
-"""
 import os
 import warnings
 import coreutils
@@ -87,6 +80,7 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
         If there is an issue with the NEdata default path inside ``coreutils``.
     OSError
         If ``serpent`` directory does not exist in the ``datapath`` path.
+
     """
     # -- serpentTools settings
     st.settings.rc['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod',

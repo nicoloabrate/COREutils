@@ -1,10 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: core.py
-
-Description: Class to define the thermal-hydraulics configuration of a core.
-"""
 import os
 import re
 import sys
@@ -40,6 +33,14 @@ class TH:
         Neutronics configurations according to time.
     time : list
         Neutronics time instants when configuration changes.
+
+    Methods
+    -------
+        from_dict:
+        replaceSA: 
+            Replace full assemblies.
+        perturbBC:
+            Spatially perturb cooling zone boundary conditions.
 
     """
     def __init__(self, THargs=None, CI=None, inpdict=None):

@@ -1,11 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: FreneticInpGen.py
-
-Description: Set of methods for generating FRENETIC input files.
-
-"""
 import io
 import os
 import json
@@ -442,6 +434,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
 
     with open('DiffLengthToNodeSize.json', 'w') as outfile:
         json.dump({"DFLtoZ": DFLtoZ}, outfile, indent=2)
+
 
 def writeConfig(core, NZ):
     """

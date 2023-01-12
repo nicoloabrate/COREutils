@@ -1,11 +1,3 @@
-"""
-Author: N. Abrate.
-
-File: core.py
-
-Description: Class to define the nuclear reactor core geometry defined in an
-external text file.
-"""
 import os
 import re
 from shutil import which
@@ -38,15 +30,15 @@ class Core:
 
     Attributes
     ----------
-    AssemblyGeom : obj
+    AssemblyGeom : :class:`coreutils.core.AssemblyGeometry`
         Object with assembly geometrical features.
-    Map : obj
+    Map: :class:`coreutils.core.Map`
         Object mapping the core assemblies with the different numerations.
     NAss: int
         Number of assemblies.
-    NE : obj
+    NE: :class:`coreutils.core.NE`
         Object for the NEutronic configuration.
-    TH:
+    TH: :class:`coreutils.core.TH`
         Object for the Thermo-Hydraulic configuration.
     Tc: np.array
         Array with coolant temperatures for NE data.
