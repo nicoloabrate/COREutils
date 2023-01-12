@@ -235,7 +235,11 @@ class NEoutput:
 
         if not oldfmt:
             try:
-                datapath = os.path.join(self.NEpath, "output.h5")
+                datapath = os.path.join(self.NEpath, "output_NE.h5")
+                # back compatibility with v1 of FRENETIC 
+                # (commit n.8aaa49a23fcc8ffc01077c2c58facb66fd9aae0c on FRENETIC development)
+                if not os.path.exists(datapath):
+                    datapath = os.path.join(self.NEpath, "output.h5")
                 fh5 = h5.File(datapath, "r")
             except OSError as err:
                 if 'Unable to open file' in str(err):
@@ -259,7 +263,6 @@ class NEoutput:
                 return times
             isintegral = False
             dictkey = "distributions"
-            fname = 'output.h5'
             idx = self.distributions.index(which)
             # check core h5 is present
             if self.core is None:
@@ -308,8 +311,6 @@ class NEoutput:
                     dictkey = k
                     if oldfmt:
                         fname = f'{dictkey}.out'
-                    else:
-                        fname = 'output.h5'
                     idx = v.index(which)+skip
                     notfound = False
                     break
@@ -318,8 +319,6 @@ class NEoutput:
                     if 'betaeff(1)' in v:
                         if oldfmt:
                             fname = 'intpar.out'
-                        else:
-                            fname = 'output.h5'
                         idx = []
                         for p in range(self.core.NE.nPre):
                             idx.append(v.index(f'betaeff({p+1})')+skip)
@@ -836,7 +835,7 @@ class NEoutput:
                 if isinstance(t, (list, np.ndarray)):
                     idt = [np.argmin(abs(ti-times)) for ti in t]
                 else:
-                    idt = np.argmin(abs(t-times))
+                    idt = [np.argmin(abs(t-times))]
             else:
                 idt = np.arange(0, len(times)).tolist()
         else:
@@ -849,14 +848,14 @@ class NEoutput:
 
         Parameters
         ----------
-        gro : int or list
-            Number of energy groups for neutrons.
-        grp : int or list
-            Number of energy groups for photons.
-        pre : int or list
-            Number of precursors for neutrons.
-        prp : int or list
-            Number of precursors for photons.
+        gro : list
+            Indeces of energy groups for neutrons.
+        grp : list
+            Indeces of energy groups for photons.
+        pre : list
+            Indeces of precursors for neutrons.
+        prp : list
+            Indeces of precursors for photons.
         Returns
         -------
         list
@@ -914,7 +913,7 @@ class NEoutput:
             Label for the plot.
         """
         label_dict = {'ngro': 'g', 'ngrp': 'g',
-                      'pre': 'p', 'prp': 'p', 'nhex': 'n='}
+                      'pre': 'p', 'prp': 'p', 'nhex': 'n'}
         dim2plot_dict = {'ntim': 't', 'nelz': 'z'}
         uom = {'ntim': 's', 'nelz': 'cm'}
 

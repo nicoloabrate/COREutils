@@ -20,17 +20,58 @@ from matplotlib import rcParams
 class THoutput:
     """
     Class to read TH profiles computed by FRENETIC.
+
+    Parameters
+    ----------
+    path: str
+        Path to the FRENETIC case.
+
+    Attributes
+    ----------
+    casepath: str
+        Path to the FRENETIC case.
+    THpath: str
+        Path to the TH directory in the FRENETIC case.
+    core: :class:`coreutils.core.Core`
+        Object representing the core of the FRENETIC simulation.
+    mapHAType: dict
+        Dict mapping the types of the various assemblies. The keys are
+        the HA types, while the values are lists containing the numbers
+        of the HA according to FRENETIC numeration.
+    inout: list
+        List of ``str`` with the names of the In-Out quantities.
+    maximum: list
+        List of ``str`` with the names of the Maximum quantities.
+    distributions: list
+        List of ``str`` with the names of the Distributions (e.g., the coolant
+        temperature).
+    aliases: dict
+        Dict mapping possible aliases of the quantities in ``inout``
+        and ``maximum``.
+    inout_measure: dict
+        Dict mapping the unit of measure of the In-Out quantities.
+    maximum_measure: dict
+        Dict mapping the unit of measure of the Maximum quantities.
+    distributions_measure: dict
+        Dict mapping the unit of measure of the Distributions.
+    distrout_descr: dict
+        Dict with the descriptions of the Distributions.
+    inout_descr: dict
+        Dict with the descriptions of the In-Out quantities.
+    maximum_descr: dict
+        Dict with the descriptions of the Maximum quantities.
     """
 
     # default keys for integral parameters (namelist)
-    inout = {'DensOut', 'DensIn', 'EnthOut', 'EnthIn', 'PIn',
-             'POut', 'TOut', 'TIn', 'VIn', 'VOut', 'mDotOut',
-             'mDotIn'}
+    inout = ['DensOut', 'DensIn', 'EnthOut', 'EnthIn', 'PIn',
+            # FIXME Tin should be TIn
+             'Pout', 'TOut', 'Tin', 'VIn', 'Vout', 'mDotOut',
+             'mDotIn', 'Time']
 
     maximum = ['Tcoolant', 'Tpin_average', 'Tpin_center', 
                'Tpin_surface', 'pressure', 'zMax_pressure',
                'zMax_Tcoolant', 'zMax_Tpin_average', 
-               'zMax_Tpin_center', 'zMax_Tpin_surface']
+               'zMax_Tpin_center', 'zMax_Tpin_surface', 'Time']
 
     distrout = ['timeDistr', 'T_coolant', 'T_pin_avg', 'T_pin_ctr', 
                 'T_pin_sur', 'density', 'htc', 'pressure',
@@ -38,36 +79,64 @@ class THoutput:
 
     aliases = {'DensOut': ['Densout', 'densout'], 'DensIn': ['Densin', 'densin'],
                'EnthOut': ['Enthout', 'enthout'], 'EnthIn': ['Enthin', 'enthin'],
-               'PIn': ['Pin', 'pin'], 'POut': ['Pout', 'pout'],
-               'TOut': ['Tout', 'tout'], 'TIn': ['Tin', 'tin'],
-               'VIn': ['Vin', 'vin'], 'VOut': ['Vout', 'vout'],
+               'PIn': ['Pin', 'pin'], 'Pout': ['Pout', 'pout'],
+               # FIXME Tin should be TIn
+               'TOut': ['Tout', 'tout'], 'Tin': ['Tin', 'tin'],
+               'VIn': ['Vin', 'vin'], 'Vout': ['Vout', 'vout'],
                'mDotOut': ['mDotout', 'mdotout', 'mDotout'],
-               'mDotIn': ['mDotin', 'mdotin', 'mDotin']
+               'mDotIn': ['mDotin', 'mdotin', 'mDotin'],
+               'Time': ['time']
               }
 
-    distrout_attr = {'timeDistr': 'time instant [s]', 
-                     'T_coolant': 'coolant temperature [K]', 
-                     'T_pin_avg': 'Average pin temperature [K]',
-                     'T_pin_ctr': 'Center pin temperature [K]', 
-                     'T_pin_sur': 'Surface pin temperature [K]', 
-                     'density': 'Coolant density [kg/m^3]', 
-                     'htc': 'Heat Transfer Coefficient [W/(m^2 K)]', 
-                     'pressure': 'Coolant pressure [Pa]',
-                     'q_pin': 'Pin heat flux [W/m^2]',
-                     'velocity': 'Coolant velocity [m/s]'}
+    distrout_attr = {'timeDistr': 'time instant', 
+                     'T_coolant': 'coolant temperature', 
+                     'T_pin_avg': 'Average pin temperature',
+                     'T_pin_ctr': 'Center pin temperature', 
+                     'T_pin_sur': 'Surface pin temperature', 
+                     'density': 'Coolant density', 
+                     'htc': 'Heat Transfer Coefficient', 
+                     'pressure': 'Coolant pressure',
+                     'q_pin': 'Pin heat flux',
+                     'velocity': 'Coolant velocity'}
+
+    maximum_attr = {'Tcoolant': "max. coolant temp.", 
+                    'Tpin_average': "max. pin avg. temp.", 
+                    'Tpin_center': "max. pin center temp.", 
+                    'Tpin_surface': "max. pin surf. temp.", 
+                    'pressure': "max. pressure", 
+                    'zMax_pressure': "axial coordinate",
+                    'zMax_Tcoolant': "axial coordinate",
+                    'zMax_Tpin_average': "axial coordinate", 
+                    'zMax_Tpin_center': "axial coordinate",
+                    'zMax_Tpin_surface': "axial coordinate"}
+
+    inout_attr = {'DensOut': "outlet density", 
+                  'DensIn': "inlet density", 
+                  'EnthOut': "outlet enthalpy",
+                  'EnthIn': "inlet enthalpy",
+                  'PIn': "inlet pressure",
+                # FIXME Tin should be TIn, Pout should be POut, Vout
+                  'Pout': "outlet pressure",
+                  'TOut': "outlet temperature",
+                  'Tin': "inlet temperature",
+                  'VIn': "inlet velocity",
+                  'Vout': "outlet velocity",
+                  'mDotOut': "outlet massflow",
+                  'mDotIn': "inlet massflow"}
 
     # default profiles unit of measures
     inout_uom = {'DensOut': '[kg/m^3]', 'DensIn': '[kg/m^3]', 'EnthOut': 'J/(kg K)',
                  'EnthIn': '[J/(kg K)]', 'PIn': '[Pa]',
-                 'POut': '[Pa]', 'TOut': '[K]', 'TIn': '[K]', 'VIn': '[m/s]', 
-                 'VOut': '[m/s]', 'mDotOut': '[kg/s]',
+                 # FIXME Tin should be TIn
+                 'Pout': '[Pa]', 'TOut': '[K]', 'Tin': '[K]', 'VIn': '[m/s]', 
+                 'Vout': '[m/s]', 'mDotOut': '[kg/s]',
                  'mDotIn': '[kg/s]'}
 
-    distrout_uom = {'timeDistr': '[s]', 'T_coolant': '[K]', 
-                    'T_pin_avg': '[K]', 'T_pin_ctr': '[K]', 
-                    'T_pin_sur': '[K]', 'density': '[kg/m^3]', 
-                    'htc': '[W/(m^2 K)]', 'pressure': '[Pa]',
-                    'q_pin': '[W/m^2]', 'velocity': '[m/s]'}
+    distributions_uom = {'timeDistr': '[s]', 'T_coolant': '[K]', 
+                         'T_pin_avg': '[K]', 'T_pin_ctr': '[K]', 
+                         'T_pin_sur': '[K]', 'density': '[kg/m^3]', 
+                         'htc': '[W/(m^2 K)]', 'pressure': '[Pa]',
+                         'q_pin': '[W/m^2]', 'velocity': '[m/s]'}
 
     maximum_uom = {'Tcoolant': '[K]', 'Tpin_average': '[K]', 
                    'T_pin_center': '[K]', 
@@ -79,13 +148,6 @@ class THoutput:
                 }
 
     def __init__(self, path):
-        """Initialise the class.
-
-        Parameters
-        ----------
-        path : string
-            Path to the FRENETIC case.
-        """
         self.casepath = path
         self.THpath = os.path.join(path, 'TH')
         # looking for core file
@@ -101,9 +163,11 @@ class THoutput:
         self.distributions = THoutput.distrout
         self.maximum = THoutput.maximum
         self.inout_measure = THoutput.inout_uom
-        self.maximum_meaure = THoutput.maximum_uom
+        self.maximum_measure = THoutput.maximum_uom
         self.distributions_descr = THoutput.distrout_attr
-        self.distributions_measure = THoutput.distrout_uom
+        self.maximum_descr = THoutput.maximum_attr
+        self.inout_descr = THoutput.inout_attr
+        self.distributions_measure = THoutput.distributions_uom
 
     def get(self, which, hex=None, t=None, z=None):
         """
@@ -131,7 +195,7 @@ class THoutput:
                 which = key
 
         try:
-            datapath = os.path.join(self.THpath, "output.h5")
+            datapath = os.path.join(self.THpath, "output_TH.h5")
             fh5 = h5.File(datapath, "r")
         except OSError as err:
             if 'Unable to open file' in str(err):
@@ -148,7 +212,6 @@ class THoutput:
                 return times
             isdistr = True
             dictkey = "distributions"
-            fname = 'output.h5'
             idx = self.distributions.index(which)
             # check core h5 is present
             if self.core is None:
@@ -167,17 +230,18 @@ class THoutput:
             else:
                 whichHexType = self.mapHAType
                 if self.core.dim == 1:
-                    hex = [1]
+                    hex = [0]
                 else:
-                    hex = np.arange(1, self.core.NAss+1).tolist()
+                    hex = np.arange(0, self.core.NAss).tolist()
 
             # "t" refers to slicing
             if t is None:
-                if len(self.core.TH.CZtime) == 1:
+                if self.core.trans:
+                    t = cp(np.asarray(fh5[dictkey]["timeDistr"])[()])
+                else:
                     t = [0]  # time instant, not python index!
             # "times" refers to all time instants
-            nTimeConfig = len(self.core.TH.CZtime)
-            if nTimeConfig == 1:
+            if not self.core.trans:
                 times = None
             else:  # parse time from h5 file
                 times = cp(np.asarray(fh5[dictkey]["timeDistr"])[()])
@@ -191,51 +255,57 @@ class THoutput:
 
         else:  # InOut or Maximum data
             isdistr = False
-            notfound = True
-            for k in self.maximum:
-                if which == k:
-                    dictkey = k
-                    notfound = False
-                    group = "maximum"
-                    break
-
-            for k in self.inout:
-                if which == k:
-                    dictkey = k
-                    notfound = False
-                    group = "inout"
-                    break
-
-            if notfound:
-                raise THoutputError(f'{which} not found in data!')
-
-            # --- PARAMETERS
-            if hex is not None:
-                hex = [h-1 for h in hex]
+            if which == "Time":
+                group = "maximum"
+                dictkey = which
             else:
-                if self.core.dim == 1:
-                    hex = [1]
-                else:
-                    hex = np.arange(1, self.core.NAss+1).tolist()
+                notfound = True
+                for k in self.maximum:
+                    if which == k:
+                        dictkey = k
+                        notfound = False
+                        group = "maximum"
+                        break
 
-            # "t" refers to slicing
-            if t is None:
-                if not self.core.trans:
-                    idt = [0]  # time instant, not python index!
+                for k in self.inout:
+                    if which == k:
+                        dictkey = k
+                        notfound = False
+                        group = "inout"
+                        break
+
+                if notfound:
+                    raise THoutputError(f'{which} not found in data!')
+
+                # --- PARAMETERS
+                if hex is not None:
+                    hex = [h-1 for h in hex]
                 else:
-                    # FIXME (here and in FRENETIC) current output misses "timeDistr"
-                    t = cp(np.asarray(fh5[dictkey]["timeDistr"])[()])
-                    idt = np.arange(0, len(t)).tolist()
-            else:
-                if isinstance(t, (list, np.ndarray)):
-                    idt = [np.argmin(abs(ti-times)) for ti in t]
+                    if self.core.dim == 1:
+                        hex = [0]
+                    else:
+                        hex = np.arange(0, self.core.NAss).tolist()
+
+                # "t" refers to slicing
+                times = np.asarray(fh5[group]["Time"])
+                if t is None:
+                    if not self.core.trans:
+                        idt = [0]  # time instant, not python index!
+                    else:
+                        # FIXME (here and in FRENETIC) current output misses "timeDistr"
+                        t = cp(np.asarray(fh5[group]["Time"])[()])
+                        idt = np.arange(0, len(t)).tolist()
                 else:
-                    idt = np.argmin(abs(t-times))
+                    if isinstance(t, (list, np.ndarray)):
+                        idt = [np.argmin(abs(ti-times)) for ti in t]
+                    else:
+                        idt = [np.argmin(abs(t-times))]
 
         # --- PARSE PROFILE FROM H5 FILE
         if isdistr:
             # allocate output profile
             profile = np.zeros((len(idt), len(idz), len(hex)), dtype=float)
+            ihex = [h-1 for h in hex]
             dimlst = [None]*3
             dimlst[0] = idt
             dimlst[1] = idz
@@ -259,8 +329,13 @@ class THoutput:
             # reshuffle last index order to match hex numeration
             idx = np.argsort(whichhex)
             profile = profile[:, :, idx]
+            # dimlst = [idt, idz, ihex]
+            # profile = profile[np.ix_(*dimlst)][()]
         else:
-            profile = fh5[group][dictkey][idt, hex][()]
+            profile = np.asarray(fh5[group][dictkey])
+            if dictkey != "Time":
+                dimlst = [idt, hex]
+                profile = profile[np.ix_(*dimlst)][()]
 
         # --- close H5 file
         fh5.close()
@@ -269,13 +344,13 @@ class THoutput:
 
     def plot1D(self, which, t=None, ax=None, abscissas=None, z=None, 
                hex=None, leglabels=None, figname=None, xlabel=None,
-               xlims=None, ylims=None, ylabel=None,
+               xlims=None, ylims=None, ylabel=None, autolabel=True,
                style='sty1D.mplstyle', legend=True, **kwargs):
         """Plot time/axial profile of integral parame. or distribution in hex.
 
         Parameters
         ----------
-        which: string
+        which: str
             Name of the variable to be parsed
         t: float or iterable, optional
             Time instant(s), by default ``None``.
@@ -292,14 +367,17 @@ class THoutput:
             List of strings for the legend entries, by default ``None``
         figname : string, optional
             Name of the figure to be saved, including its format, by default ``None``
-        xlabel : string, optional
+        xlabel : str, optional
             Label for the x-axis, by default ``None``
         xlims : list, optional
             Limits on the x-axis, by default ``None``
         ylims : list, optional
             Limits on the y-axis, by default ``None``
-        ylabel : string, optional
+        ylabel : str, optional
            Label for the y-axis, by default ``None``
+        autolabel: str, optional
+            Flag to generate automatically the legend
+            label, by default ``True``
         style : str, optional
             Path of the `matplotlib` style, by default ``sty1D.mplstyle``
         legend : bool, optional
@@ -326,29 +404,30 @@ class THoutput:
             else:
                 sty1D = style
 
-        label = which
         # check if which is an alias
         for key, alias_list in self.aliases.items():
             if which in alias_list:
                 which = key
 
         # select unit of measure corresponding to profile
-        plotvstime = True if t else False
+        plotvstime = True if t is None else False
         if t:
             t = None
 
         if which in self.distributions:
             isdistr = True
-            uom = self.distrout_uom[which]
+            uom = self.distributions_measure[which]
+            dims = ["ntim", "nelz", "nhex"]
         else:  # integral data
             isdistr = False
             notfound = True
+            dims = ["ntim", "nhex"]
             for k in self.maximum:
                 if which == k:
                     dictkey = k
                     notfound = False
                     group = "maximum"
-                    uom = self.maximum_uom[which]
+                    uom = self.maximum_measure[which]
                     break
 
             for k in self.inout:
@@ -356,7 +435,7 @@ class THoutput:
                     dictkey = k
                     notfound = False
                     group = "inout"
-                    uom = self.inout_uom[which]
+                    uom = self.inout_measure[which]
                     break
 
         # --- parse profile
@@ -367,7 +446,7 @@ class THoutput:
         if not self.core.trans:
             times = None # np.array([0])
         else:  # parse time from h5 file
-            datapath = os.path.join(self.NEpath, "output.h5")
+            datapath = os.path.join(self.THpath, "output_TH.h5")
             times = cp(self.get('timeDistr')[()])
             if plotvstime:
                 t = times
@@ -375,10 +454,16 @@ class THoutput:
         if t is None:
             t = [0]  # initial condition
 
+        if hex is None:
+            ihex = [0] # 1st hexagon (this is python index, not hex. number)
+        else:
+            ihex = [h-1 for h in hex]
+
         ax = plt.gca() if ax is None else ax
+
         if not isdistr:
             # --- PLOT
-            # plot against time or axial coordinate
+            # plot against time
             with plt.style.context(sty1D):
                 handles = []
                 handlesapp = handles.append
@@ -394,31 +479,36 @@ class THoutput:
                 else:
                     ax.set_ylabel(ylabel)
         else:   # plot distribution
-            if hex is None:
-                hex = [0] # 1st hexagon (this is python index, not hex. number)
-
             # get python-wise index for slicing
             idt, idz = self._shift_index(t, z, times=times)
             # map indexes from full- to sliced-array
-            idt, idz = self._to_index(idt, idz)
+            # idt, idz = self._to_index(idt, idz)
 
-            if nTime > 1 and plotvstime:  # plot against time
+            if plotvstime:  # plot against time
                 x = times
                 dim2plot = 'ntim'
+                idx = 0
                 if xlabel is None:
                     xlabel = 'time [s]'
             else:  # plot time snapshots, if any, against axial coordinate
                 x = self.core.TH.zcoord
                 dim2plot = 'nelz'
+                idx = 1
                 if xlabel is None:
-                    xlabel = 'z-coordinate [cm]'
+                    xlabel = 'z-coordinate [m]'
 
             # --- DEFINE SLICES
-            dimdict = {'ntim': idt, 'nelz': idz, 'nhex': hex}
+            if not hasattr(t, "__len__"):
+                t = [t]
+
+            if not hasattr(z, "__len__"):
+                z = [z]
+
+            dimdict = {'ntim': idt, 'nelz': idz, 'nhex': ihex}
             usrdict = {'ntim': t, 'nelz': z, 'nhex': hex}
             dimlst = [None]*len(dimdict.keys())
             for k in dimdict.keys():
-                i = dimdict.keys().index(k)
+                i = list(dimdict.keys()).index(k)
                 dimlst[i] = dimdict[k]
             # define multi-index
             tmp = dimlst.pop(idx)
@@ -437,7 +527,16 @@ class THoutput:
                 # loop over dimensions to slice
                 for i, s in enumerate(indexes):
                     y = prof[s[i]]
-                    label = self._build_label(s, dims, dim2plot, usrdict)
+                    # label settings
+                    if autolabel:
+                        label = self._build_label(s, dims, dim2plot, usrdict)
+                    else:
+                        if "label" in kwargs.keys():
+                            label = kwargs["label"]
+                            kwargs.pop("label")
+                        else:
+                            label = None
+
                     if abscissas is not None:
                         x = abscissas
                     lin1, = ax.plot(x, y, label=label, **kwargs)
@@ -551,11 +650,11 @@ class THoutput:
         else:
             raise TypeError('Input must be str, dict or list!')
 
-        if title:
+        if title is True:
             timeSnap = self.core.TimeSnap
             idt = np.argmin(abs(t-timeSnap))
 
-            if core.dim != 2:
+            if self.core.dim != 2:
                 nodes = self.core.TH.zcoord
                 idz = np.argmin(abs(z-nodes))
                 title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], timeSnap[idt])
@@ -565,8 +664,18 @@ class THoutput:
                 title = 't=%.2f [s]' % (timeSnap[idt])
 
         if cbarLabel:
-            dist = self.distributions_descr[what]
-            uom = self.distributions[what]
+            if what in self.distributions_descr.keys():
+                dist = self.distributions_descr[what]
+                uom = self.distributions_measure[what]
+            elif what in self.maximum_descr.keys():
+                dist = self.maximum_descr[what]
+                uom = self.maximum_measure[what]
+            elif what in self.inout_descr.keys():
+                dist = self.inout_descr[what]
+                uom = self.inout_measure[what]
+            else:
+                raise OSError(f"{what} description not found!")
+
             uom = uom.replace('**', '^')
             changes = ['-1', '-2', '-3']
             for c in changes:
@@ -575,7 +684,7 @@ class THoutput:
             # uom = '$%s$' % uom if usetex is True else uom
             cbarLabel = r'%s $%s$' % (dist, uom)
 
-        RadialMap(core, tallies=tallies, z=z, time=t, label=label,
+        RadialMap(self.core, tallies=tallies, z=z, time=t, label=label,
                   figname=figname,
                   which=None,
                   fren=True,
@@ -628,7 +737,7 @@ class THoutput:
                 if isinstance(t, (list, np.ndarray)):
                     idt = [np.argmin(abs(ti-times)) for ti in t]
                 else:
-                    idt = np.argmin(abs(t-times))
+                    idt = [np.argmin(abs(t-times))]
             else:
                 idt = np.arange(0, len(times)).tolist()
         else:
@@ -641,10 +750,10 @@ class THoutput:
 
         Parameters
         ----------
-        t : int or list
-            Time instant(s).
-        z : int or list
-            Axial coordinate(s).
+        t : list
+            Time instant indeces.
+        z : list
+            Axial coordinate indeces.
 
         Returns
         -------
@@ -682,7 +791,7 @@ class THoutput:
         str
             Label for the plot.
         """
-        label_dict = {'nhex': 'n='}
+        label_dict = {'nhex': 'n'}
         dim2plot_dict = {'ntim': 't', 'nelz': 'z'}
         uom = {'ntim': 's', 'nelz': 'm'}
 
@@ -696,10 +805,15 @@ class THoutput:
             if self.core.dim == 1 and k == 'nhex':
                 continue
 
-            if k != dim2plot:
+            if k not in ['ntim', 'nelz']:
                 txt = usrdict[k][s[i]]
-                txt = rf"{dim2plot_dict[k]}{equal}{txt} {uom[k]}"
+                txt = rf"{label_dict[k]}{equal}{txt}"
                 label.append(txt)
+            else:
+                if k != dim2plot:
+                    txt = usrdict[k][s[i]]
+                    txt = rf"{dim2plot_dict[k]}{equal}{txt} {uom[k]}"
+                    label.append(txt)
 
         return str(", ".join(label))
 

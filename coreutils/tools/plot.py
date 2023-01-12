@@ -408,6 +408,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
         patchesapp = patches.append
         coordapp = coord.append
         valuesapp = values.append
+        # loop over SA centers according to Serpent map
         for k, xy in amap.serpcentermap.items():
             if k not in which:
                 continue
@@ -454,7 +455,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                                            coord[:, 1]*scale)
             pc = PatchCollection(patches, cmap=cmap, ec='k', lw=0.5, **kwargs)
 
-            if title:
+            if title is None:
                 if whichconf == 'NE':
                     times = np.array(core.NE.time)
                 elif whichconf == 'CZ':
@@ -464,17 +465,19 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 
                 idt = np.argmin(abs(time-times))
                 if core.dim != 2:
-                    nodes = core.NE.AxialConfig.AxNodes if whichconf == 'NE' else core.TH.AxialConfig.AxNodes
+                    nodes = core.NE.AxialConfig.AxNodes if whichconf == 'NE' else core.TH.zcoord
                     idz = np.argmin(abs(z-nodes))
-                    title = 'z={nodes[idz]:.2f} [cm], t={times[idt]:.2f} [s]'
+                    title = f'z={nodes[idz]:.2f} [cm], t={t:.2f} [s]'
                 else:
                     if len(times) > 1:
-                        title = 't={times[idt]:.2f} [s]'
+                        title = f't={t:.2f} [s]'
                     else:
                         title = None
+
             formatPlot(ax, loglog=loglog, logx=logx, logy=logy,
                        xlabel=xlabel or "X [cm]",
                        ylabel=ylabel or "Y [cm]", title=title)
+
             pc.set_array(values)
             pc.set_norm(normalizer)
             ax.add_collection(pc)
@@ -502,7 +505,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                         # see https://stackoverflow.com/questions/28752727/map-values-to-colors-in-matplotlib
                         # see https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html#sphx-glr-gallery-images-contours-and-fields-image-annotated-heatmap-py
                         # get patch colour
-                        col = mapValToCol.to_rgba(values[idx])
+                        col = mapValToCol.to_rgba(tallies[idx])
                         txtcol = 'w' if isDark(col) else 'k'
                         txt = fmt % tallies[idx]
                         plt.text(x*scale, y*scale, txt, ha='center',
