@@ -1,5 +1,5 @@
- COREutils
-==========
+COREutils
+=========
 
 COREutils is a python package allowing the construction of objects representing the core of a nuclear reactor (at the assembly level, assuming that the pin level is spatially homogenised). The resulting object can then be used to generate the input for other codes (like FRENETIC or FreeFEM++).
 
@@ -16,7 +16,7 @@ The structure of the code should enable to easily extend its functionality by wr
 
 To install COREutils, run the following commands:
 
-`git clone https://nicolo_abrate@bitbucket.org/nemofissiondivision/coreutils.git`
+`git clone https://github.com/nicoloabrate/COREutils`
 
 ## ⚖️ License
 

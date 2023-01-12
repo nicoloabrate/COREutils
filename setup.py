@@ -11,16 +11,16 @@ from distutils.core import setup
 requirements = "requirements.txt"
 
 setup(
-   name='coreutils',
+   name='COREutils',
    version='0.0.1',
    author='N. Abrate',
    author_email='nicolo.abrate@polito.it',
-   url='https://nicolo_abrate@bitbucket.org/nicolo_abrate/coreutils.git',
+   url='https://github.com/nicoloabrate/COREutils',
    package_name = ['coreutils'],
    packages=find_packages(),
    license='LICENSE.md',
    description='Handle core geometry and data for reactor physics applications',
-   long_description=open('README.md').read(),
+#    long_description=open('README.md').read(),
    test_suite="tests",
    setup_requires=['pytest-runner'],
    tests_require=['pytest'],

@@ -32,8 +32,8 @@ release = '1.0.0'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinxcontrib.bibtex',
-    'sphinxcontrib.rsvgconverter',
+    # 'sphinxcontrib.bibtex',
+    # 'sphinxcontrib.rsvgconverter',
     'sphinx_copybutton',
     'sphinx.ext.imgmath',
     'sphinx.ext.autosummary',
@@ -42,7 +42,7 @@ extensions = [
     'sphinx.ext.extlinks',
     'matplotlib.sphinxext.plot_directive',
     'nbsphinx'
-    #'jupyter_sphinx.execute'
+    # 'jupyter_sphinx.execute'
 ]
 
 intersphinx_mapping = {'python': ('https://docs.python.org/3', None),

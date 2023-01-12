@@ -1,13 +1,10 @@
-
-Developers
+Developers' manual
 ==================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
-   src_sampling
-   src_reduction
-   src_interpolation
-   src_iowrapper
-   src_metamodels
+   core
+   frenetic
+   freefem

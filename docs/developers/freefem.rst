@@ -1,10 +1,10 @@
 
-Interpolation
+FreeFEM++
 ===========================
 
-.. currentmodule:: rom.interpolation
+.. currentmodule:: coreutils.freefem
 
-.. autoclass:: RBF
+.. autoclass:: InpNE
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__
