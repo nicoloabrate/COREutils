@@ -602,12 +602,12 @@ class NEoutput:
                 if figname is not None:
                     ax.savefig(figname)
 
-    def RadialMap(self, core, what, z=0, t=0, pre=0, gro=0, grp=0,
-                  label=False, figname=None, which=None,
+    def RadialMap(self, what, z=0, t=0, pre=0, gro=0, grp=0,
+                  label=False, figname=None, hex=None,
                   usetex=False, fill=True, axes=None, cmap='Spectral_r',
                   thresh=None, cbarLabel=True, xlabel=None, ylabel=None,
                   loglog=None, logx=None, logy=None, title=True,
-                  scale=1, fmt="%.2f", numbers=False, **kwargs):
+                  scale=1, fmt="%.2f", **kwargs):
         """
         Plot FRENETIC output on the x-y plane.
 
@@ -666,18 +666,6 @@ class NEoutput:
         None.
 
         """
-        # ensure only one hyperslab slice is plotted
-        if not isinstance(z, (int, np.integer)):
-            raise NEOutputError("`z` should be an integer!")
-        if not isinstance(t, (int, np.integer)):
-            raise NEOutputError("`t` should be an integer!")
-        if not isinstance(gro, (int, np.integer)):
-            raise NEOutputError("`gro` should be an integer!")
-        if not isinstance(grp, (int, np.integer)):
-            raise NEOutputError("`grp` should be an integer!")
-        if not isinstance(pre, (int, np.integer)):
-            raise NEOutputError("`pre` should be an integer!")
-
         # check data type
         if isinstance(what, dict):  # comparison with FRENETIC and other vals.
             tallies = np.zeros((self.core.NAss, len(what.keys())))
@@ -705,11 +693,11 @@ class NEoutput:
         else:
             raise TypeError('Input must be str, dict or list!')
 
-        if title:
+        if title is True:
             timeSnap = self.core.TimeSnap
             idt = np.argmin(abs(t-timeSnap))
 
-            if core.dim != 2:
+            if self.core.dim != 2:
                 nodes = self.core.NE.AxialConfig.AxNodes
                 idz = np.argmin(abs(z-nodes))
                 title = 'z=%.2f [cm], t=%.2f [s]' % (nodes[idz], timeSnap[idt])
@@ -731,7 +719,7 @@ class NEoutput:
             # uom = '$%s$' % uom if usetex is True else uom
             cbarLabel = r'%s $%s$' % (dist, uom)
 
-        RadialMap(core, tallies=tallies, z=z, time=t, pre=pre, gro=gro,
+        RadialMap(self.core, tallies=tallies, z=z, time=t, pre=pre, gro=gro,
                   grp=grp, 
                   label=label,
                   figname=figname,
@@ -755,7 +743,7 @@ class NEoutput:
                   title=title,
                   scale=scale, 
                   fmt=fmt,
-                  numbers=False, 
+                #   numbers=False, 
                   **kwargs)
 
     def whereMaxSpectralRad(self, path, core, plot=True):
@@ -769,7 +757,7 @@ class NEoutput:
                     IK, IG = int(IK), int(IG)
                 else:
                     IK, IG = None, None
-        nElz = len(self.core.NE.AxialConfig.AxNodes) if core.dim != 2 else 1
+        nElz = len(self.core.NE.AxialConfig.AxNodes) if self.core.dim != 2 else 1
         myIK = 0
         for iz in range(0, nElz):
             for ih in range(1, self.core.NAss+1):

@@ -280,7 +280,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
               axes=None, cmap='Spectral_r', thresh=None, fontsize=6,
               cbarfontsize=15, cbarLabel=None, xlabel=None, ylabel=None,
               loglog=None, logx=None, logy=None, title=None,
-              scale=1, fmt=None, fmt_cbar=None, txtcol='k', numbers=False,
+              scale=1, fmt=None, fmt_cbar=None, txtcol='k', # numbers=False,
               cbar=True, **kwargs):
     """
     Plot something (geometry, input/output data) on the x-y plane.
