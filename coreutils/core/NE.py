@@ -8,7 +8,7 @@ import coreutils.tools.h5 as myh5
 from copy import deepcopy as cp
 # from collections import OrderedDict
 from pathlib import Path
-from coreutils.tools.utils import parse, MyDict
+from coreutils.tools.utils import MyDict
 from coreutils.core.UnfoldCore import UnfoldCore
 from coreutils.core.MaterialData import *
 from coreutils.core.Assembly import AssemblyGeometry, AxialConfig, AxialCuts
@@ -63,10 +63,10 @@ class NE:
         config = NEargs['config']
         NEfren = NEargs['fren']
         NEassemblylabel = NEargs['assemblylabel']
-        NEdata = NEargs['NEdata']
-        isPH = True if 'PH' in NEargs.keys() else False
+        NEdata = NEargs['nedata']
+        isPH = True if 'ph' in NEargs.keys() else False
 
-        self.time = [0]
+        self.time = [0.]
         # --- AXIAL GEOMETRY, IF ANY
         if cuts is not None and dim != 2:
             # initial axial configuration
@@ -147,7 +147,7 @@ class NE:
                             raise OSError(f'Number of neutron precursor families in {k} '
                                         'not consistent with the other regions!')
                 if isPH: # add photon data
-                    PHargs = NEargs['PH']
+                    PHargs = NEargs['ph']
                     self.get_PH_energy_grid(PHargs)
                     #for k, mat in self.PHMaterialData[temp].items():
                     #    if NPp == -1:
@@ -170,8 +170,8 @@ class NE:
         
         # ------ BUILD NE TIME_DEP. CONFIGURATIONS
         # do replacements if needed at time=0 s
-        if NEargs["replaceSA"] is not None:
-            self.replaceSA(CI, NEargs["replaceSA"], 0, isfren=NEfren)
+        if NEargs["replacesa"] is not None:
+            self.replaceSA(CI, NEargs["replacesa"], 0, isfren=NEfren)
         if NEargs["replace"] is not None:
             self.replace(CI, NEargs["replace"], 0, isfren=NEfren, P1consistent=P1consistent)
 
@@ -184,7 +184,7 @@ class NE:
                     self.time.append(t)
                 else:
                     # set initial condition
-                    t = 0
+                    t = 0.
                 # check operation
                 if config[time] == {}:  # enforce constant properties
                     nt = self.time.index(float(time))

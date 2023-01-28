@@ -45,7 +45,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
 
     Parameters
     ----------
-    core : obj
+    core : :class:`coreutils.core.Core`
         Reactor core object created with "Core" class.
     which : list
         List of int with assemblies to be plotted in the desired numeration

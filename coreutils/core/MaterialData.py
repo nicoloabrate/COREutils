@@ -1,14 +1,15 @@
 import os
-import warnings
-import coreutils
-from os import path
-from pathlib import Path
-import serpentTools as st
-from serpentTools import read
-from serpentTools.settings import rc as rcst
 import json
 import numpy as np
+import warnings
+import coreutils
+import serpentTools as st
 import matplotlib.pyplot as plt
+from coreutils.tools.utils import uppcasedict, lowcasedict
+from os import path
+from pathlib import Path
+from serpentTools import read
+from serpentTools.settings import rc as rcst
 from copy import deepcopy as copy
 from matplotlib import rc, checkdep_usetex
 
@@ -1134,7 +1135,7 @@ class NEMaterial():
         return self.Fiss.max() > 0
 
 
-class CZMaterialData:
+class CZData:
     """
     Assign TH material data to the reactor core.
 
@@ -1184,5 +1185,90 @@ class CZMaterialData:
                 self.pressures = dict(zip(CZassemblynames, pressures))
 
 
+class THHexData():
+    def __init__(self, which, inpdict):
+        inpdict = lowcasedict(inpdict)
+        # assign assemblies to type 
+        self.iHA = which
+        # geometry
+        self.nHeatPins = inpdict["n_fuel_pins"]
+        self.nNonHeatPins = inpdict["n_nonfuel_pins"]
+        self.isBiB = 0
+        self.isAnn = 0
+
+        if self.nHeatPins > 0:
+            if "fuel" in inpdict.keys():
+                self.FuelRad = np.sort(np.asarray((inpdict["fuel"][1])))
+            else:
+                self.FuelRad = np.array([0., 0.])
+            self.isAnn = 1 if self.FuelRad[0] > 0 else 0
+
+        if self.nNonHeatPins > 0:
+            if "nonfuel" in inpdict.keys():
+                self.NonFuelRad = np.sort(np.asarray((inpdict["nonfuel"][1])))
+            else:
+                self.NonFuelRad = np.array([0., 0.])
+            if not hasattr(self, "isAnn"):
+                self.isAnn = 1 if self.NonFuelRad[0] > 0 else 0
+
+        if self.nHeatPins > 0 or self.nNonHeatPins > 0:
+            if "gap" in inpdict.keys():
+                self.GapRad = np.sort(np.asarray((inpdict["gap"][1])))
+            else:
+                self.GapRad = [pin_r[1], pin_r[1]]
+
+            if "clad" in inpdict.keys():
+                self.CladRad = np.sort(np.asarray((inpdict["clad"][1])))
+            else:
+                self.CladRad = [gap_r[1], gap_r[1]]
+
+            if "wrapper" in inpdict.keys():
+                self.WrapThick = inpdict["wrapper"][0]
+            else:
+                self.WrapThick = 0.
+
+            if "bib_sides" in inpdict.keys():
+                self.BiBSides = np.sort(np.asarray((inpdict["bib_sides"])))
+                self.isBiB = 1
+            else:
+                self.BiBSides = np.array([0., 0.])
+
+            self.ThickClear = inpdict["clear_thick"] if "clear_thick" in inpdict.keys() else 0.
+            self.WireDiam = inpdict["wire_diameter"] if "wire_diameter" in inpdict.keys() else 0.
+            self.WirePitch = inpdict["wire_pitch"] if "wire_pitch" in inpdict.keys() else 0.
+            self.FuelPitch = inpdict["pin_pitch"]
+
+        # TH correlations
+        self.frictMult = 1
+        self.htcMult = 1
+        self.htcCorr = inpdict["htc_corr"]
+        self.frictCorr = inpdict["frict_corr"]
+        self.chanCouplCorr = inpdict["chan_coupling_corr"]
+
+        # materials
+        if hasattr(self, "FuelRad"):
+            self.FuelPinMat = inpdict["fuel"][0]
+
+        if hasattr(self, "NonFuelRad"):
+            self.NonFuelPinMat = inpdict["nonfuel"][0]
+
+        if hasattr(self, "GapRad"):
+            self.GapMat = inpdict["gap"][0]
+
+        if hasattr(self, "CladRad"):
+            self.CladMat = inpdict["clad"][0]
+
+        if hasattr(self, "WrapThick"):
+            self.WrapMat = inpdict["wrapper"][0]
+
+        if not hasattr(self, "GapMat") and not hasattr(self, "CladMat"):
+            self.isRadHomog = 1
+        else:
+            self.isRadHomog = 0
+
 class NEMaterialError(Exception):
+    pass
+
+
+class THDataError(Exception):
     pass

@@ -10,13 +10,15 @@ from copy import deepcopy as cp
 # from collections import OrderedDict
 from pathlib import Path
 
-from coreutils.tools.utils import parse, MyDict
+from coreutils.tools.utils import MyDict
+from coreutils.tools.parser import parse
 from coreutils.core.Map import Map
 from coreutils.core.NE import NE
 from coreutils.core.TH import TH
 from coreutils.core.UnfoldCore import UnfoldCore
 from coreutils.core.MaterialData import *
 from coreutils.core.Assembly import AssemblyGeometry, AxialConfig, AxialCuts
+from coreutils.frenetic.InpGen import inpgen, fillFreneticNamelist
 
 
 class Core:
@@ -54,6 +56,8 @@ class Core:
         Total power in Watt.
     trans: bool
         Boolean for transient case.
+    FreneticNamelist: dict
+        Dictionary containing keywords needed for FRENETIC input.
 
     Methods
     -------
@@ -111,10 +115,10 @@ class Core:
         # -- parse input file
         else:
 
-            CIargs, NEargs, THargs = parse(inpjson)
+            CIargs, NEargs, THargs, FRNargs = parse(inpjson)
 
-            tEnd = CIargs['tEnd']
-            nProf = CIargs['nSnap'] 
+            tEnd = CIargs['tend']
+            nProf = CIargs['nsnap'] 
             pitch = CIargs['pitch'] 
             shape = CIargs['shape'] 
             power = CIargs['power'] 
@@ -153,10 +157,10 @@ class Core:
 
         # --- ASSIGN COMMON INPUT DATA
         TfTc = []
-        CIargs['Tf'].sort()
-        CIargs['Tc'].sort()
-        fuel_temp = CIargs['Tf']
-        cool_temp = CIargs['Tc']
+        CIargs['tf'].sort()
+        CIargs['tc'].sort()
+        fuel_temp = CIargs['tf']
+        cool_temp = CIargs['tc']
         fuel_temp = np.asarray(fuel_temp,dtype=np.double)
         cool_temp = np.asarray(cool_temp,dtype=np.double)
         # ensure ascending order
@@ -171,7 +175,11 @@ class Core:
         self.trans = trans
         self.dim = dim
         self.power = power
+        if FRNargs is not None:
+            self.FreneticNamelist = FRNargs
 
+        # FIXME ensure consistency with NE and TH modules
+        # foresee start time for restarted simulations (TimeSnap could be translated in time but only for FRN input)
         if isinstance(nProf, (float, int)):
             dt = tEnd/nProf
             self.TimeSnap = np.arange(0, tEnd+dt, dt) if dt > 0 else [0]
@@ -193,25 +201,24 @@ class Core:
                 NEcore = tmp.coremap
                 self.Map = Map(NEcore, NEargs['rotation'], self.AssemblyGeom, inp=tmp.inp)
                 if not hasattr(self, 'Nass'):
-                    self.NAss = len((self.Map.serpcentermap))
+                    self.nAss = len((self.Map.serpcentermap))
             else:
                 NEcore = [1]
-                self.NAss = 1
+                self.nAss = 1
             datacheck = 1
             self.NE = NE(NEargs, self, datacheck=datacheck, P1consistent=P1consistent)
 
         # --- TH OBJECT
         if isTH and dim != 1:
             # --- assign TH map
-            assemblynames = THargs['THdata']['assemblynames']
+            assemblynames = THargs['thnames']
             nAssTypes = len(assemblynames)
             assemblynames = MyDict(dict(zip(assemblynames, np.arange(1, nAssTypes+1))))
-            THcore = UnfoldCore(
-                THargs['THdata']['filename'], THargs['rotation'], assemblynames).coremap
+            THcore = UnfoldCore(THargs['thdata']['filename'], THargs['rotation'], assemblynames).coremap
             if not hasattr(self, 'Map'):
                 self.Map = Map(THcore, THargs['rotation'], self.AssemblyGeom, inp=tmp.inp)
             if not hasattr(self, 'Nass'):
-                self.NAss = len((self.Map.serpcentermap))
+                self.nAss = len((self.Map.serpcentermap))
 
             self.TH = TH(THargs, self)
 
@@ -230,7 +237,7 @@ class Core:
             tmp2 = cp(NEcore)
             tmp2[tmp2 != 0] = 1
 
-            if THargs['THdata'] is not None:
+            if THargs['thdata'] is not None:
                 tmp3 = cp(THcore)
                 tmp3[tmp3 != 0] = 1
 
@@ -241,6 +248,17 @@ class Core:
             if (tmp1 != tmp3).all():
                 raise OSError("Assembly positions in CZ and TH mismatch. " +
                               "Check core input file!")
+
+        # --- complete FRENETIC namelist and make input, if any
+        if FRNargs is not None:
+            # update missing args with ones coming from Core object
+            updatedFreneticNamelist = fillFreneticNamelist(self)
+            self.FreneticNamelist = updatedFreneticNamelist
+
+            if "makeinput" in CIargs.keys():
+                if CIargs["makeinput"]:
+                    # make FRENETIC input
+                    inpgen(self, inpjson)
 
     def _from_h5(self, h5name):
         """Instantiate object from h5 file.

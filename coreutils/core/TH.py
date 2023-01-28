@@ -8,9 +8,9 @@ import coreutils.tools.h5 as myh5
 from copy import deepcopy as cp
 # from collections import OrderedDict
 from pathlib import Path
-from coreutils.tools.utils import parse, MyDict
+from coreutils.tools.utils import MyDict
 from coreutils.core.UnfoldCore import UnfoldCore
-from coreutils.core.MaterialData import *
+from coreutils.core.MaterialData import THHexData, CZData
 from coreutils.core.Assembly import AssemblyGeometry, AxialConfig, AxialCuts
 
 
@@ -53,25 +53,25 @@ class TH:
     def _init(self, THargs, CI):
         # parse inp args
         dim = CI.dim  # it could be useful in the future for 1D and 2D cases
-        CZassemblynames = THargs['CZnames']
-        CZconfig = THargs['CZconfig']
-        THconfig = THargs['THconfig']
-        THdata = THargs['THdata']
+        CZassemblynames = THargs['cznames']
+        CZconfig = THargs['czconfig']
+        THconfig = THargs['thconfig']
+        THdata = THargs['thdata']
         # sort list
         assnum = np.arange(1, len(CZassemblynames)+1)
 
         CZassemblynames = MyDict(dict(zip(CZassemblynames, assnum)))
         # define dict between strings and ints for assembly type
         self.CZassemblytypes = MyDict(dict(zip(assnum, CZassemblynames)))
-        if 'CZlabels' not in THargs.values():
+        if 'czlabels' not in THargs.values():
             self.CZlabels = self.CZassemblytypes
         else:
-            self.CZlabels = MyDict(dict(zip(assnum, THargs['CZlabels'])))
+            self.CZlabels = MyDict(dict(zip(assnum, THargs['czlabels'])))
         # define TH core with assembly types
-        CZcore = UnfoldCore(THargs['CZfile'], THargs['rotation'], CZassemblynames).coremap
+        CZcore = UnfoldCore(THargs['czfile'], THargs['rotation'], CZassemblynames).coremap
 
         # --- define THcore
-        THassemblynames = THdata['assemblynames']
+        THassemblynames = THargs['thnames']
         assnum = np.arange(1, len(THassemblynames)+1)
         THassemblynames = MyDict(dict(zip(THassemblynames, assnum)))
         # define dict between strings and ints for assembly type
@@ -80,6 +80,7 @@ class TH:
             self.THassemblylabels = self.THassemblytypes
         else:
             self.THassemblylabels = MyDict(dict(zip(assnum, THdata['assemblylabels'])))
+
         THinp = THdata['filename']
         tmp = UnfoldCore(THinp, THargs['rotation'], THassemblynames)
         THcore = tmp.coremap
@@ -88,8 +89,8 @@ class TH:
         if THcore.shape != CZcore.shape:
             raise OSError("CZ and TH core dimensions mismatch!")
 
-        self.CZtime = [0]
-        self.THtime = [0]
+        self.CZtime = [0.]
+        self.THtime = [0.]
         self.CZconfig = {}
         self.THconfig = {}
         self.CZconfig[0] = CZcore
@@ -121,34 +122,38 @@ class TH:
                         self.replaceSA(CI, config[time]["replace"], time, configtype=configtype, isfren=True)
 
         # assign material properties
-        cz = CZMaterialData(THargs['massflowrates'], THargs['pressures'], 
+        cz = CZData(THargs['massflowrates'], THargs['pressures'], 
                             THargs['temperatures'], self.CZassemblytypes.values())
-        self.CZMaterialData = cz
+        self.CZData = cz
+
+        self.THdata = {}
+        for HAtype, data in THdata['data'].items():
+            atype = THassemblynames[HAtype]
+            which = CI.getassemblylist(atype, self.THconfig[0], match=True, isfren=True)
+            self.THdata[HAtype] = THHexData(which, data)
 
         # --- ADD OPTIONAL ARGUMENTS
         if "axplot" in THargs:
-            if not hasattr(self, "THplot"):
+            if not hasattr(self, "thplot"):
                 self.THplot = {}
             self.THplot['axplot'] = THargs["axplot"]
+
         if "radplot" in THargs:
-                    if not hasattr(self, "THplot"):
+                    if not hasattr(self, "thplot"):
                         self.THplot = {}
                     self.THplot['radplot'] = THargs["radplot"]
+
         if "nelems" in THargs:
             self.nVol = THargs["nelems"]
-            if "zmin" not in THargs or "zmax" not in THargs:
-                raise OSError("zmin and zmax args needed for TH mesh refinement!")
-            self.zmin = THargs["zmin"]
-            self.zmax = THargs["zmax"]
+            self.zmesh = THargs["zmesh"]
+            self.zmesh.sort()
             if "nelref" in THargs:
                 self.nVolRef = THargs["nelref"]
-                if "zmaxref" not in THargs or "zminref" not in THargs:
-                    raise OSError("Beginning and end of the mesh refinement zone are both needed!")
-                self.zmaxref = THargs["zmaxref"]
-                self.zminref = THargs["zminref"]
-                zcoord, axstep = meshTH1d(self.zmin, self.zmax, self.nVol, 
-                                          nvolref=self.nVolRef, zminref=self.zminref,
-                                          zmaxref=self.zmaxref)
+                self.zref = THargs["zref"]
+                self.zref.sort()
+                zcoord, axstep = meshTH1d(min(self.zmesh), max(self.zmesh), self.nVol, 
+                                          nvolref=self.nVolRef, zminref=min(self.zref),
+                                          zmaxref=max(self.zref))
                 self.zcoord = zcoord
                 self.axstep = axstep
 
@@ -242,10 +247,10 @@ class TH:
             # check consistency between dz and which
             if len(pertconfig['which']) != len(pertconfig['what']):
                 raise OSError('Groups of assemblies and perturbations do' +
-                              'not match in TH "boundaryconditions"!')
+                              'not match in TH "BCs"!')
 
             if len(pertconfig['with']) != len(pertconfig['what']):
-                raise OSError('Each new value in TH "boundaryconditions"' +
+                raise OSError('Each new value in TH "BCs"' +
                               ' must come with its identifying parameter!')
 
             pconf = zip(pertconfig['which'], pertconfig['with'],
@@ -273,7 +278,7 @@ class TH:
                         nass = len(self.CZassemblytypes.keys())
                         self.CZassemblytypes[nass + 1] = newname
                         # update values inside parameters
-                        self.CZMaterialData.__dict__[whatpar][newname] = withpar
+                        self.CZData.__dict__[whatpar][newname] = withpar
 
                     # replace assembly
                     if newcore is None:
@@ -289,7 +294,7 @@ class TH:
 
         except KeyError:
             raise OSError('"which" and/or "with" and/or "what" keys missing' +
-                          ' in "boundaryconditions" in TH!')
+                          ' in "BCs" in TH!')
 
     @property
     def nReg(self):

@@ -20,8 +20,6 @@ NDIM = $NDIM,		           !number of hexagonal-z spatial dimensions (=0,1,2,3)
 ALBEDOXY = +0.00000D+00,	   !albedo coefficient, xy-directions
 ALBEDOZN = +0.00000D+00,	   !albedo coefficient, lower z-plane
 ALBEDOZP = +0.00000D+00,	   !albedo coefficient, upper z-plane
-!IBUCKXY = 0,		           !buckling model, xy-directions (=0,1)
-!IBUCKZ	= 0,		           !buckling model, axial direction (=0,1)
 
 !Axial cuts
 NELEZ0 = $NELEZ0,		       !number of axial nodes of input mesh
@@ -37,9 +35,6 @@ SPLITZ = $SPLITZ,
 TOLLFLUX = 1.0D-08,       !tolerance for the relative error of the flux
 IOUTACC = 1,		      !convergence acceleration of outer iterations (0=no; 1=yes)
 NOUTMAX = 12000,          !maximum number of outer iterations per inversion
-NBASEFH = 4,              !number of basis functions for flux in plane (=1,2,3,4)
-NBASEFZ = 3,              !number of basis functions for flux in axial direction (=1,2,3)
-NBASELZ = 2,              !number of basis functions for leakage in axial direction (=0,2)
 /
 
 &NUMERICS2
@@ -47,19 +42,15 @@ IMETHOD	= 3,              !kinetics method (0=PK; 1=full/theta; 2=IQM; 3=PCQM)
 IALGVAR	= 1,              !kinetics method algorithmic variant
 IADAPT = 1,               !adaptive time step selection (0=no; 1=yes)
 ICTRLQTY = 0,             !
-!DTAMAX = 1.0D+00,        ![s] maximum time step for adjoint calculations
-!DTSMAX = 1.0D-01,        ![s] maximum time step for shape calculations
-DTFMAX = 1.0D-3,          !
+DSHPMAX = 1.0D-03,       !maximum allowed variation of shape across shape step
 DTRMAX = 1.0D-5,          ![s] maximum time step for reactivity updates
-!DSHPMAX = 1.0D-03,       !maximum allowed variation of shape across shape step
-!DAMPMAX = 1.5D+00,       !maximum allowed variation of amplitude across reactivity stepS
 TOLLNORM = 1.0D-03,       !tolerance for the relative error of the normalisation condition (IQM)
 TOLLFORM = 1.0D-03,       !
 TOLLINTP = 1.0D-03,       !
 FACSAF = 1,               !
 IADJOINT = 1,             !
 NNORMMAX = 10,            !maximum number of normalisation condition iterations (IQM)
-TETA = 1.0,		          !theta-method parameter of prompt neutron balance equation (0=explicit; (0,1]=implicit)
+TETA = 1.0,               !theta-method parameter of prompt neutron balance equation (0=explicit; (0,1]=implicit)
 /
 
 &NUMERICS3

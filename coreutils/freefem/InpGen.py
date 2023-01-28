@@ -33,7 +33,7 @@ def inpgen(core, json, casename=None, plotNE=None, whichSA=None,
 
     Parameters
     ----------
-    core : obj
+    core : :class:`coreutils.core.Core`
         Core object created with Core class.
     json : str
         Absolute path of the ``.json`` input file.

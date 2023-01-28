@@ -232,7 +232,7 @@ class THoutput:
                 if self.core.dim == 1:
                     hex = [0]
                 else:
-                    hex = np.arange(0, self.core.NAss).tolist()
+                    hex = np.arange(0, self.nAss).tolist()
 
             # "t" refers to slicing
             if t is None:
@@ -284,7 +284,7 @@ class THoutput:
                     if self.core.dim == 1:
                         hex = [0]
                     else:
-                        hex = np.arange(0, self.core.NAss).tolist()
+                        hex = np.arange(0, self.nAss).tolist()
 
                 # "t" refers to slicing
                 times = np.asarray(fh5[group]["Time"])
@@ -628,7 +628,7 @@ class THoutput:
         """
         # check data type
         if isinstance(what, dict):  # comparison with FRENETIC and other vals.
-            tallies = np.zeros((self.core.NAss, len(what.keys())))
+            tallies = np.zeros((self.nAss, len(what.keys())))
             for i, k in enumerate(what.keys()):
                 v2 = what[k]
                 v1 = self.get(k, hex=hex, t=t, z=z)
@@ -639,7 +639,7 @@ class THoutput:
                 tallies[:, i] = tmp*100
 
         elif isinstance(what, list):  # list of output
-            tallies = np.zeros((self.core.NAss, len(what)))
+            tallies = np.zeros((self.nAss, len(what)))
             for i, w in enumerate(what):
                 _tmp = self.get(w, hex=hex, t=t, z=z)
                 tallies[:, i] = np.squeeze(_tmp)

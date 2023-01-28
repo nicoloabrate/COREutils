@@ -28,7 +28,7 @@ def writeNEdata(core, verbose=False, fmt=1):
 
     Parameters
     ----------
-    core : obj
+    core : :class:`coreutils.core.Core`
         Core object created with Core class
     verbose : bool, optional
         Set to ``True`` in order to print also capture, nubar and scattering
@@ -157,7 +157,7 @@ def writeConfig(core):
 
     Parameters
     ----------
-    core : obj
+    core : :class:`coreutils.core.Core`
         Core object created with Core class.
 
     Returns
@@ -196,7 +196,7 @@ def writeConfig(core):
             rad_config[t] = core.writecorelattice(fname=None, time=t)
 
         # --- write config.inp file
-        for n in range(1, core.NAss+1):  # loop over all assemblies (1 assembly in 1D)
+        for n in range(1, core.nAss+1):  # loop over all assemblies (1 assembly in 1D)
             iType = core.getassemblytype(n, core.NE.config[t], isfren=False)
             aType = core.NE.assemblytypes[iType]
             x, y = core.Map.serpcentermap[n]

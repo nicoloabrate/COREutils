@@ -92,7 +92,7 @@
           "replace" : {
                         "CR": [3, 28, 45, 92, 106, 123, 184, 201, 237, 262, 279, 326, 340, 357, 418, 435]
                       },
-          "boundaryconditions" : {
+          "BCs" : {
                                     "7.6" : {
                                               "which" : [[25, 26], [376, 355]],
                                               "what" : ["massflowrates", "massflowrates"],

@@ -178,16 +178,13 @@ class AxialConfig:
 
     def _init(self, cuts, splitz, labels=None, NE_dim=3, assemblynames=None):
         if isinstance(splitz, list):
-            splitz = np.asarray(splitz)
-        
+            splitz = np.asarray(splitz, dtype=int)
+
         # cuts defining different material regions
         xscuts = cuts['xscuts']
         # homogenisation cuts
-        if cuts['zcuts'] is None:
-            self.zcuts = list(set(up+lo))
-        else:
-            self.zcuts = cuts['zcuts']
-            self.zcuts.sort()
+        self.zcuts = [float(z) for z in cuts['zcuts']]
+        self.zcuts.sort()
 
         self.nZ = len(self.zcuts)-1
         if len(splitz) != self.nZ:

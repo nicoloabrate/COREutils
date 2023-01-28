@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 from .InpTH import writeTHdata, writeCZdata, makeTHinput
 from .InpNE import writeConfig, makeNEinput, writemacro, writeNEdata
 import coreutils.tools.h5 as myh5
+from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticNamelistError
+
 try:
     import importlib.resources as pkg_resources
 except ImportError:
@@ -29,25 +31,282 @@ repopath = pathlib.Path(__file__).resolve().parents[2]
 repo = git.Repo(repopath)
 sha = repo.head.object.hexsha  # commit id
 
-def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
-           H5fmt=2, NEtxt=False):
+
+def fillFreneticNamelist(core):
+    """Fill FRENETIC kw dict with missing data, ensuring their consistency.
+
+    Parameters
+    ----------
+    core : :class:`coreutils.core.Core`
+        Object storing the information needed to fill the missing
+        keys.
+
+    Raises
+    ------
+    FreneticNamelistError
+        If a keyword is not specified
+    """
+    # --- CI
+    try:
+        nL = np.count_nonzero(core.Map.inp, axis=1)
+        nL = nL[nL != 0]
+        # parse number of rows
+        nR = len(nL)
+        # flip to be consistent with FRENETIC numeration
+        if nL[0] < nL[-1]:
+            nL = (np.flipud(nL))
+            nL = nL.tolist()
+
+        pitch = core.AssemblyGeom.pitch
+        nH = core.nAss
+        try:
+            nDiff = len(core.TH.assemblytypes)
+        except AttributeError:
+            nDiff = len(core.NE.assemblytypes)
+            logging.warn('nDiff variable set equal to the number of NE assemblies')
+
+    except AttributeError as err:
+        if "object has no attribute 'Map'" in str(err):  # assume 1D core
+            nL, nR, nDiff, nH = 1, 1, 1, 1
+            pitch = core.AssemblyGeom.pitch
+        else:
+            print(err)
+
+    core.FreneticNamelist['nChan'] = nH
+    core.FreneticNamelist['nL'] = nL
+    core.FreneticNamelist['nR'] = nR
+    core.FreneticNamelist['nDiff'] = nDiff
+    core.FreneticNamelist['HexPitch'] = pitch/100
+    core.FreneticNamelist['LeXag'] = core.AssemblyGeom.edge if core.dim != 1 else 1.
+    core.FreneticNamelist['isNETH'] = 2 if hasattr(core, "NE") and hasattr(core, "TH") and core.dim == 3 else 0
+    core.FreneticNamelist['tEnd'] = core.TimeEnd if core.trans else 0.
+
+    # unionise NE and TH configuration times in a single list
+    TimeNETHConfig = []
+    if hasattr(core, "NE"):
+        TimeNETHConfig.extend(core.NE.time)
+    if hasattr(core, "TH"):
+        TimeNETHConfig.extend(core.TH.CZtime)
+
+    TimeNETHConfig = list(set(TimeNETHConfig))
+
+    # --- is NE
+    core.FreneticNamelist['nDim'] = core.dim
+    if hasattr(core, "NE"):
+        if core.dim != 2:
+            tmp = core.NE.AxialConfig.splitz
+            NZ = len(core.NE.AxialConfig.zcuts)-1
+            if isinstance(tmp, (int)):
+                splitz = [tmp]*NZ
+            elif isinstance(tmp, (list, np.ndarray)):
+                splitz = tmp if len(tmp) > 1 else [tmp[0]]*NZ
+            else:
+                raise OSError(f'splitz in core.NEAxialsConfig.splitz cannot'
+                            f'be of type {type(tmp)}')
+            meshz = core.NE.AxialConfig.zcuts
+        else:
+            NZ = 1
+            splitz = [1]
+            meshz = [0., 0.]
+
+        core.FreneticNamelist['iRun'] = 2 if core.trans else 1
+        core.FreneticNamelist['nConf'] = len(core.NE.time)
+        core.FreneticNamelist['nElez0'] = NZ
+        core.FreneticNamelist['Meshz0'] = meshz
+        core.FreneticNamelist['SplitZ'] = splitz
+    else:
+        core.FreneticNamelist['iRun'] = -1
+        core.FreneticNamelist['nConf'] = -1
+        core.FreneticNamelist['nElez0'] = -1
+        core.FreneticNamelist['Meshz0'] = -1
+        core.FreneticNamelist['SplitZ'] = -1
+
+    # --- is TH
+    if hasattr(core, "TH"):
+        core.FreneticNamelist['nElems'] = core.TH.nVol
+        core.FreneticNamelist['xLengt'] = core.TH.zmesh[1]-core.TH.zmesh[0]
+        if hasattr(core.TH, "nVolRef"):
+            core.FreneticNamelist['nElRef'] = core.TH.nVolRef
+            core.FreneticNamelist['xBRefi'] = core.TH.zref[0]
+            core.FreneticNamelist['xERefi'] = core.TH.zref[1]
+            core.FreneticNamelist['iTyMsh'] = 1
+        else:
+            core.FreneticNamelist['iTyMsh'] = 0
+
+        if np.isnan(core.FreneticNamelist['zLayer']):
+            core.FreneticNamelist['zLayer'] = core.TH.axstep
+            core.FreneticNamelist['nLayer'] = core.TH.axstep.shape[0]
+
+        if np.isnan(core.FreneticNamelist['nTimeProf']):
+            core.FreneticNamelist['TimeProf'] = TimeNETHConfig
+            core.FreneticNamelist['nTimeProf'] = len(core.FreneticNamelist['TimeProf'])
+        #  assign THdata in ad hoc keys
+        iType = 1
+        for THtype, THdata in core.TH.THdata.items():
+            core.FreneticNamelist[f'HAType{iType}'] = {}
+            HAdict = core.FreneticNamelist[f'HAType{iType}']
+            HAdict['iHA'] = THdata.iHA
+            HAdict['iPinSolidX'] = THdata.isRadHomog
+            HAdict['nFuelX'] = THdata.nHeatPins
+            HAdict['nNonHeatedX'] = THdata.nNonHeatPins
+            # geometry
+            if hasattr(THdata, 'FuelRad'):
+                HAdict['dFuelX'] = THdata.FuelRad[1]*2
+                HAdict['dFuelInX'] = THdata.FuelRad[0]*2
+            else:
+                HAdict['dFuelX'] = 0.
+                HAdict['dFuelInX'] = 0.
+
+            if hasattr(THdata, 'NonFuelRad'):
+                HAdict['DFuelNfX'] = THdata.NonFuelRad[1]*2
+            else:
+                HAdict['DFuelNfX'] = 0.
+
+            if hasattr(THdata, 'GapRad'):
+                HAdict['ThickGasX'] = THdata.GapRad[1]-THdata.GapRad[0]
+            else:
+                HAdict['ThickGasX'] = 0.
+
+            if hasattr(THdata, 'CladRad'):
+                HAdict['RCoX'] = THdata.CladRad[1]
+                HAdict['RCiX'] = THdata.CladRad[0]
+            else:
+                HAdict['RCoX'] = 0.
+                HAdict['RCiX'] = 0.
+
+            if hasattr(THdata, 'WrapThick'):
+                HAdict['ThickBoxX'] = THdata.WrapThick
+                HAdict['ThickClearX'] = THdata.ThickClear
+            else:
+                HAdict['ThickBoxX'] = 0.
+                HAdict['ThickClearX'] = 0.
+
+            if hasattr(THdata, 'BibSides'):
+                HAdict['InBoxInsideX'] = THdata.BibSides[0]
+                HAdict['InBoxOutsideX'] = THdata.BibSides[1]
+            else:
+                HAdict['InBoxInsideX'] = 0.
+                HAdict['InBoxOutsideX'] = 0.
+
+            if hasattr(THdata, 'WireDiam'):
+                HAdict['dWireX'] = THdata.WireDiam
+                HAdict['pWireX'] = THdata.WirePitch
+            else:
+                HAdict['dWireX'] = 0.
+                HAdict['pWireX'] = 0.
+
+            if hasattr(THdata, 'FuelPitch'):
+                HAdict['PtoPDistX'] = THdata.FuelPitch
+            else:
+                HAdict['PtoPDistX'] = 0.
+
+            HAdict['iBiBX'] = THdata.isBiB
+            HAdict['iCRadX'] = THdata.isAnn
+            # correlations
+            HAdict['FPeakX'] = THdata.frictMult
+            HAdict['QBoxX'] = THdata.htcMult
+            HAdict['iHpbPinX'] = THdata.htcCorr
+            HAdict['iTyFrictX'] = THdata.frictCorr
+            HAdict['iChCouplX'] = THdata.chanCouplCorr
+            # material
+            if hasattr(THdata, 'FuelPinMat'):
+                HAdict['iFuelX'] = THdata.FuelPinMat
+            else:
+                HAdict['iFuelX'] = 0
+
+            if hasattr(THdata, 'NonFuelPinMat'):
+                HAdict['cNfX'] = THdata.NonFuelPinMat
+            else:
+                HAdict['cNfX'] = 0
+
+            if hasattr(THdata, 'GapMat'):
+                HAdict['iGapX'] = THdata.GapMat
+            else:
+                HAdict['iGapX'] = 0
+
+            if hasattr(THdata, 'CladMat'):
+                HAdict['iCladX'] = THdata.CladMat
+            else:
+                HAdict['iCladX'] = 0
+
+            if hasattr(THdata, 'WrapMat'):
+                HAdict['BoxMatX'] = THdata.WrapMat
+            else:
+                HAdict['BoxMatX'] = 0
+
+            # FIXME add multiplier to matlst and heastghx (radial discretisation)
+            matlst = [1, 0, 0]
+            if hasattr(THdata, "GapMat"):
+                matlst[1] = 2
+            if hasattr(THdata, "CladMat"):
+                matlst[2] = 3
+
+            HAdict['MaterHX'] = matlst
+            HAdict['HeatGhX'] = [1, 0, 0]
+            HAdict['iMatX'] = 1
+            iType += 1
+        
+        eraseKeys = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX",
+                     "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX", "BoxMatX", 
+                     "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", "ThickGasX",
+                     "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "DFuelNfX", "PtoPDistX", 
+                     "iCRadX", "cNfX", "iCladX", "iGapX", "MaterHX", "HeatGhX"]
+        for key in eraseKeys:
+            core.FreneticNamelist.pop(key)
+    else:
+        setToValue = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX",
+                      "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX",
+                      "BoxMatX", "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", "ThickGasX", 
+                      "DFuelNfX", "PtoPDistX", "iCRadX" "cNfX" "iCladX" "iGapX" "MaterHX" "HeatGhX", 
+                      "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "PtoPDistX", "nElems", "xLengt", 
+                      "zLayer", "nLayer", "TimeProf", "nTimeProf", "iMatX", "MaterHX", "HeatGhX"]
+        for key in setToValue:
+            core.FreneticNamelist[key] = -1
+
+    # --- final sanity check
+    for k, v in core.FreneticNamelist.items():
+        if "HAType" not in k:
+            if isinstance(v, float):
+                # check possible missing kw set to np.nan in FreneticNamelist class
+                if np.isnan(v):
+                    raise FreneticNamelistError(f"`{k}` keyword is not specified! Check input keywords in the .json file!")
+        else:
+            for kk, vv in v.items():
+                if isinstance(vv, float):
+                    # check possible missing kw set to np.nan in FreneticNamelist class
+                    if np.isnan(vv):
+                        raise FreneticNamelistError(f"`{kk}` keyword is not specified for {k}! Check input keywords in the .json file!")
+
+    # --- arrange data in namelists
+    frnnml_full = {}
+    namelists = FreneticNamelist().namelists
+    for nml, lst in namelists.items():
+        if nml not in ["COMMONS", "THERMALHYDRAULIC"]:
+            frnnml_full[nml] = {}
+            for s in lst:
+                frnnml_full[nml][s] = core.FreneticNamelist[s]
+        else:
+            for iTHtype, THtype in enumerate(core.TH.THdata.keys()):
+                hatype = f'HAType{iTHtype+1}'
+                if hatype not in frnnml_full.keys():
+                    frnnml_full[hatype] = {}
+                frnnml_full[hatype][nml] = {}
+                for s in lst:
+                    frnnml_full[hatype][nml][s] = core.FreneticNamelist[hatype][s]
+
+    return frnnml_full
+
+
+def inpgen(core, json):
     """
     Make FRENETIC NE/TH files if the required data are in core object.
 
     Parameters
     ----------
-    core : obj
+    core : :class:`coreutils.core.Core`
         Core object created with Core class.
     json : str
         Absolute path of the ``.json`` input file.
-    casename : str, optional
-        File path where the case directory is located, by default ``None``.
-        In this case, the name of the FRENETIC case is 'case1'.
-    templates : dict, optional
-        File path where the template files are located, by default ``None``.
-        In this case, the default template is used.
-    H5fmt : bool, optional
-        Set ``True`` to print NE data also in txt format, by default ``False``.
 
     Returns
     -------
@@ -56,28 +315,32 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
     # generate case directory-tree
     cwd = os.getcwd()
     iwd = os.path.dirname(json)
-    if casename is None:
-        casename = join(cwd, 'case1')
 
     if '.json' not in json:
         json = f"{json}.json"
+    
+    json = pathlib.Path(json)
+    casename = json.stem
 
     if not os.path.exists(iwd):
         raise OSError(f'{iwd} path does not exist!')
 
     casepath = mkdir(join(iwd, casename))
     AUXpath = mkdir("auxiliary", casepath)
-    AUXpathNE = mkdir("NE", AUXpath)
-    AUXpathTH = mkdir("TH", AUXpath)
 
-    # --- save json to root directory
-    jsonname = pathlib.Path(json).name
+    if hasattr(core, "NE"):
+        AUXpathNE = mkdir("NE", AUXpath)
+
+    if hasattr(core, "TH"):
+        AUXpathTH = mkdir("TH", AUXpath)
+
+    # --- echoing json to root directory
     try:
-        copyfile(f'{json}', join(casepath, f'{jsonname}'))
+        copyfile(f'{json}', join(casepath, f'{json.name}'))
     except SameFileError:
-        os.remove(join(casepath, f'{jsonname}'))
-        print(f'Overwriting file {jsonname}')
-        copyfile(f'{json}', join(casepath, f'{jsonname}'))
+        os.remove(join(casepath, f'{json.name}'))
+        print(f'Overwriting file {json.name}')
+        copyfile(f'{json}', join(casepath, f'{json.name}'))
 
     # --- add GIT info
     print_coreutils_info()
@@ -95,31 +358,16 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
         print(f'Overwriting file {corefname}')
         copyfile(f'{corefname}', join(casepath, f'{corefname}'))
 
-    templateTH, templateCZ, templateCI, templateNE = None, None, None, None
-    if isinstance(templates, dict):
-        if 'TH' in templates.keys():
-            templateTH = templates['TH']
-
-        if 'CZ' in templates.keys():
-            templateCZ = templates['CZ']
-
-        if 'NE' in templates.keys():
-            templateNE = templates['NE']
-
-        if 'CI' in templates.keys():
-            templateCI = templates['CI']
-
-    # make common input (common_input.dat)
-    makecommoninput(core, templateCI)
-    # move common_input
+    # --- COMMON INPUT (common_input.dat)
+    makecommoninput(core)
     try:
         move('common_input.dat', join(casepath, 'common_input.dat'))
     except SameFileError:
         os.remove(join(casepath, 'common_input.dat'))
-        print('Overwriting file {}'.format(json))
+        print(f'Overwriting file {str(json)}')
         move('common_input.dat', join(casepath, 'common_input.dat'))
-    
-    # make NE input (config.dat, macro.nml)
+
+    # --- NE input (config.dat, macro.nml)
     if hasattr(core, "NE"):
         NE = True
         isNE1D = True if core.dim == 1 else False
@@ -128,17 +376,12 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
 
     if NE:
         NEpath = mkdir("NE", casepath)
-        # define number of axial cuts
-        nFreAxReg = len(core.NE.AxialConfig.zcuts)-1 if core.dim != 2 else 1
-
         # define nmix (number of different regions)
         nmix = len(core.NE.regions.keys())
-
         # --- write config.inp
-        writeConfig(core, nFreAxReg)
-
+        writeConfig(core)
         # --- write input.dat
-        makeNEinput(core, template=templateNE, H5fmt=H5fmt)
+        makeNEinput(core)
 
         # move NE files
         NEfiles = ['input.dat', 'config.inp']
@@ -173,11 +416,11 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
         lambda0 = mat0.__dict__['lambda']
 
         # --- write macro.nml
-        writemacro(core, nmix, vel, lambda0, beta0, nFreAxReg,
-                   (Tf, Tc), core.NE.regions, H5fmt=H5fmt)
+        writemacro(core, nmix, vel, lambda0, beta0,
+                   (Tf, Tc), core.NE.regions, H5fmt=2)
 
         # -- write NE_data.h5
-        writeNEdata(core, verbose=False, H5fmt=H5fmt, txt=NEtxt)
+        writeNEdata(core, verbose=False, H5fmt=2, txt=0)
         # move NE files
         NEfiles = ['macro.nml', 'NE_data.h5']
         for f in NEfiles:
@@ -199,7 +442,7 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
     if TH:
         THpath = mkdir("TH", casepath)
         THdatapath = mkdir("data", THpath)
-        writeTHdata(core, template=templateTH)
+        writeTHdata(core)
         # move TH data files
         pwd = os.getcwd()
         for f in os.listdir(pwd):
@@ -211,7 +454,7 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
         # write CZ .txt data
         writeCZdata(core)
         # write input.dat
-        makeTHinput(core, template=templateCZ)
+        makeTHinput(core)
         # move TH files
         THfiles = ['mdot.dat', 'press.dat', 'temp.dat', 'input.dat']
         [move(f, join(THpath, f)) for f in THfiles]
@@ -225,6 +468,15 @@ def inpgen(core, json, casename=None, templates=None, plot=None, whichSA=None,
 
 
 def auxNE(core, AUXpathNE):
+    """Generate NE auxiliary files.
+
+    Parameters
+    ----------
+    core : :class:`coreutils.core.Core`
+        Core object created with Core class.
+    AUXpathNE : str
+        Path to auxiliary NE directory.
+    """
     plotNE = core.NE.plot if hasattr(core.NE, "plot") else None
     # plot configurations
     if core.dim == 3:
@@ -382,6 +634,15 @@ def auxNE(core, AUXpathNE):
 
 
 def auxTH(core, AUXpathTH):
+    """Generate TH auxiliary files.
+
+    Parameters
+    ----------
+    core : :class:`coreutils.core.Core`
+        Core object created with Core class.
+    AUXpathTH : str
+        Path to auxiliary TH directory.
+    """
     # plotTH = core.TH.plotTH
     # plot configurations
     if core.dim == 3:
@@ -426,93 +687,37 @@ def auxTH(core, AUXpathTH):
             move(f, join(AUXpathTH, f))
 
 
-def makecommoninput(core, template=None):
+def makecommoninput(core):
     """
     Make common_input.dat file.
 
     Parameters
     ----------
-    core : obj
+    core : :class:`coreutils.core.Core`
         Core object created with Core class.
-    template : str, optional
-        File path where the template file is located, by default ``None``.
-        In this case, the default template is used.
-    tEnd : float, optional
-        Final time instant for FRENETIC simulation, by default ``None``.
+
     Returns
     -------
     ``None``
     """
-    # parse number of hexagons per row
-    try:
-        NL = np.count_nonzero(core.Map.inp, axis=1)
-        NL = NL[NL != 0]
-        # parse number of rows
-        NR = len(NL)
-        # flip to be consistent with FRENETIC numeration
-        if NL[0] < NL[-1]:
-            NL = np.flipud(NL)
-        # convert in strings
-        NL = [str(i) for i in NL]
-        # join strings
-        NL = ','.join(NL)
-        NH = core.NAss
-        PITCH = core.AssemblyGeom.pitch
-        try:
-            NDIFF = len(core.TH.assemblytypes)
-        except AttributeError:
-            NDIFF = len(core.NE.assemblytypes)
-            logging.warn('NDIFF variable set equal to the number of NE assemblies')
-
-    except AttributeError as err:
-        if "object has no attribute 'Map'" in str(err):  # assume 1D core
-            NL, NR, NDIFF, NH = 1, 1, 1, 1
-            PITCH = core.AssemblyGeom.pitch
-        else:
-            print(err)
-    # check if coupled calculation is possible
-    if all([i in core.__dict__.keys() for i in ['THconfig', 'NEconfig']]):
-        isNETH = 2
-    else:
-        isNETH = 0
-
-    TimeEnd = core.TimeEnd if core.trans else 0
-
-    nVolRef = core.TH.nVolRef if hasattr(core, "TH") else 0
-    zmaxref = core.TH.zmaxref if hasattr(core, "TH") else 0
-    zminref = core.TH.zminref if hasattr(core, "TH") else 0
-    nVol = core.TH.nVol if hasattr(core, "TH") else 0
-    zmin = core.TH.zmin if hasattr(core, "TH") else 0
-    zmax = core.TH.zmax if hasattr(core, "TH") else 0
-
-    data = {'$NH': NH, '$NR': NR, '$NL': NL, '$NDIFF': NDIFF,
-            '$TEND': TimeEnd, '$ISNETH': isNETH,
-            '$PITCH': PITCH/100, '$NVOL': nVol, 
-            '$NVREF': nVolRef, '$XBREFI': zminref,
-            '$XEREFI': zmaxref, '$HEIGHT': zmax-zmin}
-
-    if template is None:
-        tmp = pkg_resources.read_text(templates, 'template_common_input.dat')
-        tmp = tmp.splitlines()
-    else:
-        with open(template, 'r') as f:
-            temp_contents = f.read()
-            tmp = temp_contents. splitlines()
-
+    frnnml = FreneticNamelist()
     f = io.open('common_input.dat', 'w', newline='\n')
 
-    for line in tmp:  # loop over lines in reference file
-        for key, val in data.items():  # loop over dict keys
-            if key in line:
-                if key in ['$TEND', '$PITCH']:
-                   val = ff(val, 'double')
-                else:
-                   val = str(val)
-                
-                line = line.replace(key, val)
+    for namelist in frnnml.files["common_input.dat"]:
+        f.write(f"&{namelist}\n")
+        for key, val in core.FreneticNamelist[namelist].items():
+            # format value with FortranFormatter utility
+            val = ff(val)
+            # "vectorise" in Fortran input if needed
+            if key in frnnml.vector_inp:
+                val = f"{core.nAss}*{val}"
+            # FIXME in the future there will be no need for (1, 1:nASS)
+            if key.casefold() in ["nelref", "xbrefi", "xerefi"]:
+                f.write(f"{key}(1, 1:{core.nAss}) = {val}\n")
+            else:
+                f.write(f"{key} = {val}\n")
         # write to file
-        f.write(line)
-        f.write('\n')
+        f.write("/\n")
 
 
 def mkdir(dirname, indirs=None):
@@ -550,6 +755,16 @@ def mkdir(dirname, indirs=None):
 
 
 def print_coreutils_info():
+    """Print information for reproducibility.
+
+    Parameters
+    ----------
+    ``None``
+
+    Returns
+    -------
+    ``None``
+    """
     # datetime object containing current date and time
     now = datetime.now()
     mmddyyhh = now.strftime("%B %d, %Y %H:%M:%S")

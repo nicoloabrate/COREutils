@@ -8,17 +8,13 @@ import pandas as pd
 import h5py as h5
 from . import templates
 from coreutils.tools.utils import fortranformatter as ff
-try:
-    import importlib.resources as pkg_resources
-except ImportError:
-    # Try backported to PY<37 `importlib_resources`.
-    import importlib_resources as pkg_resources
+from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticNamelistError
 
 # TODO: implementare gestione proprieta' fotoni
 # TODO: quale coppia di temperature considero per i param. cinetici?
 
-def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
-               unimap, H5fmt=1):
+def writemacro(core, nmix, vel, lambda0, beta0, temps,
+               unimap, H5fmt=2):
     """
     Write the input file "macro.nml" for the NE module of FRENETIC.
 
@@ -34,8 +30,6 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
         Precursors' families decay constants
     beta0 : ndarray
         Precursors' families physical neutron delayed fraction
-    nFrenCuts : int
-        Number of axial cuts in FRENETIC geometry
     temps : list
         List of tuples with T fuel and T coolant used to evaluate NE data
     unimap : dict
@@ -47,62 +41,63 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
     ``None``
     """
     macronames = ["DIFFCOEF", "XS_TOT", "XS_SCATT", "XS_FISS", "NUSF", "ESIGF"]
+    # FIXME kerma should be separated from photon data and set to zero if not present in the input data
     macronamesp = ["KERMA", "MUSIGP", "DIFFP", "XS_TOT_P", "XS_SCATT_P", "KERMAP"]
     inpnames = ["filediff", "filesigt", "filesigs", "filesigf", "filenusigf",
                 "fileesigf"]
     inpnamesp = ["filekerma", "filemusigp", "filediffp", "filesigtp", "filesigsp", "filekermap"]
 
-    # FIXME kerma should be separated from photon data
+    nFrenCuts = len(core.NE.AxialConfig.zcuts)-1 if core.dim != 2 else 1
     (Tf, Tc) = temps
     # -- write macro.nml file
     asstypeN = 0
     f = io.open('macro.nml', 'w', newline='\n')
     f.write('&MACROXS0\n')
-    f.write(f'NMAT = {nmix} \n')
-    f.write(f'NGRO = {core.NE.nGro} \n')
-    f.write(f'NPRE = {core.NE.nPre} \n')
-    f.write(f'NDHP = {core.NE.nDhp} \n')
-    f.write(f'NGRP = {core.NE.nGrp } \n')
-    f.write(f'NPRP = {core.NE.nPrp } \n')
+    f.write(f'nMat = {nmix} \n')
+    f.write(f'nGro = {core.NE.nGro} \n')
+    f.write(f'nPre = {core.NE.nPre} \n')
+    f.write(f'nDhp = {core.NE.nDhp} \n')
+    f.write(f'nGrp = {core.NE.nGrp } \n')
+    f.write(f'nPrp = {core.NE.nPrp } \n')
     f.write('/\n\n')
     f.write('&MACROXS\n')
-    f.write('IRHO = 0,\n')
-    f.write(f'VELOC0(1:{core.NE.nGro}) = ')
+    f.write('iRHO = 0,\n')
+    f.write(f'velc0(1:{core.NE.nGro}) = ')
 
     for igro in range(core.NE.nGro):
-        f.write('%s,' % ff(vel[igro], 'double'))
+        f.write('%s,' % ff(vel[igro]))
 
     if core.NE.nGrp > 0:
-        f.write(f'\nVELOCP0(1:{core.NE.nGrp}) = 1.0E7')
+        f.write(f'\nvelocP0(1:{core.NE.nGrp}) = 1.0E7')
         # FIXME FIXME FIXME at the moment the photon velocity is not computed
         # therefore hardcode value
         #for igrp in range(core.NE.nGrp):
-        #    f.write('%s,' % ff(velp[igrp], 'double'))
+        #    f.write('%s,' % ff(velp[igrp]))
 
-    f.write(f'\nLAMBDA0(1:{core.NE.nPre}) = ')
+    f.write(f'\nlambda0(1:{core.NE.nPre}) = ')
 
     for iprec in range(core.NE.nPre):
-        f.write('%s,' % ff(lambda0[iprec], 'double'))
+        f.write(f'{ff(lambda0[iprec])},')
 
     if core.NE.nDhp > 0:
-        f.write(' \nlambdadhp0(1:1) = 1.000000d+99,\n') # FIXME FIXME FIXME large value for steady state
-        f.write('betadhp0(1:1) = 0.000000d+00,\n')
-    f.write(f'IDIFF(1:{nmix}) = {nmix}*2,\n')
-    f.write(f'ISIGT(1:{nmix}) = {nmix}*2,\n')
-    f.write(f'ISIGF(1:{nmix}) = {nmix}*2,\n')
-    f.write(f'ISIGS(1:{nmix}) = {nmix}*2,\n')
+        f.write(' \n lambdaDHP0(1:1) = 1.000000d+99,\n') # FIXME FIXME FIXME large value for steady state
+        f.write('betaDHP0(1:1) = 0.000000d+00,\n')
+    f.write(f'iDiff(1:{nmix}) = {nmix}*2,\n')
+    f.write(f'iSigT(1:{nmix}) = {nmix}*2,\n')
+    f.write(f'iSigF(1:{nmix}) = {nmix}*2,\n')
+    f.write(f'iSigS(1:{nmix}) = {nmix}*2,\n')
 
     if core.NE.nGrp > 0:
-        f.write(f'IKERMA(1:{nmix}) = {nmix}*2,\n')
-        f.write(f'ISIGP(1:{nmix}) = {nmix}*2,\n')
-        f.write(f'IDIFFP(1:{nmix}) = {nmix}*2,\n')
-        f.write(f'IKERMAP(1:{nmix}) = {nmix}*2,\n')
-        f.write(f'ISIGTP(1:{nmix}) = {nmix}*2,\n')
-        f.write(f'ISIGSP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'iKERMA(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'iSigP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'iDiffP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'iKERMAP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'iSigtP(1:{nmix}) = {nmix}*2,\n')
+        f.write(f'iSigsP(1:{nmix}) = {nmix}*2,\n')
 
-    f.write('TEMPFUEL0 = {},\n'.format(ff(Tf, 'double')))
-    f.write('TEMPCOOL0 = {},\n'.format(ff(Tc, 'double')))
-    f.write(f'ISIGS(1:{nmix}) = {nmix}*2,\n')
+    f.write(f'TempFuel0 = {ff(Tf)},\n')
+    f.write(f'TempCool0 = {ff(Tc)},\n')
+    f.write(f'iSigS(1:{nmix}) = {nmix}*2,\n')
 
     for imix in range(nmix):
 
@@ -131,26 +126,25 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
             f.write(f'\n!Mix n.{imix+1} is {whichmix} and belongs to {u}\n')
 
         # write kinetic and spectrum parameters
-        f.write(f'CHIT0({imix+1},1:{core.NE.nGro}) = ')
+        f.write(f'chiT0({imix+1},1:{core.NE.nGro}) = ')
         for igro in range(core.NE.nGro):
-            f.write('%s,' % ff(chit[imixF, igro], 'double'))
+            f.write(f'{ff(chit[imixF, igro])},')
         
         # single photon group --> all emitted in this group
         if core.NE.nGrp > 0:
-            f.write('\nZETAT0(%d,1:%d) = 1.0E+0,' % (imix+1,core.NE.nGrp))
+            f.write(f'\nzetaT0({imix+1:d},1:{core.NE.nGrp:d}) = 1.0E+0,')
             
         for igro in range(core.NE.nGro):
             if len(chid.shape) > 2:
                 v = chid[imixF, 0, igro]
             else:
                 v = chid[imixF, igro]
-            f.write('\nCHID0(%d,%d,1:%d) = %d*%s,' % (imix+1, igro+1, core.NE.nPre, core.NE.nPre,
-                                                      ff(v, 'double')))
+            f.write(f'\nchiD0({imix+1:d},{igro+1:d},1:{core.NE.nPre:d}) = {core.NE.nPre:d}*{ff(v)},')
         f.write('\n')
         imixF = imixF+1
-        f.write(f'BETA0({imix+1},1:{core.NE.nPre}) = ')
+        f.write(f'beta0({imix+1},1:{core.NE.nPre}) = ')
         for iprec in range(core.NE.nPre):
-            f.write('%s,' % ff(beta0[iprec], 'double'))
+            f.write(f'{ff(beta0[iprec])},')
 
         f.write('\n')
         f.write('\n')
@@ -176,8 +170,7 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
                 if H5fmt == 1:
                     f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
                     for igro in range(core.NE.nGro):
-                        triple = (macro, imix+1, igro+1)
-                        f.write(" '%s_%d_%d', " % triple)
+                        f.write(f" '{macro}_{imix+1:d}_{igro+1:d}', ")
                     f.write('\n')
                 elif H5fmt == 2:
                     f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
@@ -197,16 +190,13 @@ def writemacro(core, nmix, vel, lambda0, beta0, nFrenCuts, temps,
                 elif macro == "KERMA" or macro == "MUSIGP":
                     f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
                     for igro in range(core.NE.nGro):
-                        triple = (macro, imix+1, igro+1)
-                        f.write(" 'input/%s_%d_%d.txt', " % triple)
+                        f.write(f" 'input/{macro}_{imix+1:d}_{igro+1:d}.txt', ")
                     f.write('\n')
                 else:
                     f.write(f'{inp}({imix+1},1:{core.NE.nGrp}) =')
                     for igrp in range(core.NE.nGrp):
-                        triple = (macro, imix+1, igrp+1)
-                        f.write(" 'input/%s_%d_%d.txt', " % triple)
+                        f.write(f" 'input/{macro}_{imix+1:d}_{igrp+1}.txt', ")
                     f.write('\n')
-
 
     # write namelist end
     f.write('/\n')
@@ -436,7 +426,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
         json.dump({"DFLtoZ": DFLtoZ}, outfile, indent=2)
 
 
-def writeConfig(core, NZ):
+def writeConfig(core):
     """
     Write config.inp file.
 
@@ -444,8 +434,6 @@ def writeConfig(core, NZ):
     ----------
     core : obj
         Core object created with Core class.
-    NZ : int
-        Number of axial cuts
 
     Returns
     -------
@@ -454,6 +442,8 @@ def writeConfig(core, NZ):
     """
     f1 = io.open('config.inp', 'w', newline='\n')
     NAssTypes = len(core.NE.assemblytypes)
+    nAss = core.nAss
+    nZ = len(core.NE.AxialConfig.zcuts)-1 if core.dim != 2 else 1
 
     writer = pd.ExcelWriter("configurationsNE.xlsx", engine='xlsxwriter')
     workbook=writer.book
@@ -464,7 +454,7 @@ def writeConfig(core, NZ):
         SAnumbers = core.writecorelattice(fname=None, numbers=True, string=False, fren=True)
         df_geom1 = pd.DataFrame(data=SAnumbers, index=np.arange(1, core.Map.Nx+1),
                                 columns=np.arange(1, core.Map.Ny+1))
-        df_geom1.name = 'SA numbering according to FRENETIC'
+        df_geom1.name = 'HA numbering according to FRENETIC'
 
     if core.dim != 2:
         z_cuts = np.asarray(core.NE.AxialConfig.zcuts)
@@ -496,12 +486,12 @@ def writeConfig(core, NZ):
             rad_config[t] = core.writecorelattice(fname=None, time=t)
         
         if core.dim != 2:
-            ax_config[t] = np.zeros((NZ, core.NAss), dtype=object)
+            ax_config[t] = np.zeros((nZ, nAss), dtype=object)
 
         # --- write config.inp file
-        config_int = np.zeros((NZ, core.NAss), dtype=int)
-        config_str = np.zeros((NZ, core.NAss), dtype=object)
-        for n in range(1, core.NAss+1):  # loop over all assemblies (1 assembly in 1D)
+        config_int = np.zeros((nZ, nAss), dtype=int)
+        config_str = np.zeros((nZ, nAss), dtype=object)
+        for n in range(1, nAss+1):  # loop over all assemblies (1 assembly in 1D)
             iType = core.getassemblytype(n, core.NE.config[t], isfren=True)
             aType = core.NE.assemblytypes[iType]
             if core.dim != 2:
@@ -510,9 +500,9 @@ def writeConfig(core, NZ):
             else:
                 config_int[:, n-1] = iType
                 config_str[:, n-1] = aType
-        for iz in range(NZ):
+        for iz in range(nZ):
             # f1.write('%s ' % ff(t, 'double'))  # write time instant for each cut
-            f1.write(f"{ff(t, 'double')}  ")  # write time instant for each cut
+            f1.write(f"{ff(t)}")  # write time instant for each cut
             # define region number
             typestr = np.array(['{:04d}'.format(x) for x in config_int[iz, :]])
             # write to file
@@ -549,7 +539,7 @@ def writeConfig(core, NZ):
     writer.save()
 
 
-def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2):
+def makeNEinput(core, H5fmt=2):
     """
     Make input.dat file.
 
@@ -557,10 +547,6 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2
     ----------
     core : obj
         Core object created with Core class
-    whereMACINP : str, optional
-        File path where the 'macro.nml' should be located
-    whereNH5INP : str, optional
-        File path where the 'NE_data.h5' should be located
     template : str, optional
         File path where the template file is located, by default ``None``.
         In this case, the default template is used
@@ -569,81 +555,43 @@ def makeNEinput(core, whereMACINP=None, whereNH5INP=None, template=None, H5fmt=2
     -------
     ``None``
     """
-    if whereMACINP is None:
-        whereMACINP = "'macro.nml'"
-
-    if whereNH5INP is None:
-        whereNH5INP = "'NE_data.h5'"
-
     if H5fmt is False:
         H5fmt = 1
 
     if core.dim != 2:
         tmp = core.NE.AxialConfig.splitz
-        NZ = len(core.NE.AxialConfig.zcuts)-1
+        nZ = len(core.NE.AxialConfig.zcuts)-1
         if isinstance(tmp, (int)):
-            splitz = [tmp]*NZ
+            splitz = [tmp]*nZ
         elif isinstance(tmp, (list, np.ndarray)):
-            splitz = tmp if len(tmp) > 1 else [tmp[0]]*NZ
+            splitz = tmp if len(tmp) > 1 else [tmp[0]]*nZ
         else:
             raise OSError(f'splitz in core.NEAxialsConfig.splitz cannot'
-                        f'be of type {type(tmp)}')
+                          f'be of type {type(tmp)}')
         meshz = core.NE.AxialConfig.zcuts
     else:
-        NZ = 1
+        nZ = 1
         splitz = [1]
         meshz = [0, 0]
 
     nConfig = len(core.NE.time)
-
     # core.trans = False if max(core.NE.time) == 0 else True
     nRun = 2 if core.trans else 1
-    # FIXME tmp patch due to bug in FRENETIC h5 output
-    if nRun == 1 and len(core.NE.time) > 1:
-        h5out = 0
-    else:
-        h5out = 1
 
-    geomdata = {'$NH5INP': whereNH5INP, '$MACINP': whereMACINP, '$NELEZ0': NZ,
-                '$MESHZ0': meshz, '$NDIM': core.dim, '$SPLITZ': splitz, '$H5fmt': H5fmt,
-                '$NCONFIG': nConfig, '$NRUN': nRun, '$POW': core.power,
-                '$NPROF': len(core.TimeSnap), '$TPROF': core.TimeSnap,
-                '$IHDF5OUT': h5out}
-
-    if template is None:
-        tmp = pkg_resources.read_text(templates, 'template_NEinput.dat')
-        tmp = tmp.splitlines()
-    else:
-        with open(template, 'r') as f:
-            temp_contents = f.read()
-            tmp = temp_contents. splitlines()
-
+    frnnml = FreneticNamelist()
     f = io.open("input.dat", 'w', newline='\n')
-    for line in tmp:  # loop over lines in reference file
-        for key, val in geomdata.items():  # loop over dict keys
-            if key in line:
-                if key in ['$MESHZ0', '$SPLITZ']:
-                    try:
-                        val = [str(v) for v in val]
-                    except TypeError as err:
-                        if "'int' object is not iterable" in str(err):
-                            val = str(val)
-                    val = "%s" % ",".join(val)
-                elif key == '$TPROF':
-                    tProf = [ff(t, 'double') for t in val]
-                    val = ','.join(tProf)
-                elif key == '$POW':
-                    val = ff(val, 'double')
-                else:
-                    val = str(val)
 
-                # write to file
-                line = line.replace(key, val)
-
+    for namelist in frnnml.files["NEinput.dat"]:
+        f.write(f"&{namelist}\n")
+        for key, val in core.FreneticNamelist[namelist].items():
+            # format value with FortranFormatter utility
+            val = ff(val)
+            # "vectorise" in Fortran input if needed
+            if key in frnnml.vector_inp:
+                val = f"{core.nAss}*{val}"
+            f.write(f"{key} = {val}\n")
         # write to file
-        f.write(line)
-        f.write('\n')
-    f.close()
+        f.write("/\n")
 
 
 def mysavetxt(fname, x, fmt="%.6e", delimiter=' '):

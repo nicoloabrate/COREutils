@@ -31,9 +31,9 @@ SIZMIN = $NH*0.0001, 	        !spatial mesh minimum size (if refined)
 SIZMAX = $NH*1.0, 	          !spatial mesh maximum size (if refined)
 IADAPTIME	= 1,	           	  !time adaptivity flag (0=no adaptivity (tstep=tstepmin); 1=adaptivity; 2=adaptivity only with respect to temperatures)
 TEND = $TEND, 	              !simulation end time
-STPMIN = $NH*0.005, 	        !minimum timestep
-STPMAX = $NH*0.005, 	        !maximum timestep (for t<5tauq)
-STPMINSTEADY = $NH*0.05, 	    !minimum timestep
+STPMIN = 0.005, 	        !minimum timestep
+STPMAX = 0.005, 	        !maximum timestep (for t<5tauq)
+STPMINSTEADY = 0.05, 	    !minimum timestep
 NTIMEREF = 1,
 TREFBEG	= 0.0d0,
 TREFEND	= $TEND,
