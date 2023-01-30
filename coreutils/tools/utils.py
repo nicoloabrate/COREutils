@@ -51,7 +51,7 @@ def uncformat(data, std, fmtn=".5e", fmts=None):
     return out
 
 
-def fortranformatter(value):
+def fortranformatter(value, multiplier=None):
     """
     Convert python format to Fortran-wise format.
 
@@ -79,6 +79,9 @@ def fortranformatter(value):
         return f"{mantissa}d{exponent}"
     elif isinstance(value, _iter_types):
         val = [fortranformatter(v) for v in value]
+        if isinstance(multiplier, _iter_types):
+            mul = [fortranformatter(m) for m in multiplier]
+            val = [f"{m}*{v}" for m, v in zip(mul, val)]
         string = ",".join(val)
         return f"{string}"
     elif isinstance(value, str):
