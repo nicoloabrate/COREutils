@@ -46,7 +46,7 @@ class THoutput:
         List of ``str`` with the names of the Distributions (e.g., the coolant
         temperature).
     aliases: dict
-        Dict mapping possible aliases of the quantities in ``inout``
+        Dict mapping possible aliases of the quantities in ``inlet_outlet``
         and ``maximum``.
     inout_measure: dict
         Dict mapping the unit of measure of the In-Out quantities.
@@ -63,29 +63,27 @@ class THoutput:
     """
 
     # default keys for integral parameters (namelist)
-    inout = ['DensOut', 'DensIn', 'EnthOut', 'EnthIn', 'PIn',
-            # FIXME Tin should be TIn
-             'Pout', 'TOut', 'Tin', 'VIn', 'Vout', 'mDotOut',
-             'mDotin', 'Time']
+    inout = ['densOut', 'densIn', 'enthOut', 'enthIn', 'pIn',
+             'pOut', 'TOut', 'TIn', 'vIn', 'vOut', 'mdotOut',
+             'mdotIn', 'time']
 
     maximum = ['Tcoolant', 'Tpin_average', 'Tpin_center', 
                'Tpin_surface', 'pressure', 'zMax_pressure',
                'zMax_Tcoolant', 'zMax_Tpin_average', 
-               'zMax_Tpin_center', 'zMax_Tpin_surface', 'Time']
+               'zMax_Tpin_center', 'zMax_Tpin_surface', 'time']
 
     distrout = ['timeDistr', 'T_coolant', 'T_pin_avg', 'T_pin_ctr', 
                 'T_pin_sur', 'density', 'htc', 'pressure',
                  'q_pin', 'velocity']
 
-    aliases = {'DensOut': ['Densout', 'densout'], 'DensIn': ['Densin', 'densin'],
-               'EnthOut': ['Enthout', 'enthout'], 'EnthIn': ['Enthin', 'enthin'],
-               'PIn': ['Pin', 'pin'], 'Pout': ['Pout', 'pout'],
-               # FIXME Tin should be TIn
-               'TOut': ['Tout', 'tout'], 'Tin': ['Tin', 'tin'],
-               'VIn': ['Vin', 'vin'], 'Vout': ['Vout', 'vout'],
-               'mDotOut': ['mDotout', 'mdotout', 'mDotout'],
-               'mDotin': ['mDotin', 'mdotin', 'mDotin'],
-               'Time': ['time']
+    aliases = {'densOut': ['Densout', 'densout'], 'densIn': ['Densin', 'densin'],
+               'enthOut': ['Enthout', 'enthout'], 'enthIn': ['Enthin', 'enthin'],
+               'pIn': ['Pin', 'pin'], 'pOut': ['Pout', 'pout'],
+               'TOut': ['Tout', 'tout'], 'TIn': ['Tin', 'tin'],
+               'vIn': ['Vin', 'vin'], 'vOut': ['Vout', 'vout'],
+               'mdotOut': ['mDotout', 'mdotout', 'mDotout'],
+               'mdotIn': ['mDotin', 'mdotin', 'mDotin'],
+               'time': ['Time']
               }
 
     distrout_attr = {'timeDistr': 'time instant', 
@@ -110,27 +108,26 @@ class THoutput:
                     'zMax_Tpin_center': "axial coordinate",
                     'zMax_Tpin_surface': "axial coordinate"}
 
-    inout_attr = {'DensOut': "outlet density", 
-                  'DensIn': "inlet density", 
-                  'EnthOut': "outlet enthalpy",
-                  'EnthIn': "inlet enthalpy",
-                  'PIn': "inlet pressure",
-                # FIXME Tin should be TIn, Pout should be POut, Vout
-                  'Pout': "outlet pressure",
+    inout_attr = {'densOut': "outlet density", 
+                  'densIn': "inlet density", 
+                  'enthOut': "outlet enthalpy",
+                  'enthIn': "inlet enthalpy",
+                  'pIn': "inlet pressure",
+                  'pOut': "outlet pressure",
                   'TOut': "outlet temperature",
                   'Tin': "inlet temperature",
-                  'VIn': "inlet velocity",
-                  'Vout': "outlet velocity",
-                  'mDotOut': "outlet massflow",
-                  'mDotin': "inlet massflow"}
+                  'vIn': "inlet velocity",
+                  'vout': "outlet velocity",
+                  'mdotOut': "outlet massflow",
+                  'mdotin': "inlet massflow"}
 
     # default profiles unit of measures
-    inout_uom = {'DensOut': '[kg/m^3]', 'DensIn': '[kg/m^3]', 'EnthOut': 'J/(kg K)',
-                 'EnthIn': '[J/(kg K)]', 'PIn': '[Pa]',
+    inout_uom = {'densOut': '[kg/m^3]', 'DensIn': '[kg/m^3]', 'EnthOut': 'J/(kg K)',
+                 'enthIn': '[J/(kg K)]', 'PIn': '[Pa]',
                  # FIXME Tin should be TIn
-                 'Pout': '[Pa]', 'TOut': '[K]', 'Tin': '[K]', 'VIn': '[m/s]', 
-                 'Vout': '[m/s]', 'mDotOut': '[kg/s]',
-                 'mDotin': '[kg/s]'}
+                 'pOut': '[Pa]', 'TOut': '[K]', 'TIn': '[K]', 'vIn': '[m/s]', 
+                 'vOut': '[m/s]', 'mdotOut': '[kg/s]',
+                 'mdotIn': '[kg/s]'}
 
     distributions_uom = {'timeDistr': '[s]', 'T_coolant': '[K]', 
                          'T_pin_avg': '[K]', 'T_pin_ctr': '[K]', 
@@ -271,7 +268,7 @@ class THoutput:
                     if which == k:
                         dictkey = k
                         notfound = False
-                        group = "inout"
+                        group = "inlet_outlet"
                         break
 
                 if notfound:
@@ -434,7 +431,7 @@ class THoutput:
                 if which == k:
                     dictkey = k
                     notfound = False
-                    group = "inout"
+                    group = "inlet_outlet"
                     uom = self.inout_measure[which]
                     break
 
