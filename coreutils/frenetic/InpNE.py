@@ -62,7 +62,7 @@ def writemacro(core, nmix, vel, lambda0, beta0, temps,
     f.write('/\n\n')
     f.write('&MACROXS\n')
     f.write('iRHO = 0,\n')
-    f.write(f'velc0(1:{core.NE.nGro}) = ')
+    f.write(f'veloc0(1:{core.NE.nGro}) = ')
 
     for igro in range(core.NE.nGro):
         f.write('%s,' % ff(vel[igro]))

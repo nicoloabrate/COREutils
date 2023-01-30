@@ -1026,7 +1026,7 @@ class NE:
             self.energygrid = energygrid
         elif isinstance(energygrid, (str, float, int)):
             pwd = Path(__file__).parent.parent.parent
-            if 'coreutils' not in str(pwd):
+            if 'COREutils' not in str(pwd):
                 raise OSError(f'Check coreutils tree for NEdata: {pwd}')
             else:
                 pwd = pwd.joinpath('NEdata')
