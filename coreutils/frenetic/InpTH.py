@@ -79,18 +79,30 @@ def writeTHdata(core):
     ``None``
     """
     frnnml = FreneticNamelist()
+    # FIXME this is a patch, in the future the user should choose these values
+    nRadNode = core.FreneticNamelist["ADDTH"]["MaxNRadNode"]-2
+    nr = [int(nRadNode*0.6), int(nRadNode*0.2), int(nRadNode*0.2)]
     for nType in core.TH.THassemblytypes.keys():
         for nt, t in enumerate(core.TH.THtime):
             # open new file
-            f = io.open(f'HA_{nType:02d}_{nt+1:02d}.dat', 'w', newline='\n')
-            for namelist in frnnml.files["THdatainput.dat"]:
+            f = io.open(f'HA_{nType:02d}_{nt+1:02d}.inp', 'w', newline='\n')
+            for namelist in frnnml.files["THdatainput.inp"]:
                 f.write(f"&{namelist}\n")
                 for key, val in core.FreneticNamelist[f"HAType{nType}"][namelist].items():
                     # format value with FortranFormatter utility
-                    val = ff(val)
+                    if key in ['MaterHX', 'HeatGhX']:
+                        val = ff(val, nr)
+                    else:
+                        val = ff(val)
                     # "vectorise" in Fortran input if needed
-                    if key in frnnml.vector_inp:
-                        val = f"{core.nAss}*{val}"
+                    if key in frnnml.vector_inp.keys():
+                        if frnnml.vector_inp[key] == "nAss":
+                            length = core.nAss
+                        elif frnnml.vector_inp[key] == "nSides":
+                            length = 6
+                        else:
+                            raise OSError("Unknown dim {frnnml.vector_inp[key]}!")
+                        val = f"{length}*{val}"
                     f.write(f"{key} = {val}\n")
                 # write to file
                 f.write("/\n")

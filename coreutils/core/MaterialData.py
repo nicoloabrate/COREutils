@@ -1223,13 +1223,13 @@ class THHexData():
                 self.CladRad = [gap_r[1], gap_r[1]]
 
             if "wrapper" in inpdict.keys():
-                self.WrapThick = inpdict["wrapper"][0]
+                self.WrapThick = inpdict["wrapper"][1]
             else:
                 self.WrapThick = 0.
 
             if "bib_sides" in inpdict.keys():
                 self.BiBSides = np.sort(np.asarray((inpdict["bib_sides"])))
-                self.isBiB = 1
+                self.isBiB = 1 if self.BiBSides.max() > 0 else 0
             else:
                 self.BiBSides = np.array([0., 0.])
 

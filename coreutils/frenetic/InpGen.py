@@ -133,9 +133,13 @@ def fillFreneticNamelist(core):
         else:
             core.FreneticNamelist['iTyMsh'] = 0
 
-        if np.isnan(core.FreneticNamelist['zLayer']):
-            core.FreneticNamelist['zLayer'] = core.TH.axstep
-            core.FreneticNamelist['nLayer'] = core.TH.axstep.shape[0]
+        if np.isnan(core.FreneticNamelist['nLayer']):
+            core.FreneticNamelist['zLayer'] = core.TH.zcoord
+            core.FreneticNamelist['nLayer'] = core.TH.zcoord.shape[0]
+        else:
+            if np.isnan(core.FreneticNamelist['zLayer']):
+                core.FreneticNamelist['zLayer'] = np.linspace(core.TH.zref[0], core.TH.zref[1], 
+                                                              core.FreneticNamelist['nLayer'])
 
         if np.isnan(core.FreneticNamelist['nTimeProf']):
             core.FreneticNamelist['TimeProf'] = TimeNETHConfig
@@ -203,8 +207,8 @@ def fillFreneticNamelist(core):
             HAdict['iBiBX'] = THdata.isBiB
             HAdict['iCRadX'] = THdata.isAnn
             # correlations
-            HAdict['FPeakX'] = THdata.frictMult
-            HAdict['QBoxX'] = THdata.htcMult
+            HAdict['FPeakX'] = float(THdata.frictMult)
+            HAdict['QBoxX'] = float(THdata.htcMult)
             HAdict['iHpbPinX'] = THdata.htcCorr
             HAdict['iTyFrictX'] = THdata.frictCorr
             HAdict['iChCouplX'] = THdata.chanCouplCorr
@@ -212,29 +216,31 @@ def fillFreneticNamelist(core):
             if hasattr(THdata, 'FuelPinMat'):
                 HAdict['iFuelX'] = THdata.FuelPinMat
             else:
-                HAdict['iFuelX'] = 0
+                HAdict['iFuelX'] = ""
 
             if hasattr(THdata, 'NonFuelPinMat'):
                 HAdict['cNfX'] = THdata.NonFuelPinMat
             else:
-                HAdict['cNfX'] = 0
+                HAdict['cNfX'] = ""
 
             if hasattr(THdata, 'GapMat'):
                 HAdict['iGapX'] = THdata.GapMat
             else:
-                HAdict['iGapX'] = 0
+                HAdict['iGapX'] = ""
 
             if hasattr(THdata, 'CladMat'):
                 HAdict['iCladX'] = THdata.CladMat
             else:
-                HAdict['iCladX'] = 0
+                HAdict['iCladX'] = ""
 
             if hasattr(THdata, 'WrapMat'):
                 HAdict['BoxMatX'] = THdata.WrapMat
             else:
-                HAdict['BoxMatX'] = 0
+                HAdict['BoxMatX'] = ""
 
-            # FIXME add multiplier to matlst and heastghx (radial discretisation)
+            # FIXME the radial nodes subdivision is currently fixed here.
+            # The user should have the possibility to choose it, but how
+            # this can be done is not trivial and should be discussed
             matlst = [1, 0, 0]
             if hasattr(THdata, "GapMat"):
                 matlst[1] = 2
@@ -243,9 +249,9 @@ def fillFreneticNamelist(core):
 
             HAdict['MaterHX'] = matlst
             HAdict['HeatGhX'] = [1, 0, 0]
-            HAdict['iMatX'] = 1
+            HAdict['iMatX'] = 1. # FIXME hardcoded value
             iType += 1
-        
+
         eraseKeys = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX",
                      "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX", "BoxMatX", 
                      "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", "ThickGasX",

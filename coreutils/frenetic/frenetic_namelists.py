@@ -5,7 +5,27 @@ from collections import OrderedDict, UserDict
 
 
 class FreneticNamelist():
+   """Define the content of Frenetic namelists and assign default values.
 
+   Attributes
+   ----------
+   files: dict
+      Dictonary mapping the namelists to the input files where they are written
+   namelists: dict
+      Dictionary mapping the keywords to their corresponding namelist
+   kw_descr: dict
+      Dictionary giving a description of each keyword
+   mandatory: dict
+      Dictionary defining the mandatory arguments for NE and TH objects.
+   vector_inp: dict
+      Dictionary of keywords to be defined as vector input for FRENETIC.
+      The values are the lengths of the input vector.
+   DefaultValue: dict
+      Dictionary assigning default values to each keyword. Mandatory 
+      keyword are assigned with the value ``np.nan`` for later
+      assignement in ``coreutils.frenetic.InpGen.inpgen``
+
+   """
    def __init__(self):
 
       self.files = {
@@ -13,7 +33,7 @@ class FreneticNamelist():
                      "NEinput.dat": ["CONTROL", "GEOMETRY", "NUMERICS1", "NUMERICS2", "NUMERICS3",
                                     "OUTPUT0", "OUTPUT", "OPENMP"],
                      "THinput.dat": ["NUMERICS", "IBCONDITIONS", "COUPLING", "SENSOR", "SENSOR_RAD"],
-                     "THdatainput.dat": ["COMMONS", "THERMALHYDRAULIC"],
+                     "THdatainput.inp": ["COMMONS", "THERMALHYDRAULIC"],
                    }
 
       self.namelists = {
@@ -21,7 +41,7 @@ class FreneticNamelist():
                            "PRELIMINARY": ["isSym", "isNETH", "iResta", "SERVERPORT", "HOSTNAME"],
                            "COREGEO": ["nChan", "nDiff", "HexPitch", "LeXag", "nR", "nL", "iTyCool"],
                            "COMMNUM": ["nElems", "xLengt", "iTyMsh", "nRef", "nElRef", "xBRefi", "xERefi", "SizMin", "SizMax", "iAdapTime", "tEnd", "StpMin", "StpMax", 
-                                       "StpMinSteady", "nTimeRef", "TrefBeg", "TrefEnd"],
+                                       "StpMinSteady"], # "TrefBeg", "TrefEnd" 
                            "ADDTH": ["MaxNRadNode", "nMaxBCchange"],
                            "NUMERICS": ["ISTISC", "DTTISC", "TollToSteady", "method", "iQFun", "xQbeg", "xQend", "dxQ0", "Q0", "tQbeg", "tQend", "URTFLU", "URTPIN", "tolTemp", 
                                        "tolPres", "underTemp", "underPress", "frozencoeff", "nMaxIter", "sthMax", "errRelTime", "qPinDotStepIncrement", "kLocX", "underFlux"],
@@ -75,9 +95,8 @@ class FreneticNamelist():
                            "StpMin": "Minimum coupling timestep in [s].",
                            "StpMax": "Maximum coupling timestep in [s].",
                            "StpMinSteady": "This parameter regulates the convergence in the fixed point iterations used to couple NE and TH.",
-                           "nTimeRef": "!!!!! unused?",
-                           "TrefBeg": "Initial simulation time, could be useful in case of restart runs [s]",
-                           "TrefEnd": "End simulation time, if zero it is used as flag to just perform the steady state case [s]",
+                           # "TrefBeg": "Initial simulation time, could be useful in case of restart runs [s]", # useful for forthcoming restarting opt in FRENETIC
+                           # "TrefEnd": "End simulation time, if zero it is used as flag to just perform the steady state case [s]",
                            "MaxNRadNode": "Third dimension for temperature matrix, max radial pins nodes +1",
                            "nMaxBCchange": "The number of maximum rows input  entries for input files reading: mdot.dat, press.dat, etc.",
                            "nThreadTH": "Number of CPUs allocated for TH module",
@@ -228,11 +247,29 @@ class FreneticNamelist():
                         "TH": ["xLengt"]
                        }
 
-      self.vector_inp = ["LeXag", "nElems", "xLengt", "iTyMsh", "nRef", "nElRef", "xBRefi", "xERefi", "SizMin", 
-                         "SizMax", "iTimeProf", "iRadProf", "Q0", "dxQ0", "xQend", "xQbeg", "temIni" ,"temInl" ,
-                         "temOut" ,"preInl" ,"preOut" ,"mdtInl"]
-
-      self.mapCOREutilsToFRN = {"SplitZ": "splitz"}
+      self.vector_inp = {
+                           "LeXag": "nAss",
+                           "nElems": "nAss",
+                           "xLengt": "nAss",
+                           "iTyMsh": "nAss",
+                           "nRef": "nAss",
+                           "nElRef": "nAss",
+                           "xBRefi": "nAss",
+                           "xERefi": "nAss",
+                           "SizMin": "nAss", 
+                           "SizMax": "nAss",
+                           "iTimeProf": "nAss",
+                           "iSens": "nAss",
+                           "iRadProf": "nAss",
+                           "Q0": "nAss",
+                           "dxQ0": "nAss",
+                           "xQend": "nAss",
+                           "xQbeg": "nAss",
+                           "temIni": "nAss",
+                           "temInl": "nAss",
+                           "QBoxX": "nSides",
+                           "ThickClearX": "nSides",
+                        }
 
       self.DefaultValue = {
                            # common input
@@ -262,9 +299,8 @@ class FreneticNamelist():
                            "StpMin": 0.005,
                            "StpMax": 0.005,
                            "StpMinSteady": 1.,
-                           "nTimeRef": 1,
-                           "TrefBeg": 0.,
-                           "TrefEnd": 0.,
+                           # "TrefBeg": 0., # useful for forthcoming restarting opt in FRENETIC
+                           # "TrefEnd": 0.,
                            "MaxNRadNode": 50,
                            "nMaxBCchange": 100,
                            "ISTISC": 0,
@@ -278,7 +314,7 @@ class FreneticNamelist():
                            "URTPIN": 1,
                            "iQFun": -2,
                            "xQbeg": 0.,
-                           "xQend": 0.,
+                           "xQend": 1., # >0 to avoid "ERROR. Incorrect XQEND distribution. Allowed values: .GT. 0.0 ."
                            "dxQ0": 0.,
                            "Q0": 0.,
                            "tQbeg": 0.,
@@ -389,7 +425,7 @@ class FreneticNamelist():
                            "iHpbPinX": nan,
                            "iTyFrictX": nan,
                            "iChCouplX": nan,
-                           "iMatX": 1,  # FIXME hardcoded value which is not read by COREutils. What is the meaning of this kw in FRENETIC?
+                           "iMatX": 1.,  # FIXME hardcoded value which is not read by COREutils. What is the meaning of this kw in FRENETIC?
                            "iPinSolidX": nan,
                            "RCoX": nan,
                            "RCiX": nan,
