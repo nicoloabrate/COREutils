@@ -60,7 +60,7 @@ def fillFreneticNamelist(core):
         pitch = core.AssemblyGeom.pitch
         nH = core.nAss
         try:
-            nDiff = len(core.TH.assemblytypes)
+            nDiff = len(core.TH.THdata.keys())
         except AttributeError:
             nDiff = len(core.NE.assemblytypes)
             logging.warn('nDiff variable set equal to the number of NE assemblies')
@@ -162,9 +162,9 @@ def fillFreneticNamelist(core):
                 HAdict['dFuelInX'] = 0.
 
             if hasattr(THdata, 'NonFuelRad'):
-                HAdict['DFuelNfX'] = THdata.NonFuelRad[1]*2
+                HAdict['dFuelNfX'] = THdata.NonFuelRad[1]*2
             else:
-                HAdict['DFuelNfX'] = 0.
+                HAdict['dFuelNfX'] = 0.
 
             if hasattr(THdata, 'GapRad'):
                 HAdict['ThickGasX'] = THdata.GapRad[1]-THdata.GapRad[0]
@@ -255,7 +255,7 @@ def fillFreneticNamelist(core):
         eraseKeys = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX",
                      "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX", "BoxMatX", 
                      "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", "ThickGasX",
-                     "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "DFuelNfX", "PtoPDistX", 
+                     "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "dFuelNfX", "PtoPDistX", 
                      "iCRadX", "cNfX", "iCladX", "iGapX", "MaterHX", "HeatGhX"]
         for key in eraseKeys:
             core.FreneticNamelist.pop(key)
@@ -263,7 +263,7 @@ def fillFreneticNamelist(core):
         setToValue = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX",
                       "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX",
                       "BoxMatX", "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", "ThickGasX", 
-                      "DFuelNfX", "PtoPDistX", "iCRadX" "cNfX" "iCladX" "iGapX" "MaterHX" "HeatGhX", 
+                      "dFuelNfX", "PtoPDistX", "iCRadX" "cNfX" "iCladX" "iGapX" "MaterHX" "HeatGhX", 
                       "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "PtoPDistX", "nElems", "xLengt", 
                       "zLayer", "nLayer", "TimeProf", "nTimeProf", "iMatX", "MaterHX", "HeatGhX"]
         for key in setToValue:

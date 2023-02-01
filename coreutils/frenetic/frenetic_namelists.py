@@ -41,10 +41,13 @@ class FreneticNamelist():
                            "PRELIMINARY": ["isSym", "isNETH", "iResta", "SERVERPORT", "HOSTNAME"],
                            "COREGEO": ["nChan", "nDiff", "HexPitch", "LeXag", "nR", "nL", "iTyCool"],
                            "COMMNUM": ["nElems", "xLengt", "iTyMsh", "nRef", "nElRef", "xBRefi", "xERefi", "SizMin", "SizMax", "iAdapTime", "tEnd", "StpMin", "StpMax", 
-                                       "StpMinSteady"], # "TrefBeg", "TrefEnd" 
+                                       "StpMinSteady"
+                                      ], # "TrefBeg", "TrefEnd" 
                            "ADDTH": ["MaxNRadNode", "nMaxBCchange"],
                            "NUMERICS": ["ISTISC", "DTTISC", "TollToSteady", "method", "iQFun", "xQbeg", "xQend", "dxQ0", "Q0", "tQbeg", "tQend", "URTFLU", "URTPIN", "tolTemp", 
-                                       "tolPres", "underTemp", "underPress", "frozencoeff", "nMaxIter", "sthMax", "errRelTime", "qPinDotStepIncrement", "kLocX", "underFlux"],
+                                       "tolPres", "underTemp", "underPress", "frozencoeff", "nMaxIter", "sthMax", "errRelTime", "qPinDotStepIncrement", "kLocX", "underFlux",
+                                       "powtot0"
+                                       ],
                            "IBCONDITIONS": ["inTial", "temInl", "temOut", "preInl", "preOut", "mdtInl", "temIni", "eneBound", "masBound", "momBound", "mdtInlBiB", "preInl"],
                            "COUPLING": ["iThimb", "qVolBiBX", "qVolX", "FluxExtX"],
                            "SENSOR": ["nTimeProf", "TimeProf", "iTimeProf", "iSens", "nLayer", "zLayer", "iHDF5OutTH"],
@@ -56,15 +59,19 @@ class FreneticNamelist():
                            "NUMERICS2": ["iMethod", "iAlgVar", "iAdapt", "iCtrlQty", "dtShpMax", "dtRMax", "TollNorm", "TollForm", "TollIntp", "FacSaf", "iAdjoint", "nNormMax", "Teta"],
                            "NUMERICS3": ["nEqMax", "TollPow", "TollTmp", "iEqTyp", "RlxTmp"],
                            "OUTPUT0": ["nProf"],
-                           "OUTPUT": ["tProf", "ioFluxDP", "ioFluxAP", "ioPrecuP", "ioReactP", "ioCompD", "ioIntPar", "ioFluxD", "ioPrecu", "ioFluxA", "ioPower", "ioReact",
-                                     "ioTherm", "iHDF5OutNE"],
+                           "OUTPUT": [
+                                     "tProf", "ioFluxDP", "ioFluxAP", "ioPrecuP", "ioReactP", "ioCompD", "ioIntPar", "ioFluxD", "ioPrecu", "ioFluxA", "ioPower", "ioReact",
+                                     "ioTherm", "iHDF5OutNE"
+                                     ],
                            "OPENMP": ["nThreadTH", "nThreadNE"],
                            # TH input
                            "COMMONS": ["iHA"],
-                           "THERMALHYDRAULIC": ["nFuelX", "nNonHeatedX", "iFuelX", "dFuelX", "dFuelInX", "DFuelNfX", "RCoX", "RCiX", "ThickGasX", "ThickBoxX", "ThickClearX", "InBoxInsideX",
+                           "THERMALHYDRAULIC": [
+                                                "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX", "dFuelInX", "dFuelNfX", "RCoX", "RCiX", "ThickGasX", "ThickBoxX", "ThickClearX", "InBoxInsideX",
                                                 "InBoxOutsideX", "dWireX", "pWireX", "PtoPDistX", "FPeakX", "QBoxX",
                                                 "BoxMatX", "iHpbPinX", "iTyFrictX", "iChCouplX", 
-                                                "iMatX", "iPinSolidX", "iBiBX", "iCRadX", "cNfX", "iCladX", "iGapX", "MaterHX", "HeatGhX"],
+                                                "iMatX", "iPinSolidX", "iBiBX", "iCRadX", "cNfX", "iCladX", "iGapX", "MaterHX", "HeatGhX"
+                                               ],
                         }
 
       self.kw_descr = {
@@ -75,7 +82,7 @@ class FreneticNamelist():
                            "SERVERPORT": "!!! port number for the TISC coupling (deprecated)", 
                            "HOSTNAME": "!!! host name of the pc where TISC is running  (deprecated)",
                            "nChan": "number of exagonal channels", 
-                           "nDiff": "Number of different rows in a single sextant", 
+                           "nDiff": "Number of different channels from the TH point of view", 
                            "HexPitch": "lattice pitch of the HA in [m]", 
                            "LeXag": "side of the HA in [m]", 
                            "nR": "number of rows in a sextant", 
@@ -125,6 +132,7 @@ class FreneticNamelist():
                            "qPinDotStepIncrement": "Heating ramp step for ramp steady method",
                            "kLocX": "Flag to search file for kloc, i.e. localised axial pressure drop (0=Off; 1=on)",
                            "underFlux": "Under-relaxation parameter for inter-wrapper heat exchange linear power",
+                           "powtot0": "!!! ",
                            "inTial": "??? name meaning? Flag for reading boundary conditions from files: <0 means reading, >0 means values from input file, the BC type is however chosen by means of enebond, mombond and masbound", 
                            "eneBound": "Energy equation boundary condition (e.g., 'TIN')",
                            "masBound": "Mass equation boundary condition (e.g., 'mdotIN', 'presIN', 'pdrop')",
@@ -225,7 +233,7 @@ class FreneticNamelist():
                            "RCoX": "Outer cladding radius for fuel rods in [m]. Even if iPinSolidx=0, the value is used to perform preliminary calculations, so take it equal to half of fuel diameter",
                            "RCiX": "Inner cladding radius for fuel rods in [m]",
                            "ThickGasX": "! Gas gap thickness in [m] (having Rco and Rci could be internally computed as suggested in input.f90 ---> to be implemented)",
-                           "DFuelNfX": "Diameter of the non-fuel rods in [m]",
+                           "dFuelNfX": "Diameter of the non-fuel rods in [m]",
                            "InBoxInsideX": "Box-in-the-Box internal side length in [m]",
                            "InBoxOutsideX": "Box-in-the-Box outer side length in [m]", 
                            "dWireX": "Wire diameter in [m]",
@@ -267,6 +275,11 @@ class FreneticNamelist():
                            "xQbeg": "nAss",
                            "temIni": "nAss",
                            "temInl": "nAss",
+                           "temoOut": "nAss",
+                           "preInl": "nAss",
+                           "preOut": "nAss",
+                           "mdtInl": "nAss",
+                           "mdtInlBiB": "nAss",
                            "QBoxX": "nSides",
                            "ThickClearX": "nSides",
                         }
@@ -310,8 +323,8 @@ class FreneticNamelist():
                            "nThreadTH": 1,
                            "nThreadNE": 1,
                            # TH input.inp
-                           "URTFLU": 1,
-                           "URTPIN": 1,
+                           "URTFLU": 1.,
+                           "URTPIN": 1.,
                            "iQFun": -2,
                            "xQbeg": 0.,
                            "xQend": 1., # >0 to avoid "ERROR. Incorrect XQEND distribution. Allowed values: .GT. 0.0 ."
@@ -330,10 +343,11 @@ class FreneticNamelist():
                            "qPinDotStepIncrement": 1,
                            "kLocX": 0,
                            "underFlux": 0.05,
+                           "powtot0": 0.,
                            "inTial": -1,
                            "eneBound": 'TIN',
                            "masBound": 'mdotIN',
-                           "momBound": 'presIN',
+                           "momBound": 'presOUT',
                            "temIni": 300.,
                            "temInl": 300.,
                            "temOut": 300.,
@@ -351,7 +365,7 @@ class FreneticNamelist():
                            "nLayer": nan,
                            "zLayer": nan,
                            "iHDF5OutTH": 1,
-                           "iRadProf": 1,
+                           "iRadProf": 0,
                            "iAxNodr": 1,
                            "iTimeProf": 1,
                            "tRadProf": 0,
@@ -430,7 +444,7 @@ class FreneticNamelist():
                            "RCoX": nan,
                            "RCiX": nan,
                            "ThickGasX": nan, 
-                           "DFuelNfX": nan,
+                           "dFuelNfX": nan,
                            "InBoxInsideX": 0.,
                            "InBoxOutsideX": 0.,
                            "dWireX": 0.,
