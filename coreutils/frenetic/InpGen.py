@@ -183,7 +183,7 @@ def fillFreneticNamelist(core):
                 HAdict['ThickClearX'] = THdata.ThickClear
             else:
                 HAdict['ThickBoxX'] = 0.
-                HAdict['ThickClearX'] = 0.
+                HAdict['ThickClearX'] = 1E-6
 
             if hasattr(THdata, 'BibSides'):
                 HAdict['InBoxInsideX'] = THdata.BibSides[0]
@@ -364,16 +364,16 @@ def inpgen(core, json):
         print(f'Overwriting file {corefname}')
         copyfile(f'{corefname}', join(casepath, f'{corefname}'))
 
-    # --- COMMON INPUT (common_input.dat)
+    # --- COMMON INPUT (common_input.inp)
     makecommoninput(core)
     try:
-        move('common_input.dat', join(casepath, 'common_input.dat'))
+        move('common_input.inp', join(casepath, 'common_input.inp'))
     except SameFileError:
-        os.remove(join(casepath, 'common_input.dat'))
+        os.remove(join(casepath, 'common_input.inp'))
         print(f'Overwriting file {str(json)}')
-        move('common_input.dat', join(casepath, 'common_input.dat'))
+        move('common_input.inp', join(casepath, 'common_input.inp'))
 
-    # --- NE input (config.dat, macro.nml)
+    # --- NE input (config.inp, macro.nml)
     if hasattr(core, "NE"):
         NE = True
         isNE1D = True if core.dim == 1 else False
@@ -386,11 +386,11 @@ def inpgen(core, json):
         nmix = len(core.NE.regions.keys())
         # --- write config.inp
         writeConfig(core)
-        # --- write input.dat
+        # --- write input.inp
         makeNEinput(core)
 
         # move NE files
-        NEfiles = ['input.dat', 'config.inp']
+        NEfiles = ['input.inp', 'config.inp']
         for f in NEfiles:
             try:
                 move(f, join(NEpath, f))
@@ -399,7 +399,7 @@ def inpgen(core, json):
                 print('Overwriting file {}'.format(f))
                 move(f, join(NEpath, f))
     else:
-        logging.warn('No NE object, so input.dat and config.inp not written!')
+        logging.warn('No NE object, so input.inp and config.inp not written!')
 
     # write NE data
     if hasattr(core.NE, 'data') or isNE1D:
@@ -459,13 +459,13 @@ def inpgen(core, json):
         THpath = mkdir("TH", casepath)
         # write CZ .txt data
         writeCZdata(core)
-        # write input.dat
+        # write input.inp
         makeTHinput(core)
         # move TH files
-        THfiles = ['mdot.dat', 'press.dat', 'temp.dat', 'input.dat']
+        THfiles = ['mdot.inp', 'press.inp', 'temp.inp', 'input.inp']
         [move(f, join(THpath, f)) for f in THfiles]
     else:
-        logging.warn('No TH configuration, so HA_xx_xx.dat not written and other data not created!')
+        logging.warn('No TH configuration, so HA_xx_xx.inp not written and other data not created!')
 
     if NE:
         auxNE(core, AUXpathNE)
@@ -695,7 +695,7 @@ def auxTH(core, AUXpathTH):
 
 def makecommoninput(core):
     """
-    Make common_input.dat file.
+    Make common_input.inp file.
 
     Parameters
     ----------
@@ -707,9 +707,9 @@ def makecommoninput(core):
     ``None``
     """
     frnnml = FreneticNamelist()
-    f = io.open('common_input.dat', 'w', newline='\n')
+    f = io.open('common_input.inp', 'w', newline='\n')
 
-    for namelist in frnnml.files["common_input.dat"]:
+    for namelist in frnnml.files["common_input.inp"]:
         f.write(f"&{namelist}\n")
         for key, val in core.FreneticNamelist[namelist].items():
             # format value with FortranFormatter utility

@@ -29,10 +29,10 @@ class FreneticNamelist():
    def __init__(self):
 
       self.files = {
-                     "common_input.dat": ["PRELIMINARY", "COREGEO", "COMMNUM", "ADDTH"],
-                     "NEinput.dat": ["CONTROL", "GEOMETRY", "NUMERICS1", "NUMERICS2", "NUMERICS3",
+                     "common_input.inp": ["PRELIMINARY", "COREGEO", "COMMNUM", "ADDTH"],
+                     "NEinput.inp": ["CONTROL", "GEOMETRY", "NUMERICS1", "NUMERICS2", "NUMERICS3",
                                     "OUTPUT0", "OUTPUT", "OPENMP"],
-                     "THinput.dat": ["NUMERICS", "IBCONDITIONS", "COUPLING", "SENSOR", "SENSOR_RAD"],
+                     "THinput.inp": ["NUMERICS", "IBCONDITIONS", "COUPLING", "SENSOR", "SENSOR_RAD"],
                      "THdatainput.inp": ["COMMONS", "THERMALHYDRAULIC"],
                    }
 
@@ -98,7 +98,7 @@ class FreneticNamelist():
                            # "TrefBeg": "Initial simulation time, could be useful in case of restart runs [s]", # useful for forthcoming restarting opt in FRENETIC
                            # "TrefEnd": "End simulation time, if zero it is used as flag to just perform the steady state case [s]",
                            "MaxNRadNode": "Third dimension for temperature matrix, max radial pins nodes +1",
-                           "nMaxBCchange": "The number of maximum rows input  entries for input files reading: mdot.dat, press.dat, etc.",
+                           "nMaxBCchange": "The number of maximum rows input  entries for input files reading: mdot.inp, press.inp, etc.",
                            "nThreadTH": "Number of CPUs allocated for TH module",
                            "nThreadNE": "Number of CPUs allocated for NE module",
                            "ISTISC": "?! Deprecated",
@@ -309,7 +309,7 @@ class FreneticNamelist():
                            "method": "PSEUDO",
                            "nThreadTH": 1,
                            "nThreadNE": 1,
-                           # TH input.dat
+                           # TH input.inp
                            "URTFLU": 1,
                            "URTPIN": 1,
                            "iQFun": -2,
@@ -355,7 +355,7 @@ class FreneticNamelist():
                            "iAxNodr": 1,
                            "iTimeProf": 1,
                            "tRadProf": 0,
-                           # NE input.dat
+                           # NE input.inp
                            "iRun": nan,
                            "nConf": nan,
                            "power": 1.0,
@@ -363,9 +363,9 @@ class FreneticNamelist():
                            "MacInp": "macro.nml",
                            "MatInp": "config.inp",
                            "RhoInp": "rho.inp",
-                           "GeoInp": "input.dat",
-                           "NumInp": "input.dat",
-                           "OutInp": "input.dat",
+                           "GeoInp": "input.inp",
+                           "NumInp": "input.inp",
+                           "OutInp": "input.inp",
                            "iHDF5Inp": 2,
                            "nDim": nan,
                            "AlbedoXY": 0.0,

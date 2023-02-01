@@ -17,13 +17,13 @@ def writeCZdata(core):
     -------
     ``None``
     """
-    input_files = {'mdot.dat': 'massflowrates', 
-                   'temp.dat': 'temperatures', 
-                   'press.dat': 'pressures'}
+    input_files = {'mdot.inp': 'massflowrates', 
+                   'temp.inp': 'temperatures', 
+                   'press.inp': 'pressures'}
     for inp in input_files.keys():
-        # generate input .dat
+        # generate input .inp
         f = io.open(inp, 'w', newline='\n')
-        f.write(f"{len(core.TH.CZtime)},")
+        f.write(f"{len(core.TH.CZtime)}, \n")
         for t in core.TH.CZtime:
             # loop over each assembly
             data = [t]
@@ -39,7 +39,7 @@ def writeCZdata(core):
 
 def makeTHinput(core):
     """
-    Make input.dat file.
+    Make input.inp file.
 
     Parameters
     ----------
@@ -51,8 +51,8 @@ def makeTHinput(core):
     ``None``
     """
     frnnml = FreneticNamelist()
-    f = io.open("input.dat", 'w', newline='\n')
-    for namelist in frnnml.files["THinput.dat"]:
+    f = io.open("input.inp", 'w', newline='\n')
+    for namelist in frnnml.files["THinput.inp"]:
         f.write(f"&{namelist}\n")
         for key, val in core.FreneticNamelist[namelist].items():
             # format value with FortranFormatter utility

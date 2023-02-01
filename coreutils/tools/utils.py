@@ -72,7 +72,6 @@ def fortranformatter(value, multiplier=None):
     elif isinstance(value, _float_types):
         s = f"{value:.15e}"
         mantissa, exponent = s.split("e")
-
         mantissa = f"{float(mantissa):.15g}"
         if "." not in mantissa:
             mantissa = f"{mantissa}.0"

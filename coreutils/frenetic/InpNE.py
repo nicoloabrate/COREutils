@@ -502,7 +502,8 @@ def writeConfig(core):
                 config_str[:, n-1] = aType
         for iz in range(nZ):
             # f1.write('%s ' % ff(t, 'double'))  # write time instant for each cut
-            f1.write(f"{ff(t)}")  # write time instant for each cut
+            # FIXME set fixed precision even for t=0
+            f1.write(f"{ff(t)} ")  # write time instant for each cut
             # define region number
             typestr = np.array(['{:04d}'.format(x) for x in config_int[iz, :]])
             # write to file
@@ -541,7 +542,7 @@ def writeConfig(core):
 
 def makeNEinput(core, H5fmt=2):
     """
-    Make input.dat file.
+    Make input.inp file.
 
     Parameters
     ----------
@@ -579,9 +580,9 @@ def makeNEinput(core, H5fmt=2):
     nRun = 2 if core.trans else 1
 
     frnnml = FreneticNamelist()
-    f = io.open("input.dat", 'w', newline='\n')
+    f = io.open("input.inp", 'w', newline='\n')
 
-    for namelist in frnnml.files["NEinput.dat"]:
+    for namelist in frnnml.files["NEinput.inp"]:
         f.write(f"&{namelist}\n")
         for key, val in core.FreneticNamelist[namelist].items():
             # format value with FortranFormatter utility
