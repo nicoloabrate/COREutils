@@ -1233,7 +1233,7 @@ class THHexData():
             else:
                 self.BiBSides = np.array([0., 0.])
 
-            self.ThickClear = inpdict["clear_thick"] if "clear_thick" in inpdict.keys() else 0.
+            self.ThickClear = inpdict["clear_thick"] if "clear_thick" in inpdict.keys() else 1E-6
             self.WireDiam = inpdict["wire_diameter"] if "wire_diameter" in inpdict.keys() else 0.
             self.WirePitch = inpdict["wire_pitch"] if "wire_pitch" in inpdict.keys() else 0.
             self.FuelPitch = inpdict["pin_pitch"]
