@@ -1,5 +1,6 @@
 import numpy as np
 from copy import deepcopy
+import logging
 
 
 class UnfoldCore:
@@ -83,7 +84,8 @@ class UnfoldCore:
 
         # -- apply rotation, if needed
         if nsect == 1:
-            print("No symmetry rotation is considered")
+            logging.info("No symmetry rotation is considered")
+            self.coremap = coremap
 
         elif nsect == 2:
             self.coremap = UnfoldCore.rot180(coremap, Nx)

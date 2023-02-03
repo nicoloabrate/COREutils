@@ -1,5 +1,190 @@
 import numpy as np
 from coreutils.tools.utils import MyDict
+from coreutils.core.UnfoldCore import UnfoldCore
+
+
+class Geometry:
+    """Define an object representing the geometry of the core.
+
+    Parameters
+    ----------
+     GEargs: dict, optional
+        Dict containing info to build the object, by default ``None``.
+    inpdict: dict, optional
+        Object stored as a dict, by default ``None``.
+
+    Attributes
+    ----------
+    edge: str
+        Assembly edge
+    area: float
+        Assembly area
+    perimeter: float
+        Assembly perimeter
+    type: str
+        Assembly type.
+    numedges: int
+        Number of edges of the assembly
+
+    Methods
+    -------
+    compute_volume(self, height):
+        Compute volume of the assembly slice.
+    """
+
+    def __init__(self, GEargs=None, inpdict=None):
+        if GEargs is not None:
+            self._init(GEargs)
+        elif inpdict is not None:
+            self._from_dict(inpdict)
+        else:
+            raise GeometryError("Both ``GEargs`` and ``inpdict`` are ``None``!")
+
+    def _init(self, inpdict):
+        # assign geometric quantities
+        self.AssemblyGeometry = AssemblyGeometry(inpdict['lattice_pitch'], inpdict['shape'])
+
+        # assign further info, if provided
+        # --- ASSEMBLY
+        if inpdict['dim'] == 1:
+            self.config[0] = [1]
+            exit()
+        else:
+            if 'assembly' not in inpdict.keys():
+                raise GeometryError("`assembly` dict missing in input .json!")
+        # --- PARSE ASSEMBLY NAMES AND MAP
+        # sanity check
+        if isinstance(inpdict['assembly'], list) and inpdict['dim'] == 2:
+            assemblynames = inpdict['assembly']
+        elif isinstance(inpdict['assembly'], dict):
+            assemblynames = [a for a in inpdict['assembly'].keys()]
+        else:
+            raise TypeError(f"``assembly`` should be of type `dict` for a 3D object, not of type `{type(inpdict['assembly'])}`")
+
+        self.config = {}
+        assemblynames = MyDict(dict(zip(assemblynames, np.arange(1, len(assemblynames)+1))))
+        # --- define core Map, assembly names and types
+        # --- define core time-dep. configurations 
+        # TODO consider (and add) translations operated in the NE module
+        self.config[0] = UnfoldCore(inpdict['filename'], inpdict['rotation'], assemblynames).coremap
+
+        # --- assign axial regions (lattice)
+        self.AssemblyType = {}
+        for SA, axlat in inpdict['assembly'].items():
+            # TODO add sanity check on axlat
+
+            nZ = len(axlat)
+            upz = np.array((nZ,), dtype=float)
+            loz = np.array((nZ,), dtype=float)
+            reg = [None]*nZ
+            for iax, s in enumerate(axlat):
+                reg[iax] = s[0]
+                upz[iax] = s[1] if s[1] > s[2] else s[2]
+                loz[iax] = s[2] if s[1] > s[2] else s[1]
+            self.AssemblyType[SA] = AxialCuts(upz, loz, reg)
+        # --- LATTICE
+        if 'lattice' in inpdict.keys():
+            self.LatticeType = {}
+            self.LatticeGeometry = {}
+            latdict = inpdict['lattice']
+            # sanity check
+            if not isinstance(latdict, dict):
+                raise TypeError(f"``lattice`` should be of type `dict`, not `{type(latdict)}`")
+            # --- PIN
+            if 'pin' in inpdict.keys():
+                # sanity check
+                if not isinstance(latdict, dict):
+                    raise TypeError(f"``pin`` should be of type `dict`, not `{type(inpdict['pin'])}`")
+                self.Pin = {}
+                for pinName, pindict in inpdict['pin'].items():
+                    if isinstance(pindict, dict):
+                        self.Pin[pinName] = PinGeometry(pindict)
+                        # sanity check
+                        nmat_min = 4 if self.Pin[pinName].isAnnular else 3
+                        if len(self.Pin[pinName].materials) < nmat_min:
+                            if len(self.Pin[pinName].materials) == 1:
+                                pass
+                            elif len(self.Pin[pinName].materials) == 2 and self.Pin[pinName].isAnnular:
+                                pass
+                            else:
+                                raise OSError(f"Gap or Cladding not specified in pin {pinName}!")
+
+                    else:
+                        raise TypeError(f"{pinName} entry of `pin`` dict should be of type `dict`, not `{type(pin)}`")
+
+            for name, lat in latdict.items():
+                lattype = inpdict['shape'] if 'shape' not in lat.keys() else lat['shape']
+                # sanity check
+                if "n_pins" in lat.keys():
+                    if isinstance(lat['n_pins'], int):
+                        n_pins = lat['n_pins']
+                    else:
+                        raise TypeError(f"``n_pins`` should be of type `float`, not {type(latdict['n_pins'])} in `{name}` entry of `lattice` dict in `GE`!")
+                else:
+                    raise GeometryError(f"Number of pins (`n_pins`) argument is missing in `{name}` entry of `lattice` dict in `GE`!")
+                # sanity check
+                if "pin_types" in lat.keys():
+                    if isinstance(lat['pin_types'], list):
+                        pin_types = lat['pin_types']
+                    else:
+                        raise TypeError(f"``pin_types`` should be of type `list`, not {type(lat['pin_types'])}")
+                else:
+                    raise GeometryError(f"List with pin types (`pin_types`) argument is missing in `{name}` entry of `lattice` dict in `GE`!")
+                # sanity check
+                if "pin_pitch" in lat.keys():
+                    if isinstance(lat['pin_pitch'], float):
+                        pin_pitch = lat['pin_pitch']
+                    else:
+                        raise TypeError(f"``pin_pitch`` should be of type `list`, not {type(lat['pin_pitch'])}")
+                else:
+                    pin_pitch = 0
+                # sanity check
+                if 'wrapper' in lat.keys():
+                    if isinstance(lat["wrapper"][0], str):
+                        wrap_mat = lat["wrapper"][0]
+                        if isinstance(lat["wrapper"][1], (int, float)):
+                            wrap_width = lat["wrapper"][1]
+                        else:
+                            raise TypeError(f"``wrapper`` list 2nd entry  should be of type `str`, not {type(lat['wrapper'][0])}")
+                    else:
+                        raise TypeError(f"``wrapper`` list 1st entry should be of type `str`, not {type(lat['wrapper'][0])}")
+                else:
+                    wrap_width = 0
+                    wrap_mat = None
+                # sanity check
+                if 'inter_ass_width' in lat.keys():
+                    if isinstance(lat['inter_ass_width'], (int, float)):
+                        inter_ass_width = lat['inter_ass_width']
+                    else:
+                        raise TypeError(f"``inter_ass_width`` should be of type `float`, not {type(lat['inter_ass_width'])}")
+                else:
+                    inter_ass_width = 0
+
+                self.LatticeType[name] = pin_types
+                # FIXME assuming all pin_types have the same radius
+                if pin_types[0] in self.Pin.keys():
+                    pin_radius = self.Pin[pin_types[0]].radii.max()
+                else:
+                    raise GeometryError(f"{pin_types[0]} not in lattice {name}!")
+                self.LatticeGeometry[name] = LatticeGeometry(self.AssemblyGeometry.pitch, n_pins, pin_radius, pin_pitch, 
+                                                        lattype, wrap_width, wrap_mat, inter_ass_width)
+
+
+
+    def _from_dict(self, inpdict):
+        """Parse object from dictionary.
+
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
+        for k, v in inpdict.items():
+            if isinstance(v, bytes):
+                v = v.decode()
+            setattr(self, k, v)
+
 
 class AssemblyGeometry:
     """
@@ -40,8 +225,9 @@ class AssemblyGeometry:
             self._init(pitch, asstype)
         else:
             self._from_dict(inpdict)
-    
+
     def _init(self, pitch, asstype):
+        # --- hexagonal assembly
         if asstype == 'H' or asstype == '1D':
             # by definition of pitch between two hexagonal assemblies
             self.apothema = pitch/2
@@ -51,16 +237,21 @@ class AssemblyGeometry:
             self.perimeter = 6*self.edge
             self.type = "H"
             self.numedges = 6
-
+        # --- square assembly
         elif asstype == 'S':
             self.edge = pitch
             self.area = self.edge**2
             self.perimeter = 4*self.edge
             self.type = "S"
             self.numedges = 4
-
+        # --- 1d slab
+        elif asstype == '1D':
+            self.height = pitch
+            self.type = "1D"
+            self.area = 1
+            self.numedges = 2
         else:
-            raise OSError("Unknown type of assembly radial geometry!")
+            raise GeometryError("Unknown type of geometry!")
 
     def compute_volume(self, height):
         """Compute volume of the assembly slice.
@@ -77,6 +268,183 @@ class AssemblyGeometry:
         """
         volume = self.area*height
         return volume
+
+    def _from_dict(self, inpdict):
+        """Parse object from dictionary.
+
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
+        for k, v in inpdict.items():
+            if isinstance(v, bytes):
+                v = v.decode()
+            setattr(self, k, v)
+
+
+class LatticeGeometry:
+    """Define a regular lattice object in the x-y plane. Now only lattices
+    with identical pins are supported.
+
+    Parameters
+    ----------
+    ass_pitch: float, optional
+        Pitch of the lattice, by default ``None``. If ``None``, it 
+        assumed that the object is parsed from a dictionary.
+    n_pins: int, optional
+        Number of pins composing the lattice, by default ``None``. If ``None``, it 
+        assumed that the object is parsed from a dictionary.
+    pin_radius: float, optional
+        External radius of the pin (i.e., the surface in contact with the fluid),
+        by default ``None``. If ``None``, it assumed that the object is parsed 
+        from a dictionary.
+    pin_pitch: float, optional
+        Pin-to-Pin distance, by default ``None``. If ``None``, it 
+        assumed that the object is parsed from a dictionary.
+    lattype: string, optional
+        It can be "H" (hexagonal) or "S" (squared), by default ``None``.
+        If ``None``, it assumed that the object is parsed from a dictionary.
+    wrap_width: float, optional
+        Thickness of the wrapper (box) enclosing the pins and the coolant, by default 0.
+    wrap_width: str, optional
+        Constituting material of the wrapper (box) enclosing the pins and the coolant, by default ``None``.
+    inter_ass_width: float, optional
+        Thickness of the coolant layer between each lattice and its neighbour (inter-assembly 
+        clearance), by default 0.
+    inpdict: dict, optional
+        Object stored as a dict, by default ``None``.
+
+    Attributes
+    ----------
+    type: str
+        Lattice type.
+    nPins: int
+        Number of pins.
+    pinRad: float
+        Radius of the pin.
+    pitch: float
+        Lattice pitch.
+    wrapWidth: float
+        Thickness of the wrapper (box) enclosing the pins and the coolant.
+    interAssWidth: float
+        Thickness of the coolant layer between each lattice and its neighbour (inter-assembly clearance).
+    coolArea: float
+        Area occupied by the coolant.
+    flowArea: float
+        Area of the transverse flow in the elementary cell.
+    pinArea: float
+        Area occupied by the pins.
+    wrapArea: float
+        Area occupied by the wrapper.
+    interassArea: float
+        Area occupied by the inter-assembly clearance.
+    wetPerimenter: float
+        Wet perimeter inside the lattice.
+
+    """
+
+    def __init__(self, ass_pitch=None, n_pins=None, pin_radius=None, 
+                 pin_pitch=None, lattype=None, wrap_width=0, wrap_mat=None,
+                 inter_ass_width=0, inpdict=None):
+        if inpdict is None:
+            self._init(ass_pitch, n_pins, pin_radius, pin_pitch, lattype, 
+                       wrap_width=wrap_width, wrap_mat=wrap_mat, inter_ass_width=inter_ass_width)
+        else:
+            self._from_dict(inpdict)
+
+    def _init(self, ass_pitch, n_pins, pin_radius, pin_pitch, lattype, 
+              wrap_width, wrap_mat, inter_ass_width):
+        self.type = lattype
+        self.nPins = n_pins
+        self.pinRad = pin_radius
+        self.pitch = pin_pitch
+        self.interassWidth = inter_ass_width
+        self.wrapWidth = wrap_width
+        self.wrapMat = wrap_mat
+        self.pinArea = self.nPins*(np.pi*self.pinRad**2)
+        self.wetPerimeter = self.nPins*(np.pi*2*self.pinRad)
+        # --- hexagonal lattice (LFRs)
+        if lattype == 'H':
+            inner_pitch = ass_pitch-2*inter_ass_width
+            self.wrapArea = np.sqrt(3)/2*(inner_pitch)**2-np.sqrt(3)/2*(inner_pitch-2*wrap_width)**2
+            self.interassArea = np.sqrt(3)/2*(ass_pitch)**2-np.sqrt(3)/2*(inner_pitch)**2
+            self.coolArea = np.sqrt(3)/2*(inner_pitch-2*wrap_width)**2-self.pinArea
+            self.flowArea = np.sqrt(3)/4*pin_pitch-np.pi/2*pin_radius**2
+        # --- square lattice (LWRs)
+        elif lattype == 'S':
+            inner_pitch = ass_pitch-2*inter_ass_width
+            self.wrapArea = inner_pitch**2-(inner_pitch-2*wrap_width)**2
+            self.interassArea = ass_pitch**2-inner_pitch**2
+            self.coolArea = (inner_pitch-2*wrap_width)**2-self.pinArea
+            self.flowArea = pin_pitch**2-np.pi*pin_radius**2
+        # --- circular cluster array in a hexagonal channel
+        elif lattype == 'HC':
+            inner_pitch = ass_pitch-2*inter_ass_width
+            self.wrapArea = np.sqrt(3)/2*(inner_pitch)**2-np.sqrt(3)/2*(inner_pitch-2*wrap_width)**2
+            self.interassArea = np.sqrt(3)/2*(ass_pitch)**2-np.sqrt(3)/2*(inner_pitch)**2
+            self.coolArea = np.sqrt(3)/2*(inner_pitch-2*wrap_width)**2-self.pinArea
+            self.flowArea = None
+        else:
+            raise GeometryError(f"Unknown type of geometry {lattype}!")
+
+    def _from_dict(self, inpdict):
+        """Parse object from dictionary.
+
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
+        for k, v in inpdict.items():
+            if isinstance(v, bytes):
+                v = v.decode()
+            setattr(self, k, v)
+
+
+class PinGeometry:
+    """Define a pin object in the x-y plane.
+
+    Parameters
+    ----------
+    pindict: dict, optional
+        Dict containing materials as keys and radius in cm as values, by deafult ``None``.
+    inpdict: dict, optional
+        Object stored as a dict, by default ``None``.
+
+    Attributes
+    ----------
+    materials: list
+        List of material strings.
+    radii: np.array
+        Array with pin radii in increasing order.
+    """
+
+    def __init__(self, pindict=None, inpdict=None):
+        if inpdict is None:
+            self._init(pindict)
+        else:
+            self._from_dict(inpdict)
+
+    def _init(self, pindict):
+        # parse materials and radii
+        mats = [k for k in pindict.keys()]
+        radi = [v for v in pindict.values()]
+        # sort from smaller to larger
+        idx = np.argsort(radi).tolist()
+        mats = [mats[i] for i in idx]
+        radi = np.asarray([radi[i] for i in idx])
+
+        if "void" in mats[0] and radi.min() > 0:
+            self.isAnnular = True
+        else:
+            self.isAnnular = False
+
+        self.materials = mats
+        self.radii = radi
+
 
     def _from_dict(self, inpdict):
         """Parse object from dictionary.
@@ -514,3 +882,6 @@ class AxialCuts:
         centers = (mesh[1:]+mesh[:-1])/2 
         return mesh, centers
 
+
+class GeometryError(Exception):
+    pass

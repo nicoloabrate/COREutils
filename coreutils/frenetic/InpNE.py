@@ -420,7 +420,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
         # preallocation
         DFLtoZ = {}
         for asstype in core.NE.regions.values():
-            DFLtoZ[asstype] = DFLmax[asstype]/np.sqrt(core.AssemblyGeom.area)
+            DFLtoZ[asstype] = DFLmax[asstype]/np.sqrt(core.Geometry.AssemblyGeometry.area)
 
     with open('DiffLengthToNodeSize.json', 'w') as outfile:
         json.dump({"DFLtoZ": DFLtoZ}, outfile, indent=2)

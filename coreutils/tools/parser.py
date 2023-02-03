@@ -4,15 +4,23 @@ from collections import OrderedDict
 from coreutils.tools.utils import uppcasedict, lowcasedict
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist
 
-CImandatory = ('dim', 'shape', 'pitch', 'Tc', 'Tf') # 'pitch' only if shape!='1D', 'cuts' only in '1D'
+CImandatory = ('Tc', 'Tf')
+GEmandatory = ('dim', 'shape', 'lattice_pitch') # 'lattice_pitch' only if shape!='1D', 'cuts' only in '1D'
 NEmandatory = ('filename', 'assemblynames', 'rotation', 'energygrid', 'cuts')
 THmandatory = ('czfile', 'massflowrates', 'temperatures', 'rotation', 'pressures', 'cznames', 'thdata')
+# TODO add check on data types (e.g., rotation and dim must be integers)
 # set to value in dict if this key is missing
 setToValue = {
                 'CI': {
                         'power': 1,
                         'nSnap': 1,
                         'tEnd': 0,
+                      },
+                'GE': {
+                        'rotation': None,
+                        'pin': None,
+                        'lattice': None,
+                        'assembly': None,
                       },
                 'NE': {
                         'NEdata': None,
@@ -98,7 +106,13 @@ def parse(inp):
         else:
             raise ParserError('CI input part is missing in .json file!')
 
-        dim = CIargs['dim']
+        if 'GE' in inp.keys():
+            GEargs = __parseGE(inp['GE'])
+        else:
+            raise ParserError('GE input part is missing in .json file!')
+
+        dim = GEargs['dim']
+
         if 'NE' in inp.keys():
             NEargs = __parseNE(inp['NE'], dim)
 
@@ -108,12 +122,12 @@ def parse(inp):
             THargs = __parseTH(inp['TH'])
 
         if 'FRENETIC-NML' in inp.keys():
-            FRNargs = __parseFRN(inp['FRENETIC-NML'], CIargs, NEargs, THargs)
+            FRNargs = __parseFRN(inp['FRENETIC-NML'], CIargs, GEargs, NEargs, THargs)
 
     else:
         raise ParserError(f"Input file {f} was not dumped into a dict by `json.load` method!")
 
-    return CIargs, NEargs, THargs, FRNargs
+    return CIargs, GEargs, NEargs, THargs, FRNargs
 
 
 def __parseCI(inp):
@@ -132,7 +146,7 @@ def __parseCI(inp):
 
     Returns
     -------
-    NEargs : dict
+    CIargs : dict
         Dict of arguments.
 
     """
@@ -148,12 +162,7 @@ def __parseCI(inp):
         if k in inp.keys():
             pass
         else:
-            if k == 'shape' and CIargs['dim'] == 1:
-                CIargs[k] = '1D'
-            elif k == 'pitch' and CIargs['dim'] == 1:
-                CIargs[k] = 1.1547005383792517**0.5
-                pass
-            elif (k == 'tf' or k == 'tc') and CIargs['dim'] != 3:
+            if (k == 'tf' or k == 'tc') and CIargs['dim'] != 3:
                 CIargs[k.lower()] = [300]
             else:
                 raise ParserError(f'Mandatory {k} key missing in CI input file!')                            
@@ -174,6 +183,61 @@ def __parseCI(inp):
         CIargs['trans'] = True if CIargs['tEnd'.lower()] != 0 else False
 
     return CIargs
+
+
+def __parseGE(inp):
+    """
+    Parse GE input from .json dict.
+
+    Parameters
+    ----------
+    inp : dict
+        json input.
+
+    Raises
+    ------
+    ParserError
+        Missing mandatory arguments.
+
+    Returns
+    -------
+    GEargs : dict
+        Dict of arguments.
+
+    """
+    # assign keys
+    GEargs = {}
+    # make keys lower case to be case insensitive
+    inp = lowcasedict(inp)
+    for k in inp.keys():
+        GEargs[k] = inp[k]
+    # --- parse mandatory keys
+    for k in GEmandatory:
+        k = k.casefold()
+        if k in inp.keys():
+            pass
+        else:
+            if k == 'shape' and GEargs['dim'] == 1:
+                GEargs[k] = '1D'
+            elif k == 'lattice_pitch' and GEargs['dim'] == 1:
+                GEargs[k] = 1.1547005383792517**0.5
+                pass
+            else:
+                raise ParserError(f'Mandatory {k} key missing in GE input file!')                            
+
+    # check non-mandatory arguments
+    if GEargs['dim'] != 1:
+        warn_keys = ["pin", "lattice", "assembly"]
+        for k in warn_keys:
+            if k.lower() not in inp.keys():
+                print(f"WARNING: No {k} info is provided in GE!")
+
+    # set missing (not mandatory) keys to default value
+    for k, v in setToValue['GE'].items():
+        if k.lower() not in GEargs.keys():
+            GEargs[k.lower()] = v
+
+    return GEargs
 
 
 def __parseNE(inp, dim):
@@ -297,7 +361,7 @@ def __parseTH(inp):
                 raise ParserError("`zref` list with beginning and end of the mesh refinement zone is missing!")
 
     thdata = THargs["thdata"]
-    mandatory_args = ["n_fuel_pins", "n_nonfuel_pins", "htc_corr", "frict_corr", "chan_coupling_corr"]
+    mandatory_args = ["htc_corr", "frict_corr", "chan_coupling_corr"]
 
     if thdata is not None:
         if "data" not in thdata.keys():
@@ -309,18 +373,13 @@ def __parseTH(inp):
                     for k in mandatory_args:
                         if k.casefold() not in v.keys():
                             raise ParserError(f"{k} is missing in THdata['data'] dict in input .json!")
-                    if (v["n_fuel_pins"] > 0 or v["n_nonfuel_pins"] > 0):
-                        if "fuel" not in v.keys() and "nonfuel" not in v.keys():
-                            raise ParserError(f"'fuel' or 'nonfuel' dict should be added in {thtype}!")
-                        if "pin_pitch" not in v.keys():
-                            raise ParserError(f"'pin_pitch' is missing in {thtype}!")
             else:
                 raise ParserError("'data' key in THdata dict in input .json should be associated with a dict!")
 
     return THargs
 
 
-def __parseFRN(inp, CIargs, NEargs, THargs):
+def __parseFRN(inp, CIargs, GEargs, NEargs, THargs):
     """
     Parse FRENETIC keywords from .json dict.
 
@@ -330,6 +389,8 @@ def __parseFRN(inp, CIargs, NEargs, THargs):
         FRENETIC-NML input.
     CIargs : dict
         Common input arguments.
+    GEargs : dict
+        Geometry input arguments.
     NEargs : dict
         Neutronic input arguments.
     THargs : dict
@@ -371,7 +432,7 @@ def __parseFRN(inp, CIargs, NEargs, THargs):
                     else:
                         raise ParserError(f"Mandatory '{k}' key missing in FRENETIC-NML dict!")
             elif inptype == "TH":
-                if CIargs["dim"] == 3:
+                if GEargs["dim"] == 3:
                     if k.lower() not in inp.keys():
                         if k.lower() == "xLengt".lower():
                             if "zmesh" in THargs.keys():

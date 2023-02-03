@@ -31,7 +31,7 @@ def writeCZdata(core):
                 # get data in assembly
                 whichtype = core.getassemblytype(n, core.TH.CZconfig[t], isfren=True)
                 whichtype = core.TH.CZassemblytypes[whichtype]
-                val = core.TH.CZData.__dict__[input_files[inp]][whichtype]
+                val = core.TH.CZdata.__dict__[input_files[inp]][whichtype]
                 data.append(val)
             # write to file
             f.write(f'{ff(data)} \n')

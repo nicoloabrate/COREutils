@@ -131,7 +131,7 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
     return res
 
 
-def Homogenise(materials, weights, mixname, P1consistent=False):
+def Homogenise(materials, weights, mixname):
     """Homogenise multi-group parameters.
 
     Parameters
@@ -144,8 +144,6 @@ def Homogenise(materials, weights, mixname, P1consistent=False):
         name of the materials.
     mixname : str
         Name of the mixed material.
-    P1consistent : bool, optional
-        Boolean to choose the P1 consistent formalism, by default ``False``
 
     Returns
     -------
@@ -231,7 +229,7 @@ def Homogenise(materials, weights, mixname, P1consistent=False):
             tmp = np.divide(data, TOTFLX, where=TOTFLX!=0)
             hd[key] = tmp
 
-    homogmat.datacheck(P1consistent=P1consistent)
+    homogmat.datacheck()
     return homogmat
 
 
@@ -267,8 +265,6 @@ class NEMaterial():
         Flag to check and ensure data consistency, by default ``True``.
     init: bool, optional
         Flag to initialise the object as empty, by default ``False``
-    P1consistent : bool, optional
-        Boolean to choose the P1 consistent formalism, by default ``False``
 
     Attributes
     ----------
@@ -431,6 +427,7 @@ class NEMaterial():
             self.egridname = egridname
             self.energygrid = energygrid
             self.UniName = uniName
+            self.P1consistent = P1consistent
 
             try:
                 self.NPF = (self.beta).size
@@ -445,7 +442,7 @@ class NEMaterial():
             S = sum('S' in s for s in datastr)//2
             self.L = S if S > L else L  # get maximum scattering order
             if datacheck:
-                self.datacheck(P1consistent=P1consistent)
+                self.datacheck()
 
     def _readjson(self, path):
         """
@@ -724,7 +721,7 @@ class NEMaterial():
             plt.tight_layout()
             plt.savefig(f"{figname}.png")
 
-    def perturb(self, what, howmuch, depgro=None, sanitycheck=True, P1consistent=False):
+    def perturb(self, what, howmuch, depgro=None, sanitycheck=True):
         """Perturb material composition.
 
         Parameters
@@ -742,8 +739,6 @@ class NEMaterial():
             the scattering cross section.
         sanitycheck: bool, optional
             Flag to check and ensure data consistency, by default ``True``.
-        P1consistent : bool, optional
-            Boolean to choose the P1 consistent formalism, by default ``False``
 
         Returns
         -------
@@ -817,19 +812,18 @@ class NEMaterial():
                 else:
                     self.Chit = self.Chit/self.Chit.sum()
 
-            self.datacheck(P1consistent=P1consistent)
+            self.datacheck()
 
-    def datacheck(self, P1consistent=False):
+    def datacheck(self):
         """Check data consistency and add missing data.
 
         Parameters
         ----------
-        P1consistent : bool, optional
-            Boolean to choose the P1 consistent formalism, by default ``False``
+        ``None``.
 
         Returns
         -------
-        None.
+        ``None``.
 
         """
         E = self.energygrid
@@ -856,14 +850,18 @@ class NEMaterial():
         self.Remxs = self.Abs+sTOT-InScatt
         self.Tot = self.Remxs+InScatt
         # ensure non-zero total XS
+        self.bad_data = False
+        if np.count_nonzero(self.Tot) != self.Tot.shape[0]:
+            self.bad_data = True
         self.Tot[self.Tot <= 0] = 1E-8
-        if 'Invv' not in datavail:
-            avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
-            v = np.sqrt(2*avgE/1.674927351e-27)
-            self.Invv = 1/(v*100)  # s/cm
+
+
+        avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
+        v = np.sqrt(2*avgE/1.674927351e-27)
+        self.Invv = 1/(v*100)  # s/cm
 
         # --- compute diffusion coefficient and transport xs
-        if P1consistent:
+        if self.P1consistent:
             if 'S1' in datavail:
                 # --- compute transport xs (derivation from P1)
                 self.Transpxs = self.Tot-self.S1.sum(axis=0)
@@ -1001,7 +999,7 @@ class NEMaterial():
 
             json.dump(tmp, f, sort_keys=True, indent=10)
 
-    def collapse(self, fewgrp, spectrum=None, egridname=None, P1consistent=False):
+    def collapse(self, fewgrp, spectrum=None, egridname=None):
         """Collapse in energy the multi-group data.
 
         Parameters
@@ -1013,8 +1011,6 @@ class NEMaterial():
             the ``Flx`` attribute is used as a weighting spectrum.
         egridname: str, optional
             Name of the energy grid, by default ``None``.
-        P1consistent : bool, optional
-            Boolean to choose the P1 consistent formalism, by default ``False``
 
         Raises
         ------
@@ -1135,7 +1131,7 @@ class NEMaterial():
         return self.Fiss.max() > 0
 
 
-class CZData:
+class CZdata:
     """
     Assign TH material data to the reactor core.
 
@@ -1190,81 +1186,12 @@ class THHexData():
         inpdict = lowcasedict(inpdict)
         # assign assemblies to type 
         self.iHA = which
-        # geometry
-        self.nHeatPins = inpdict["n_fuel_pins"]
-        self.nNonHeatPins = inpdict["n_nonfuel_pins"]
-        self.isBiB = 0
-        self.isAnn = 0
-
-        if self.nHeatPins > 0:
-            if "fuel" in inpdict.keys():
-                self.FuelRad = np.sort(np.asarray((inpdict["fuel"][1])))
-            else:
-                self.FuelRad = np.array([0., 0.])
-            self.isAnn = 1 if self.FuelRad[0] > 0 else 0
-
-        if self.nNonHeatPins > 0:
-            if "nonfuel" in inpdict.keys():
-                self.NonFuelRad = np.sort(np.asarray((inpdict["nonfuel"][1])))
-            else:
-                self.NonFuelRad = np.array([0., 0.])
-            if not hasattr(self, "isAnn"):
-                self.isAnn = 1 if self.NonFuelRad[0] > 0 else 0
-
-        if self.nHeatPins > 0 or self.nNonHeatPins > 0:
-            if "gap" in inpdict.keys():
-                self.GapRad = np.sort(np.asarray((inpdict["gap"][1])))
-            else:
-                self.GapRad = [pin_r[1], pin_r[1]]
-
-            if "clad" in inpdict.keys():
-                self.CladRad = np.sort(np.asarray((inpdict["clad"][1])))
-            else:
-                self.CladRad = [gap_r[1], gap_r[1]]
-
-            if "wrapper" in inpdict.keys():
-                self.WrapThick = inpdict["wrapper"][1]
-            else:
-                self.WrapThick = 0.
-
-            if "bib_sides" in inpdict.keys():
-                self.BiBSides = np.sort(np.asarray((inpdict["bib_sides"])))
-                self.isBiB = 1 if self.BiBSides.max() > 0 else 0
-            else:
-                self.BiBSides = np.array([0., 0.])
-
-            self.ThickClear = inpdict["clear_thick"] if "clear_thick" in inpdict.keys() else 1E-6
-            self.WireDiam = inpdict["wire_diameter"] if "wire_diameter" in inpdict.keys() else 0.
-            self.WirePitch = inpdict["wire_pitch"] if "wire_pitch" in inpdict.keys() else 0.
-            self.FuelPitch = inpdict["pin_pitch"]
-
         # TH correlations
         self.frictMult = 1
         self.htcMult = 1
         self.htcCorr = inpdict["htc_corr"]
         self.frictCorr = inpdict["frict_corr"]
         self.chanCouplCorr = inpdict["chan_coupling_corr"]
-
-        # materials
-        if hasattr(self, "FuelRad"):
-            self.FuelPinMat = inpdict["fuel"][0]
-
-        if hasattr(self, "NonFuelRad"):
-            self.NonFuelPinMat = inpdict["nonfuel"][0]
-
-        if hasattr(self, "GapRad"):
-            self.GapMat = inpdict["gap"][0]
-
-        if hasattr(self, "CladRad"):
-            self.CladMat = inpdict["clad"][0]
-
-        if hasattr(self, "WrapThick"):
-            self.WrapMat = inpdict["wrapper"][0]
-
-        if not hasattr(self, "GapMat") and not hasattr(self, "CladMat"):
-            self.isRadHomog = 1
-        else:
-            self.isRadHomog = 0
 
 class NEMaterialError(Exception):
     pass

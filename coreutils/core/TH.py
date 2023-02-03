@@ -10,8 +10,8 @@ from copy import deepcopy as cp
 from pathlib import Path
 from coreutils.tools.utils import MyDict
 from coreutils.core.UnfoldCore import UnfoldCore
-from coreutils.core.MaterialData import THHexData, CZData
-from coreutils.core.Assembly import AssemblyGeometry, AxialConfig, AxialCuts
+from coreutils.core.MaterialData import THHexData, CZdata
+from coreutils.core.Geometry import Geometry, AxialConfig, AxialCuts
 
 
 class TH:
@@ -20,8 +20,6 @@ class TH:
 
     Attributes
     ----------
-    AssemblyGeom : obj
-        Object with assembly geometrical features.
     labels : dict
         Dictionary with regions names and strings for plot labelling.
     assemblytypes : dict
@@ -71,7 +69,8 @@ class TH:
         CZcore = UnfoldCore(THargs['czfile'], THargs['rotation'], CZassemblynames).coremap
 
         # --- define THcore
-        THassemblynames = THargs['thnames']
+        THassemblynames = THargs['thnames'].keys()
+        self.THtoGE = THargs['thnames']
         assnum = np.arange(1, len(THassemblynames)+1)
         THassemblynames = MyDict(dict(zip(THassemblynames, assnum)))
         # define dict between strings and ints for assembly type
@@ -122,9 +121,9 @@ class TH:
                         self.replaceSA(CI, config[time]["replace"], time, configtype=configtype, isfren=True)
 
         # assign material properties
-        cz = CZData(THargs['massflowrates'], THargs['pressures'], 
+        cz = CZdata(THargs['massflowrates'], THargs['pressures'], 
                             THargs['temperatures'], self.CZassemblytypes.values())
-        self.CZData = cz
+        self.CZdata = cz
 
         self.THdata = {}
         for HAtype, data in THdata['data'].items():
@@ -143,19 +142,21 @@ class TH:
                         self.THplot = {}
                     self.THplot['radplot'] = THargs["radplot"]
 
-        if "nelems" in THargs:
+        if THargs["nelems"] is not None:
             self.nVol = THargs["nelems"]
-            self.zmesh = THargs["zmesh"]
+            self.zmesh = [z/100 for z in THargs["zmesh"]]
             self.zmesh.sort()
-            if "nelref" in THargs:
+            if THargs["nelref"] is not None:
                 self.nVolRef = THargs["nelref"]
-                self.zref = THargs["zref"]
+                self.zref = [z/100 for z in THargs["zref"]]
                 self.zref.sort()
-                zcoord, axstep = meshTH1d(min(self.zmesh), max(self.zmesh), self.nVol, 
-                                          nvolref=self.nVolRef, zminref=min(self.zref),
-                                          zmaxref=max(self.zref))
-                self.zcoord = zcoord
-                self.axstep = axstep
+            nVolRef = self.nVolRef if hasattr(self, "nVolRef") else None
+            zref = self.zref if hasattr(self, "zref") else [0, 0]
+            zcoord, axstep = meshTH1d(min(self.zmesh), max(self.zmesh), self.nVol, 
+                                        nvolref=nVolRef, zminref=min(zref),
+                                        zmaxref=max(zref))
+            self.zcoord = zcoord
+            self.axstep = axstep
 
     def from_dict(self, inpdict):
         mydicts = ["assemblytypes", "assemblylabel"]
@@ -278,7 +279,7 @@ class TH:
                         nass = len(self.CZassemblytypes.keys())
                         self.CZassemblytypes[nass + 1] = newname
                         # update values inside parameters
-                        self.CZData.__dict__[whatpar][newname] = withpar
+                        self.CZdata.__dict__[whatpar][newname] = withpar
 
                     # replace assembly
                     if newcore is None:
@@ -296,15 +297,11 @@ class TH:
             raise OSError('"which" and/or "with" and/or "what" keys missing' +
                           ' in "BCs" in TH!')
 
-    @property
-    def nReg(self):
-        return len(self.regions.keys())
-
 
 def meshTH1d(zmin, zmax, nvol, nvolref=None, 
-           zminref=None, zmaxref=None):
+             zminref=None, zmaxref=None):
     """provide baricenter of each nodes between zmin and zmax with optional refinement.
-        This method is based on the subroutine mesh.f90 of FRENETIC.
+       This method is based on the subroutine mesh.f90 of FRENETIC.
 
     Parameters
     ----------
@@ -327,12 +324,11 @@ def meshTH1d(zmin, zmax, nvol, nvolref=None,
         Centers of each axial cell
     
     """
-    if nvolref is not None:
-        refinement = True
+    refinement = True if nvolref is not None else False
 
     # allocation
-    zcoord = np.zeros((nvol,), dtype=float)
-    axstep = np.zeros((nvol,), dtype=float)
+    zcoord = np.zeros((nvol,), dtype=np.float32)
+    axstep = np.zeros((nvol,), dtype=np.float32)
     zltot = zmax-zmin
 
     if refinement:
@@ -361,11 +357,10 @@ def meshTH1d(zmin, zmax, nvol, nvolref=None,
             iz += 1
     else:
         # build mesh
-        axstep[0] = zltot/nvol
+        axstep[:] = zltot/nvol
         zcoord[0] = 0.0 + axstep[0]/2.0
-        for iz in range(1, nvol+1):
+        for iz in range(1, nvol):
             z0 = zcoord[iz-1]
-            axstep[iz] = zltot/nvol
-            zcoord[iz] = z0 + axstep[iz]/2
+            zcoord[iz] = z0 + axstep[iz]
 
     return zcoord, axstep

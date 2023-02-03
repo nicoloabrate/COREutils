@@ -11,7 +11,7 @@ from pathlib import Path
 from coreutils.tools.utils import MyDict
 from coreutils.core.UnfoldCore import UnfoldCore
 from coreutils.core.MaterialData import *
-from coreutils.core.Assembly import AssemblyGeometry, AxialConfig, AxialCuts
+from coreutils.core.Geometry import Geometry, AxialConfig, AxialCuts
 
 
 class NE:
@@ -20,8 +20,6 @@ class NE:
 
     Attributes
     ----------
-    AssemblyGeom : obj
-        Object with assembly geometrical features.
     labels : dict
         Dictionary with regions names and strings for plot labelling.
     assemblytypes : dict
@@ -46,18 +44,19 @@ class NE:
         Replace assemblies with user-defined new or existing type.
     """
 
-    def __init__(self, NEargs=None, CI=None, inpdict=None, datacheck=True,
-                 P1consistent=False):
+    def __init__(self, NEargs=None, CI=None, inpdict=None, datacheck=True):
 
         if inpdict is None:
             self._init(NEargs, CI, datacheck=datacheck)
         else:
             self.from_dict(inpdict)
 
-    def _init(self, NEargs, CI, datacheck=True, P1consistent=False):
+    def _init(self, NEargs, CI, datacheck=True):
         # parse inp args
         dim = CI.dim
+        self.NEtoGE = NEargs['assemblynames']
         assemblynames = tuple(NEargs['assemblynames'])
+
         cuts = {'xscuts': NEargs['xscuts'],
                 'zcuts': NEargs['zcuts']}
         config = NEargs['config']
@@ -134,7 +133,7 @@ class NE:
         if NEdata is not None:
             self.get_energy_grid(NEargs)
             self.NEdata = NEdata
-            self.get_material_data(univ, CI, datacheck=datacheck, P1consistent=P1consistent)
+            self.get_material_data(univ, CI, datacheck=datacheck)
             # --- check precursors family consistency
             NP = -1
             NPp = -1
@@ -173,7 +172,7 @@ class NE:
         if NEargs["replacesa"] is not None:
             self.replaceSA(CI, NEargs["replacesa"], 0, isfren=NEfren)
         if NEargs["replace"] is not None:
-            self.replace(CI, NEargs["replace"], 0, isfren=NEfren, P1consistent=P1consistent)
+            self.replace(CI, NEargs["replace"], 0, isfren=NEfren)
 
         # build time-dependent core configuration
         if config is not None:
@@ -199,11 +198,11 @@ class NE:
 
                 if "perturb" in config[time]:
                     self.perturb(CI, config[time]["perturb"],
-                                   time, isfren=NEfren, P1consistent=P1consistent)
+                                   time, isfren=NEfren)
 
                 if "replace" in config[time]:
                     self.replace(CI, config[time]["replace"], 
-                                time, isfren=NEfren, P1consistent=P1consistent)
+                                time, isfren=NEfren)
 
                 if "replaceSA" in config[time]:
                     self.replaceSA(CI, config[time]["replaceSA"], 
@@ -291,7 +290,7 @@ class NE:
 
             self.config[float(time)] = newcore
 
-    def replace(self, core, rpl, time, isfren=False, action='repl', P1consistent=False):
+    def replace(self, core, rpl, time, isfren=False, action='repl'):
         """
         Replace full assemblies or axial regions.
         
@@ -550,7 +549,7 @@ class NE:
                                 for name in names:
                                     mat4hom[name] = self.data[temp][name]
                                 weight4hom = dict(zip(names, w))
-                                tmp[u0] = Homogenise(mat4hom, weight4hom, u0, P1consistent=P1consistent)
+                                tmp[u0] = Homogenise(mat4hom, weight4hom, u0)
 
                 # --- update info in object
                 if newtype not in self.assemblytypes.keys():
@@ -590,33 +589,9 @@ class NE:
         
         keff = keff*self.nGro
 
-        # # --- get all fissile regions at the present config
-        # if core.dim == 2: # check all regions
-        #     reg2d_now = self.config[now].unique()
-        #     fiss_mat = []
-        #     for iReg in reg2d_now:
-        #         reg_str = self.regions[iReg]
-            #     for temp in core.TfTc:
-        #             if self.data[temps][reg_str].isfiss:
-                #         self.data[temp][prtreg] = cp(self.data[temp][oldreg])
-                #         self.data[temp][prtreg].perturb(perturbation, howmuch, depgro, sanitycheck=sanitycheck, P1consistent=P1consistent)
-
-        # else:
-            #     # --- perturb data and assign it
-
-        #     # --- add new assemblies
-        #     self.regions[self.nReg+1] = prtreg
-        #     self.labels[prtreg] = f"{self.labels[oldreg]}-{iP}{action}"
-        #     # --- define replacement dict to introduce perturbation
-        #     if core.dim == 2:
-        #         repl = {atype: assbly}
-        #         self.replaceSA(core, repl, time, isfren=isfren)
-        #     else:
-        #         repl = {"which": [assbly], "with": [prtreg], "where": [zpert]}
-        #         self.replace(core, repl, time, isfren=isfren, action=action, P1consistent=P1consistent)
 
     def perturb(self, core, prt, time=0, sanitycheck=True, isfren=True,
-                action='pert', P1consistent=False):
+                action='pert'):
         """
 
         Perturb material composition.
@@ -754,7 +729,7 @@ class NE:
                 # --- perturb data and assign it
                 for temp in core.TfTc:
                     self.data[temp][prtreg] = cp(self.data[temp][oldreg])
-                    self.data[temp][prtreg].perturb(perturbation, howmuch, depgro, sanitycheck=sanitycheck, P1consistent=P1consistent)
+                    self.data[temp][prtreg].perturb(perturbation, howmuch, depgro, sanitycheck=sanitycheck)
                 # --- add new assemblies
                 self.regions[self.nReg+1] = prtreg
                 self.labels[prtreg] = f"{self.labels[oldreg]}-{iP}{action}"
@@ -764,7 +739,7 @@ class NE:
                     self.replaceSA(core, repl, time, isfren=isfren)
                 else:
                     repl = {"which": [assbly], "with": [prtreg], "where": [zpert]}
-                    self.replace(core, repl, time, isfren=isfren, action=action, P1consistent=P1consistent)
+                    self.replace(core, repl, time, isfren=isfren, action=action)
 
     def translate(self, core, transconfig, time, isfren=False, action='trans'):
         """
@@ -933,7 +908,7 @@ class NE:
                     dim = 3
                     self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
 
-    def get_material_data(self, univ, core, datacheck=True, P1consistent=False):
+    def get_material_data(self, univ, core, datacheck=True):
         try:
             path = self.NEdata['path']
         except KeyError:
@@ -946,6 +921,8 @@ class NE:
 
         if "checktempdep" not in self.NEdata.keys():
             self.NEdata["checktempdep"] = 0
+        if "P1consistent" not in self.NEdata.keys():
+            self.NEdata["P1consistent"] = 0
 
         try:
             files = self.NEdata['beginwith']
@@ -983,11 +960,11 @@ class NE:
             for u in univ:
                 if u in serpuniv:
                     tmp[u] = NEMaterial(u, self.energygrid, egridname=self.egridname, 
-                                        serpres=serpres, temp=T, datacheck=datacheck, P1consistent=P1consistent)
+                                        serpres=serpres, temp=T, datacheck=datacheck, P1consistent=self.NEdata["P1consistent"])
                 else: # look for data in json and txt format
                     tmp[u] = NEMaterial(u, self.energygrid, 
                                         egridname=self.egridname,
-                                        datapath=path, temp=T, basename=u, datacheck=datacheck, P1consistent=P1consistent)
+                                        datapath=path, temp=T, basename=u, datacheck=datacheck, P1consistent=self.NEdata["P1consistent"])
             # --- HOMOGENISATION (if any)
             if core.dim != 2:
                 if self.AxialConfig.homogenised:
@@ -1026,7 +1003,7 @@ class NE:
             self.energygrid = energygrid
         elif isinstance(energygrid, (str, float, int)):
             pwd = Path(__file__).parent.parent.parent
-            if 'COREutils' not in str(pwd):
+            if 'COREutils'.lower() not in str(pwd).lower():
                 raise OSError(f'Check coreutils tree for NEdata: {pwd}')
             else:
                 pwd = pwd.joinpath('NEdata')

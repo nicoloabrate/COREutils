@@ -18,8 +18,8 @@ class Map:
         rotation angle over which the arrangement is symmetrically rotated.
         The rotation angle should be passed in degree (only 0,60,45,90,180
         values are allowed). With rotangle=0 no rotation occurs.
-    AssRadGeom : ``AssemblyGeometry``
-        Assembly radial geometry object.
+    Geom : ``Geometry``
+        Geometry object.
     regionsdict: dict
     inp: np.array
         2D array representing the reactor core sector defined in input.
@@ -52,14 +52,14 @@ class Map:
 
     """
 
-    def __init__(self, geinp=None, rotangle=None, AssRadGeom=None,
+    def __init__(self, geinp=None, rotangle=None, Geom=None,
                  regionsdict=None, inp=None, inpdict=None):
         if inpdict is None:
-            self._init(geinp, rotangle, AssRadGeom, regionsdict, inp)
+            self._init(geinp, rotangle, Geom, regionsdict, inp)
         else:
             self._from_dict(inpdict)
 
-    def _init(self, geinp, rotangle, AssRadGeom, regionsdict, inp):
+    def _init(self, geinp, rotangle, Geom, regionsdict, inp):
         if isinstance(geinp, str):
             rotangle = int(rotangle)
             core = UnfoldCore(geinp, rotangle, regionsdict)
@@ -71,13 +71,35 @@ class Map:
 
         # -- compute assembly geometrical features
         self.rotation_angle = rotangle
+
+        if rotangle == 0:
+            # sanity check
+            N, M = self.inp.shape
+            if N != M:
+                raise MapError("Input map should be squared also for hexagonal cores if rotation angle != 60!")
+            self.sector = np.zeros((N, M), dtype=int)
+            yc, xc = int(N/2)-1, int(N/2)-1 # -1 for python idx
+            # count non-zero assemblies along each row
+            nL = []
+            nnz = True
+            row, col = yc, xc
+            while nnz:
+                nnz = np.count_nonzero(self.inp[row, col:])
+                if nnz:
+                    nL.append(nnz)
+                    self.sector[row, col:col+nnz] = np.ones((nnz, ))
+                row -= 1
+                col += 1 if col != xc else 2
+        else:
+            self.sector = self.inp
+
         self.Nx, self.Ny = (self.type).shape
         # define assembly map
-        serpmap = Map.__drawserpmap(self, AssRadGeom)  # Serpent numeration
+        serpmap = Map.__drawserpmap(self, Geom)  # Serpent numeration
         # define assembly centers coordinate
-        coord = Map.__findcenters(self, AssRadGeom)
+        coord = Map.__findcenters(self, Geom)
 
-        if AssRadGeom.type == "H":
+        if Geom.type == "H":
             # define assembly numeration according to FRENETIC
             frenmap = Map.__drawfrenmap(self)
             # sort FRENETIC map in ascending way
@@ -120,13 +142,13 @@ class Map:
         for k, v in inpdict.items():
             setattr(self, k, v)
 
-    def __findcenters(self, AssRadGeom):
+    def __findcenters(self, Geom):
         """Compute x and y coordinates of the centers of each assembly.
         
         Parameters
         ----------
-        AssRadGeom: ``AssemblyGeometry``
-            Assembly radial geometry object.
+        Geom: ``AssemblyGeometry``
+            Geometry object.
 
         Returns
         -------
@@ -137,9 +159,9 @@ class Map:
 
         # define assemblies characteristics
         Nx, Ny = np.shape(self.type)
-        L = AssRadGeom.edge  # assembly edge
+        L = Geom.edge  # assembly edge
 
-        if AssRadGeom.type == "S":
+        if Geom.type == "S":
             # evaluate coordinates points along x- and y- axes
             xspan = (np.arange(-(Nx-1)*L/2, (Nx)*L/2, L))
             yspan = np.flip(np.arange(-(Ny-1)*L/2, (Ny)*L/2, L))
@@ -151,26 +173,26 @@ class Map:
             # take cartesian product of coordinates set
             coord = tuple(it.product(xspan, yspan))
 
-        elif AssRadGeom.type == "H":
+        elif Geom.type == "H":
 
             # define core geometrical features
             nsect = 6  # only six sextants for 60 degree rotation are allowed
-            nass = nsect*(np.count_nonzero(self.inp)-1)+1  # tot ass.bly number
-            P = 2*AssRadGeom.apothema  # assembly pitch [cm]
+            nass = nsect*(np.count_nonzero(self.sector)-1)+1  # tot ass.bly number
+            P = Geom.pitch  # assembly pitch [cm]
             theta = pi/3  # hexagon inner angle
-            L = AssRadGeom.edge  # hexagon edge [cm]
+            L = Geom.edge  # hexagon edge [cm]
             x0 = P  # x-centre coordinate
             y0 = 0  # y-centre coordinate
 
             # unpack non-zero coordinates of the matrix
-            y, x = np.where(self.inp != 0)  # rows, columns
+            y, x = np.where(self.sector != 0)  # rows, columns
             # define core central assembly
             yc, xc = [np.max(y), np.min(x)]  # central row, central column
             # compute number of assemblies
             Nx, Ny = [np.max(x)-xc, yc-np.min(y)+1]  # tot. columns, tot. rows
             # compute assemblies per row
             FA = [np.count_nonzero(row)
-                  for row in self.inp[yc-Ny+1:yc+1, xc+1:]]
+                  for row in self.sector[yc-Ny+1:yc+1, xc+1:]]
             # convert to np array
             FA = np.flip(np.asarray(FA))
             NFA = sum(FA)  # sum number of assemblies per sextant
@@ -206,12 +228,12 @@ class Map:
 
         return coord
 
-    def __drawserpmap(self, AssRadGeom):
+    def __drawserpmap(self, Geom):
         """Define the core map  according to Serpent 2 code ordering.
 
         Parameters
         ----------
-        AssRadGeom: ``AssemblyGeometry``
+        Geom: ``AssemblyGeometry``
             Assembly radial geometry object.
 
         Returns
@@ -224,14 +246,14 @@ class Map:
         Nx, Ny = np.shape(self.type)
         # define assembly numeration (same for squared and hex.lattice)
         assnum = np.arange(1, Nx*Ny+1)  # array with assembly numbers
-        if AssRadGeom.type == "H":
+        if Geom.type == "H":
             assnum = assnum.reshape(Nx, Ny).T  # reshape as a matrix
             assnum = assnum.flatten('F')  # flattening the matrix by columns
             # flatten the matrix by rows
             coretype = self.type.flatten('C')
             # squeeze out void assembly numbers
             assnum[coretype == 0] = 0
-        elif AssRadGeom.type == "S":
+        elif Geom.type == "S":
             assnum = assnum.reshape(Nx, Ny)  # reshape as a matrix
             assnum = assnum.flatten('F')  # flattening the matrix by columns
 
@@ -245,7 +267,7 @@ class Map:
 
         Parameters
         ----------
-        AssRadGeom: ``AssemblyGeometry``
+        Geom: ``AssemblyGeometry``
             Assembly radial geometry object.
 
         Returns
@@ -255,12 +277,15 @@ class Map:
 
         """
         # check on geometry
-        if self.rotation_angle != 60:
+        if self.rotation_angle != 60 and self.rotation_angle != 0:
             print("FrenMap method works only for hexagonal core geometry!")
-            raise OSError("rotation angle != 60 degree")
-
+            raise OSError("rotation angle should be 60 or 0 degrees")
+        
         nsect = 6  # only six sextants for 60 degree rotation are allowed
-        frenmap = self.inp+0  # copy input matrix
+
+        nL = np.count_nonzero(self.sector, axis=1)
+        self.nonZeroCols = nL[nL != 0]
+        frenmap = self.sector+0  # copy input matrix
 
         # number of assemblies
         nass = nsect*(np.count_nonzero(frenmap)-1)+1
@@ -387,3 +412,7 @@ class Map:
         frenmap = frenmap[frenmap != 0]
 
         return frenmap
+
+
+class MapError(Exception):
+    pass

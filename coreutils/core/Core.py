@@ -17,7 +17,7 @@ from coreutils.core.NE import NE
 from coreutils.core.TH import TH
 from coreutils.core.UnfoldCore import UnfoldCore
 from coreutils.core.MaterialData import *
-from coreutils.core.Assembly import AssemblyGeometry, AxialConfig, AxialCuts
+from coreutils.core.Geometry import Geometry, AxialConfig, AxialCuts
 from coreutils.frenetic.InpGen import inpgen, fillFreneticNamelist
 
 
@@ -32,7 +32,7 @@ class Core:
 
     Attributes
     ----------
-    AssemblyGeom : :class:`coreutils.core.AssemblyGeometry`
+    AssemblyGeom : :class:`coreutils.core.Geometry.AssemblyGeometry`
         Object with assembly geometrical features.
     Map: :class:`coreutils.core.Map`
         Object mapping the core assemblies with the different numerations.
@@ -79,15 +79,15 @@ class Core:
         Write core lattice to txt file.
     """
 
-    def __init__(self, inpjson, P1consistent=False):
+    def __init__(self, inpjson):
         if '.h5' in inpjson:
             self._from_h5(inpjson)
         elif ".json" in inpjson:
-            self.from_json(inpjson, P1consistent=P1consistent)
+            self.from_json(inpjson)
         else:
             raise OSError("Input must .h5 or .json file!")
 
-    def from_json(self, inpjson, P1consistent=False):
+    def from_json(self, inpjson):
         """Generate object from .json file.
 
         Parameters
@@ -115,15 +115,15 @@ class Core:
         # -- parse input file
         else:
 
-            CIargs, NEargs, THargs, FRNargs = parse(inpjson)
+            CIargs, GEargs, NEargs, THargs, FRNargs = parse(inpjson)
 
             tEnd = CIargs['tend']
             nProf = CIargs['nsnap'] 
-            pitch = CIargs['pitch'] 
-            shape = CIargs['shape'] 
             power = CIargs['power'] 
             trans = CIargs['trans']
-            dim = CIargs['dim']
+            pitch = GEargs['lattice_pitch'] 
+            shape = GEargs['shape'] 
+            dim = GEargs['dim']
 
             # check if NEargs and THargs are not empty
             isNE = True if NEargs is not None else False
@@ -138,14 +138,17 @@ class Core:
             flag = False
             if THargs is not None:
                 if 'rotation' in THargs.keys():
-                    flag = THargs['rotation'] != 60
+                    flag = THargs['rotation'] != 60 and THargs['rotation'] != 0
             if NEargs is not None:
                 if 'rotation' in NEargs.keys():
                     if not flag:
-                        flag = NEargs['rotation'] != 60
+                        flag = NEargs['rotation'] != 60 and NEargs['rotation'] != 0
+            if not flag and GEargs['rotation'] is not None:
+                flag = GEargs['rotation'] != 60 and GEargs['rotation'] != 0
+
             if flag:
                 raise OSError('Hexagonal core geometry requires one sextant, so' +
-                            '"rotation" must be 60 degree!')
+                              ' "rotation" must be 60 degree!')
 
         if not isNE:
             if dim == 1:
@@ -178,7 +181,7 @@ class Core:
         if FRNargs is not None:
             self.FreneticNamelist = FRNargs
 
-        # FIXME ensure consistency with NE and TH modules
+        # TODO FIXME ensure consistency with NE and TH modules
         # foresee start time for restarted simulations (TimeSnap could be translated in time but only for FRN input)
         if isinstance(nProf, (float, int)):
             dt = tEnd/nProf
@@ -188,25 +191,26 @@ class Core:
         else:
             raise OSError('nSnap in .json file must be list with len >1, float or int!')
 
-        # --- initialise assembly radial geometry object
-        self.AssemblyGeom = AssemblyGeometry(pitch, shape)  # module indep.
+        # --- GE object
+        self.Geometry = Geometry(GEargs=GEargs)
+
         # --- NE OBJECT
         if isNE:
             # --- assign map
             assemblynames = NEargs['assemblynames']
             nAssTypes = 1 if dim == 1 else len(assemblynames)
-            assemblynames = MyDict(dict(zip(assemblynames, np.arange(1, nAssTypes+1))))
+            assemblynames = MyDict(dict(zip(assemblynames.keys(), np.arange(1, nAssTypes+1))))
             if dim != 1:
                 tmp = UnfoldCore(NEargs['filename'], NEargs['rotation'], assemblynames)
                 NEcore = tmp.coremap
-                self.Map = Map(NEcore, NEargs['rotation'], self.AssemblyGeom, inp=tmp.inp)
+                self.Map = Map(NEcore, NEargs['rotation'], self.Geometry.AssemblyGeometry, inp=tmp.inp)
                 if not hasattr(self, 'Nass'):
                     self.nAss = len((self.Map.serpcentermap))
             else:
                 NEcore = [1]
                 self.nAss = 1
             datacheck = 1
-            self.NE = NE(NEargs, self, datacheck=datacheck, P1consistent=P1consistent)
+            self.NE = NE(NEargs, self, datacheck=datacheck)
 
         # --- TH OBJECT
         if isTH and dim != 1:
@@ -216,7 +220,7 @@ class Core:
             assemblynames = MyDict(dict(zip(assemblynames, np.arange(1, nAssTypes+1))))
             THcore = UnfoldCore(THargs['thdata']['filename'], THargs['rotation'], assemblynames).coremap
             if not hasattr(self, 'Map'):
-                self.Map = Map(THcore, THargs['rotation'], self.AssemblyGeom, inp=tmp.inp)
+                self.Map = Map(THcore, THargs['rotation'], self.Geometry.AssemblyGeometry, inp=tmp.inp)
             if not hasattr(self, 'Nass'):
                 self.nAss = len((self.Map.serpcentermap))
 
@@ -277,8 +281,8 @@ class Core:
                 setattr(self, k, NE(inpdict=v))
             elif k == "TH":
                 setattr(self, k, TH(inpdict=v))
-            elif k == 'AssemblyGeom':
-                setattr(self, k, AssemblyGeometry(inpdict=v))
+            elif k == 'Geometry':
+                setattr(self, k, Geometry(inpdict=v))
             elif k == 'Map':
                 setattr(self, k, Map(inpdict=v))
             else:
@@ -460,9 +464,9 @@ class Core:
             comm = '#'
         else:  # Serpent-2 style header (define core lattice)
             # define assembly type according to Serpent
-            if self.AssemblyGeom.type == 'S':
+            if self.Geometry.AssemblyGeometry.type == 'S':
                 asstype = '1'  # square
-            elif self.AssemblyGeom.type == 'H':
+            elif self.Geometry.AssemblyGeometry.type == 'H':
                 asstype = '3'  # hexagon
             # define central assembly coordinates
             x0, y0 = self.Map.serpcentermap[self.Map.fren2serp[1]][:]
@@ -470,7 +474,7 @@ class Core:
             # define number of assemblies along x and y directions
             Nx, Ny = str(Nx), str(Ny)
             # define assembly pitch
-            P = str(2*self.AssemblyGeom.apothema)
+            P = str(2*self.Geometry.AssemblyGeometry.apothema)
             header = " ".join(("lat core ", asstype, x0, y0, Nx, Ny, P))
             comm = ''
         # save array to file

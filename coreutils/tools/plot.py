@@ -102,7 +102,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         else:
             axgesty = style
 
-    L = core.AssemblyGeom.edge*2
+    L = core.Geometry.AssemblyGeometry.edge*2
     # array of assembly type
     NxNy = core.Map.type.size
     config = core.NE.config[time]
@@ -354,13 +354,13 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
         else:
            radgesty = style
 
-    if core.AssemblyGeom.type == "S":
+    if core.Geometry.AssemblyGeometry.type == "S":
         orientation = np.pi/4
-        L = core.AssemblyGeom.edge
+        L = core.Geometry.AssemblyGeometry.edge
         L = L/2*np.sqrt(2)
-    elif core.AssemblyGeom.type == "H":
+    elif core.Geometry.AssemblyGeometry.type == "H":
         orientation = 0
-        L = core.AssemblyGeom.edge
+        L = core.Geometry.AssemblyGeometry.edge
 
     if tallies is None:
 
@@ -419,7 +419,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 else:
                     valuesapp(tallies[idx])
                 # plot geometry filled with colour
-                asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges,
+                asspatch = RegularPolygon(xy, core.Geometry.AssemblyGeometry.numedges,
                                             L*scale, orientation=orientation,
                                             **kwargs)
                 coordapp(xy)
@@ -441,7 +441,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                     SAslabels = core.TH.THassemblylabels
 
                 atype = core.getassemblytype(k, config)
-                asspatch = RegularPolygon(xy, core.AssemblyGeom.numedges, L*scale,
+                asspatch = RegularPolygon(xy, core.Geometry.AssemblyGeometry.numedges, L*scale,
                                         orientation=orientation, color=col, ec='k', lw=0.5,
                                         fill=fill, label=SAslabels[atype], **kwargs)
                 ax.add_patch(asspatch)

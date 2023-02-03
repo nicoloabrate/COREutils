@@ -48,8 +48,7 @@ def fillFreneticNamelist(core):
     """
     # --- CI
     try:
-        nL = np.count_nonzero(core.Map.inp, axis=1)
-        nL = nL[nL != 0]
+        nL = core.Map.nonZeroCols
         # parse number of rows
         nR = len(nL)
         # flip to be consistent with FRENETIC numeration
@@ -57,7 +56,7 @@ def fillFreneticNamelist(core):
             nL = (np.flipud(nL))
             nL = nL.tolist()
 
-        pitch = core.AssemblyGeom.pitch
+        pitch = core.Geometry.AssemblyGeometry.pitch
         nH = core.nAss
         try:
             nDiff = len(core.TH.THdata.keys())
@@ -68,7 +67,7 @@ def fillFreneticNamelist(core):
     except AttributeError as err:
         if "object has no attribute 'Map'" in str(err):  # assume 1D core
             nL, nR, nDiff, nH = 1, 1, 1, 1
-            pitch = core.AssemblyGeom.pitch
+            pitch = core.Geometry.AssemblyGeometry.pitch
         else:
             print(err)
 
@@ -77,7 +76,7 @@ def fillFreneticNamelist(core):
     core.FreneticNamelist['nR'] = nR
     core.FreneticNamelist['nDiff'] = nDiff
     core.FreneticNamelist['HexPitch'] = pitch/100
-    core.FreneticNamelist['LeXag'] = core.AssemblyGeom.edge if core.dim != 1 else 1.
+    core.FreneticNamelist['LeXag'] = core.Geometry.AssemblyGeometry.edge/100 if core.dim != 1 else 1.
     core.FreneticNamelist['isNETH'] = 2 if hasattr(core, "NE") and hasattr(core, "TH") and core.dim == 3 else 0
     core.FreneticNamelist['tEnd'] = core.TimeEnd if core.trans else 0.
 
@@ -138,7 +137,7 @@ def fillFreneticNamelist(core):
             core.FreneticNamelist['nLayer'] = core.TH.zcoord.shape[0]
         else:
             if np.isnan(core.FreneticNamelist['zLayer']):
-                core.FreneticNamelist['zLayer'] = np.linspace(core.TH.zref[0], core.TH.zref[1], 
+                core.FreneticNamelist['zLayer'] = np.linspace(core.TH.zmesh[0], core.TH.zmesh[1], 
                                                               core.FreneticNamelist['nLayer'])
 
         if np.isnan(core.FreneticNamelist['nTimeProf']):
@@ -150,93 +149,84 @@ def fillFreneticNamelist(core):
             core.FreneticNamelist[f'HAType{iType}'] = {}
             HAdict = core.FreneticNamelist[f'HAType{iType}']
             HAdict['iHA'] = THdata.iHA
-            HAdict['iPinSolidX'] = THdata.isRadHomog
-            HAdict['nFuelX'] = THdata.nHeatPins
-            HAdict['nNonHeatedX'] = THdata.nNonHeatPins
-            # geometry
-            if hasattr(THdata, 'FuelRad'):
-                HAdict['dFuelX'] = THdata.FuelRad[1]*2
-                HAdict['dFuelInX'] = THdata.FuelRad[0]*2
-            else:
-                HAdict['dFuelX'] = 0.
-                HAdict['dFuelInX'] = 0.
 
-            if hasattr(THdata, 'NonFuelRad'):
-                HAdict['dFuelNfX'] = THdata.NonFuelRad[1]*2
-            else:
-                HAdict['dFuelNfX'] = 0.
+            # TODO only one lattice axially, more should be considered
+            GEtype = core.TH.THtoGE[THtype][0]
+            latname = core.Geometry.AssemblyType[GEtype].reg[0]
+            lattice = core.Geometry.LatticeGeometry[latname]
+            # TODO only one pin type per lattice, more should be considered
+            pinname = core.Geometry.LatticeType[latname][0]
+            pin = core.Geometry.Pin[pinname]
+            isHomog = len(pin.materials) < 3
+            n = 2 if pin.isAnnular else 1
 
-            if hasattr(THdata, 'GapRad'):
-                HAdict['ThickGasX'] = THdata.GapRad[1]-THdata.GapRad[0]
-            else:
+            HAdict['iPinSolidX'] = 1 if isHomog else 0
+            HAdict['nFuelX'] = lattice.nPins
+            # FIXME TODO how to account for these? Maybe better to distinguish fissile-nonfissile
+            HAdict['nNonHeatedX'] = 0
+
+            # --- geometry
+            HAdict['dFuelX'] = 2*pin.radii[1]/100 if pin.isAnnular else 2*pin.radii[0]/100
+            HAdict['dFuelInX'] = 2*pin.radii[0]/100 if pin.isAnnular else 0.
+            # FIXME TODO how to account for these? Maybe better to distinguish fissile-nonfissile
+            HAdict['dFuelNfX'] = 0.
+
+
+            if isHomog:
                 HAdict['ThickGasX'] = 0.
-
-            if hasattr(THdata, 'CladRad'):
-                HAdict['RCoX'] = THdata.CladRad[1]
-                HAdict['RCiX'] = THdata.CladRad[0]
-            else:
                 HAdict['RCoX'] = 0.
                 HAdict['RCiX'] = 0.
+            else:
+                HAdict['ThickGasX'] = (pin.radii[n]-pin.radii[n-1])/100
+                n += 1
+                HAdict['RCoX'] = pin.radii[n]/100
+                HAdict['RCiX'] = pin.radii[n-1]/100
 
             if hasattr(THdata, 'WrapThick'):
-                HAdict['ThickBoxX'] = THdata.WrapThick
-                HAdict['ThickClearX'] = THdata.ThickClear
+                HAdict['ThickBoxX'] = lattice.WrapWidth/100
+                HAdict['ThickClearX'] = lattice.interassWidth/100
             else:
                 HAdict['ThickBoxX'] = 0.
                 HAdict['ThickClearX'] = 1E-6
 
-            if hasattr(THdata, 'BibSides'):
-                HAdict['InBoxInsideX'] = THdata.BibSides[0]
-                HAdict['InBoxOutsideX'] = THdata.BibSides[1]
-            else:
-                HAdict['InBoxInsideX'] = 0.
-                HAdict['InBoxOutsideX'] = 0.
+            # FIXME TODO
+            HAdict['InBoxInsideX'] = 0.
+            HAdict['InBoxOutsideX'] = 0.
 
-            if hasattr(THdata, 'WireDiam'):
-                HAdict['dWireX'] = THdata.WireDiam
-                HAdict['pWireX'] = THdata.WirePitch
-            else:
-                HAdict['dWireX'] = 0.
-                HAdict['pWireX'] = 0.
+            # FIXME TODO
+            HAdict['dWireX'] = 0.
+            HAdict['pWireX'] = 0.
 
             if hasattr(THdata, 'FuelPitch'):
-                HAdict['PtoPDistX'] = THdata.FuelPitch
+                HAdict['PtoPDistX'] = lattice.pitch
             else:
                 HAdict['PtoPDistX'] = 0.
 
-            HAdict['iBiBX'] = THdata.isBiB
-            HAdict['iCRadX'] = THdata.isAnn
+            # FIXME TODO
+            HAdict['iBiBX'] = 0.
+            HAdict['iCRadX'] = 1 if pin.isAnnular else 0
             # correlations
             HAdict['FPeakX'] = float(THdata.frictMult)
             HAdict['QBoxX'] = float(THdata.htcMult)
             HAdict['iHpbPinX'] = THdata.htcCorr
             HAdict['iTyFrictX'] = THdata.frictCorr
             HAdict['iChCouplX'] = THdata.chanCouplCorr
-            # material
-            if hasattr(THdata, 'FuelPinMat'):
-                HAdict['iFuelX'] = THdata.FuelPinMat
-            else:
-                HAdict['iFuelX'] = ""
 
-            if hasattr(THdata, 'NonFuelPinMat'):
-                HAdict['cNfX'] = THdata.NonFuelPinMat
-            else:
-                HAdict['cNfX'] = ""
+            # TODO TODO material
+            HAdict['iFuelX'] = pin.materials[1] if pin.isAnnular else pin.materials[0]
+            HAdict['cNfX'] = "Default"
 
-            if hasattr(THdata, 'GapMat'):
-                HAdict['iGapX'] = THdata.GapMat
+            if isHomog:
+                HAdict['iGapX'] = "Default"
+                HAdict['iCladX'] = "Default"
             else:
-                HAdict['iGapX'] = ""
+                HAdict['iGapX'] = pin.materials[2] if pin.isAnnular else pin.materials[1]
+                HAdict['iCladX'] = pin.materials[3] if pin.isAnnular else pin.materials[2]
 
-            if hasattr(THdata, 'CladMat'):
-                HAdict['iCladX'] = THdata.CladMat
+            if lattice.wrapMat is not None:
+                HAdict['BoxMatX'] = lattice.wrapMat
             else:
-                HAdict['iCladX'] = ""
-
-            if hasattr(THdata, 'WrapMat'):
-                HAdict['BoxMatX'] = THdata.WrapMat
-            else:
-                HAdict['BoxMatX'] = ""
+                HAdict['BoxMatX'] = "Default"
 
             # FIXME the radial nodes subdivision is currently fixed here.
             # The user should have the possibility to choose it, but how
