@@ -154,7 +154,7 @@ def Homogenise(materials, weights, mixname):
                     *list(map(lambda z: "Sp"+str(z), range(2))), 'Invv', 'Transpxs']
     collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'FissEn']
     inherit = ['NPF', 'nE', 'egridname', 'beta', 'beta_tot', 'energygrid',
-               'lambda', 'lambda_tot', 'L']
+               'lambda', 'lambda_tot', 'L', 'P1consistent']
     # compute normalisation constants
     for i, name in enumerate(materials.keys()):
         mat = materials[name]

@@ -166,7 +166,7 @@ def fillFreneticNamelist(core):
             HAdict['nNonHeatedX'] = 0
 
             # --- geometry
-            HAdict['dFuelX'] = 2*pin.radii[1]/100 if pin.isAnnular else 2*pin.radii[0]/100
+            HAdict['dFuelX'] = 2*pin.radii.max()/100 # the name should be dPinX
             HAdict['dFuelInX'] = 2*pin.radii[0]/100 if pin.isAnnular else 0.
             # FIXME TODO how to account for these? Maybe better to distinguish fissile-nonfissile
             HAdict['dFuelNfX'] = 0.
@@ -203,7 +203,7 @@ def fillFreneticNamelist(core):
                 HAdict['PtoPDistX'] = 0.
 
             # FIXME TODO
-            HAdict['iBiBX'] = 0.
+            HAdict['iBiBX'] = 0
             HAdict['iCRadX'] = 1 if pin.isAnnular else 0
             # correlations
             HAdict['FPeakX'] = float(THdata.frictMult)

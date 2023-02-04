@@ -218,7 +218,7 @@ class FreneticNamelist():
                            "nFuelX": "Number of heated fuel rods in each hexagonal channel",
                            "nNonHeatedX": "Number of non heated rods in each hexagonal channel",
                            "iFuelX": "Material label (e.g., 'UO2', 'U5Fs', 'B4C', 'SS')",
-                           "dFuelX": "Diameter of the fuel pin in [m]",
+                           "dFuelX": "!!! it should be 'dPinX' Diameter of the pin in [m]",
                            "dFuelInX": "Diameter of the inner fuel radius in [m] if the pellet is annular",
                            "ThickBoxX": "Thickness of a single assembly box side in [m] (should be the same as before, in the suggested inputs it was 0.008m but from ALFRED papers i saw that should be 0.004m, maybe was wrong)",
                            "ThickClearX": "Half thickness of clearance between boxes in [m] (should be the same as before, in the suggested inputs it was 0.005m but from ALFRED papers i saw that should be  0.0025m, )",
