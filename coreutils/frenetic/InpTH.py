@@ -18,8 +18,11 @@ def writeCZdata(core):
     ``None``
     """
     input_files = {'mdot.inp': 'massflowrates', 
-                   'temp.inp': 'temperatures', 
-                   'press.inp': 'pressures'}
+                   'tempinl.inp': 'temperatures', 
+                   'pressout.inp': 'pressures',
+                #    FIXME TODO specify outlet/inlet temperatures
+                #    'pressinl.inp': 'pressures_inl'
+                   }
     for inp in input_files.keys():
         # generate input .inp
         f = io.open(inp, 'w', newline='\n')

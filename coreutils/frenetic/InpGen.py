@@ -76,8 +76,9 @@ def fillFreneticNamelist(core):
     core.FreneticNamelist['nR'] = nR
     core.FreneticNamelist['nDiff'] = nDiff
     core.FreneticNamelist['HexPitch'] = pitch/100
-    core.FreneticNamelist['LeXag'] = core.Geometry.AssemblyGeometry.edge/100 if core.dim != 1 else 1.
-    core.FreneticNamelist['isNETH'] = 2 if hasattr(core, "NE") and hasattr(core, "TH") and core.dim == 3 else 0
+    core.FreneticNamelist['LeXag'] = core.Geometry.AssemblyGeometry.edge/100 if core.dim != 1 else 0.001
+    if np.isnan(core.FreneticNamelist['isNETH']):
+        core.FreneticNamelist['isNETH'] = 2 if hasattr(core, "NE") and hasattr(core, "TH") and core.dim == 3 else 0
     core.FreneticNamelist['tEnd'] = core.TimeEnd if core.trans else 0.
 
     # unionise NE and TH configuration times in a single list
@@ -197,10 +198,7 @@ def fillFreneticNamelist(core):
             HAdict['dWireX'] = 0.
             HAdict['pWireX'] = 0.
 
-            if hasattr(THdata, 'FuelPitch'):
-                HAdict['PtoPDistX'] = lattice.pitch
-            else:
-                HAdict['PtoPDistX'] = 0.
+            HAdict['PtoPDistX'] = lattice.pitch/100. # to ensure it is float
 
             # FIXME TODO
             HAdict['iBiBX'] = 0
@@ -445,14 +443,14 @@ def inpgen(core, json):
             if f.startswith("HA"):
                 move(f, join(THdatapath, f))
 
-        # make CZ input (mdot.txt, temp.txt, press.txt, filecool.txt)
+        # make CZ input (mdot.txt, temp.txt, pressout.txt, filecool.txt)
         THpath = mkdir("TH", casepath)
         # write CZ .txt data
         writeCZdata(core)
         # write input.inp
         makeTHinput(core)
         # move TH files
-        THfiles = ['mdot.inp', 'press.inp', 'temp.inp', 'input.inp']
+        THfiles = ['mdot.inp', 'pressout.inp', 'tempinl.inp', 'input.inp']
         [move(f, join(THpath, f)) for f in THfiles]
     else:
         logging.warn('No TH configuration, so HA_xx_xx.inp not written and other data not created!')

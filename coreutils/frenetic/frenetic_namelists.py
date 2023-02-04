@@ -105,7 +105,7 @@ class FreneticNamelist():
                            # "TrefBeg": "Initial simulation time, could be useful in case of restart runs [s]", # useful for forthcoming restarting opt in FRENETIC
                            # "TrefEnd": "End simulation time, if zero it is used as flag to just perform the steady state case [s]",
                            "MaxNRadNode": "Third dimension for temperature matrix, max radial pins nodes +1",
-                           "nMaxBCchange": "The number of maximum rows input  entries for input files reading: mdot.inp, press.inp, etc.",
+                           "nMaxBCchange": "The number of maximum rows input  entries for input files reading: mdot.inp, pressout.inp, etc.",
                            "nThreadTH": "Number of CPUs allocated for TH module",
                            "nThreadNE": "Number of CPUs allocated for NE module",
                            "ISTISC": "?! Deprecated",
