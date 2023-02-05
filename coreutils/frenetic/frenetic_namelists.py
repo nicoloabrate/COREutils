@@ -275,7 +275,7 @@ class FreneticNamelist():
                            "xQbeg": "nAss",
                            "temIni": "nAss",
                            "temInl": "nAss",
-                           "temoOut": "nAss",
+                           "temOut": "nAss",
                            "preInl": "nAss",
                            "preOut": "nAss",
                            "mdtInl": "nAss",
@@ -283,6 +283,9 @@ class FreneticNamelist():
                            "QBoxX": "nSides",
                            "ThickClearX": "nSides",
                         }
+
+      # TODO FIXME add list of arguments divided by type (float, string, integer)
+      # to better control the input generation
 
       self.DefaultValue = {
                            # common input
@@ -348,12 +351,12 @@ class FreneticNamelist():
                            "eneBound": 'TIN',
                            "masBound": 'mdotIN',
                            "momBound": 'presOUT',
-                           "temIni": 300.,
-                           "temInl": 300.,
-                           "temOut": 300.,
+                           "temIni": 700.,
+                           "temInl": 670.,
+                           "temOut": 670.,
                            "preInl": 1E5,
                            "preOut": 1E5,
-                           "mdtInl": 0.,
+                           "mdtInl": 200.,
                            "mdtInlBiB": 0.,
                            "iThimb": 0,
                            "qVolBiBX": 0.,
@@ -372,7 +375,7 @@ class FreneticNamelist():
                            # NE input.inp
                            "iRun": nan,
                            "nConf": nan,
-                           "power": 1.0,
+                           "power": nan,
                            "NH5Inp": "NE_data.h5",
                            "MacInp": "macro.nml",
                            "MatInp": "config.inp",
