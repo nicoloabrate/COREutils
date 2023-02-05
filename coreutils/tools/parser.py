@@ -12,9 +12,9 @@ THmandatory = ('czfile', 'massflowrates', 'temperatures', 'rotation', 'pressures
 # set to value in dict if this key is missing
 setToValue = {
                 'CI': {
-                        'power': 1,
+                        'power': 1.,
                         'nSnap': 1,
-                        'tEnd': 0,
+                        'tEnd': 0.,
                       },
                 'GE': {
                         'rotation': None,

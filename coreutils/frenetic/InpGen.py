@@ -114,6 +114,8 @@ def fillFreneticNamelist(core):
         core.FreneticNamelist['nElez0'] = NZ
         core.FreneticNamelist['Meshz0'] = meshz
         core.FreneticNamelist['SplitZ'] = splitz
+        # set power
+        core.FreneticNamelist['power'] = core.power
     else:
         core.FreneticNamelist['iRun'] = -1
         core.FreneticNamelist['nConf'] = -1
