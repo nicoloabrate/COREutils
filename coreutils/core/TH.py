@@ -327,8 +327,8 @@ def meshTH1d(zmin, zmax, nvol, nvolref=None,
     refinement = True if nvolref is not None else False
 
     # allocation
-    zcoord = np.zeros((nvol,), dtype=np.float32)
-    axstep = np.zeros((nvol,), dtype=np.float32)
+    zcoord = np.zeros((nvol,), dtype=float)
+    axstep = np.zeros((nvol,), dtype=float)
     zltot = zmax-zmin
 
     if refinement:
