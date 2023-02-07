@@ -185,8 +185,8 @@ def fillFreneticNamelist(core):
                 HAdict['RCoX'] = pin.radii[n]/100
                 HAdict['RCiX'] = pin.radii[n-1]/100
 
-            if hasattr(THdata, 'WrapThick'):
-                HAdict['ThickBoxX'] = lattice.WrapWidth/100
+            if hasattr(lattice, 'wrapWidth'):
+                HAdict['ThickBoxX'] = lattice.wrapWidth/100
                 HAdict['ThickClearX'] = lattice.interassWidth/100
             else:
                 HAdict['ThickBoxX'] = 0.
@@ -232,9 +232,8 @@ def fillFreneticNamelist(core):
             # The user should have the possibility to choose it, but how
             # this can be done is not trivial and should be discussed
             matlst = [1, 0, 0]
-            if hasattr(THdata, "GapMat"):
+            if not isHomog:
                 matlst[1] = 2
-            if hasattr(THdata, "CladMat"):
                 matlst[2] = 3
 
             HAdict['MaterHX'] = matlst
@@ -332,11 +331,11 @@ def inpgen(core, json):
 
     # --- echoing json to root directory
     try:
-        copyfile(f'{json}', join(casepath, f'{json.name}'))
+        copyfile(f'{json}', join(AUXpath, f'{json.name}_echo'))
     except SameFileError:
-        os.remove(join(casepath, f'{json.name}'))
-        print(f'Overwriting file {json.name}')
-        copyfile(f'{json}', join(casepath, f'{json.name}'))
+        os.remove(join(casepath, f'{json.name}_echo'))
+        print(f'Overwriting file {json.name}_echo')
+        copyfile(f'{json}', join(AUXpath, f'{json.name}_echo'))
 
     # --- add GIT info
     print_coreutils_info()

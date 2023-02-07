@@ -67,11 +67,11 @@ def inpgen(core, json, casename=None, plotNE=None, whichSA=None,
     # --- save json to root directory
     jsonname = pathlib.Path(json).name
     try:
-        copyfile(f'{json}', join(casepath, f'{jsonname}'))
+        copyfile(f'{json}', join(casepath, f'{jsonname}_echo'))
     except SameFileError:
-        os.remove(join(casepath, f'{jsonname}'))
-        print(f'Overwriting file {jsonname}')
-        copyfile(f'{json}', join(casepath, f'{jsonname}'))
+        os.remove(join(casepath, f'{jsonname}_echo'))
+        print(f'Overwriting file {jsonname}_echo')
+        copyfile(f'{json}', join(casepath, f'{jsonname}_echo'))
     # --- save core object to root directory
     corefname = 'core.h5'
     grp_name = 'core'
