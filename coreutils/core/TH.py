@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+import logging
 # from tkinter import NE
 import numpy as np
 import coreutils.tools.h5 as myh5

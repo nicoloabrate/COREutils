@@ -69,14 +69,19 @@ def fillFreneticNamelist(core):
             nL, nR, nDiff, nH = 1, 1, 1, 1
             pitch = core.Geometry.AssemblyGeometry.pitch
         else:
-            print(err)
+            logging.error(err)
 
     core.FreneticNamelist['nChan'] = nH
     core.FreneticNamelist['nL'] = nL
     core.FreneticNamelist['nR'] = nR
     core.FreneticNamelist['nDiff'] = nDiff
     core.FreneticNamelist['HexPitch'] = pitch/100
-    core.FreneticNamelist['LeXag'] = core.Geometry.AssemblyGeometry.edge/100 if core.dim != 1 else 0.001
+    lexag = np.nan
+    for latname, lat in core.Geometry.LatticeGeometry.items():
+        if lat.wrapWidth > 0 and lat.nPins > 0:
+            lexag = (pitch-2*lat.wrapWidth-2*lat.interassWidth)/3**0.5
+            break
+    core.FreneticNamelist['LeXag'] = lexag/100 if core.dim != 1 else 0.001
     if np.isnan(core.FreneticNamelist['isNETH']):
         core.FreneticNamelist['isNETH'] = 2 if hasattr(core, "NE") and hasattr(core, "TH") and core.dim == 3 else 0
     core.FreneticNamelist['tEnd'] = core.TimeEnd if core.trans else 0.
@@ -334,7 +339,7 @@ def inpgen(core, json):
         copyfile(f'{json}', join(AUXpath, f'{json.name}_echo'))
     except SameFileError:
         os.remove(join(casepath, f'{json.name}_echo'))
-        print(f'Overwriting file {json.name}_echo')
+        logging.warning(f'Overwriting file {json.name}_echo')
         copyfile(f'{json}', join(AUXpath, f'{json.name}_echo'))
 
     # --- add GIT info
@@ -350,7 +355,7 @@ def inpgen(core, json):
         copyfile(f'{corefname}', join(casepath, f'{corefname}'))
     except SameFileError:
         os.remove(join(casepath, f'{corefname}'))
-        print(f'Overwriting file {corefname}')
+        logging.warning(f'Overwriting file {corefname}')
         copyfile(f'{corefname}', join(casepath, f'{corefname}'))
 
     # --- COMMON INPUT (common_input.inp)
@@ -359,7 +364,7 @@ def inpgen(core, json):
         move('common_input.inp', join(casepath, 'common_input.inp'))
     except SameFileError:
         os.remove(join(casepath, 'common_input.inp'))
-        print(f'Overwriting file {str(json)}')
+        logging.warning(f'Overwriting file {str(json)}')
         move('common_input.inp', join(casepath, 'common_input.inp'))
 
     # --- NE input (config.inp, macro.nml)
@@ -385,7 +390,7 @@ def inpgen(core, json):
                 move(f, join(NEpath, f))
             except SameFileError:
                 os.remove(join(NEpath, f))
-                print('Overwriting file {}'.format(f))
+                logging.warning('Overwriting file {}'.format(f))
                 move(f, join(NEpath, f))
     else:
         logging.warn('No NE object, so input.inp and config.inp not written!')
@@ -423,7 +428,7 @@ def inpgen(core, json):
                 move(f, join(NEpath, f))
             except SameFileError:
                 os.remove(join(NEpath, f))
-                print('Overwriting file {}'.format(f))
+                logging.warning('Overwriting file {}'.format(f))
                 move(f, join(NEpath, f))
 
         move('DiffLengthToNodeSize.json', join(AUXpathNE, 'DiffLengthToNodeSize.json'))
@@ -523,7 +528,7 @@ def auxNE(core, AUXpathNE):
 
                         if "labels" in conf:
                             if len(whichSA) != len(conf["labels"]):
-                                print("Warning for plot: label numbers do not match with whichSA key!")
+                                logging.warning("plot: label numbers do not match with whichSA key!")
                             else:
                                 labeldict = {}
                                 for i, l in enumerate(conf["labels"]):
@@ -615,7 +620,7 @@ def auxNE(core, AUXpathNE):
         move(f, join(AUXpathNE, f))
     except SameFileError:
         os.remove(join(AUXpathNE, f))
-        print('Overwriting file {}'.format(f))
+        logging.warning('Overwriting file {}'.format(f))
         move(f, join(AUXpathNE, f))
 
     # move files in directory
@@ -624,7 +629,7 @@ def auxNE(core, AUXpathNE):
             move(f, join(AUXpathNE, f))
         except SameFileError:
             os.remove(join(AUXpathNE, f))
-            print('Overwriting file {}'.format(f))
+            logging.warning('Overwriting file {}'.format(f))
             move(f, join(AUXpathNE, f))
 
 
@@ -678,7 +683,7 @@ def auxTH(core, AUXpathTH):
             move(f, join(AUXpathTH, f))
         except SameFileError:
             os.remove(join(AUXpathTH, f))
-            print('Overwriting file {}'.format(f))
+            logging.warning('Overwriting file {}'.format(f))
             move(f, join(AUXpathTH, f))
 
 

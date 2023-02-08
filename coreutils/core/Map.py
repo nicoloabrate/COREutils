@@ -278,7 +278,7 @@ class Map:
         """
         # check on geometry
         if self.rotation_angle != 60 and self.rotation_angle != 0:
-            print("FrenMap method works only for hexagonal core geometry!")
+            logging.critical("FrenMap method works only for hexagonal core geometry!")
             raise OSError("rotation angle should be 60 or 0 degrees")
         
         nsect = 6  # only six sextants for 60 degree rotation are allowed

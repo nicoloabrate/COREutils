@@ -154,9 +154,9 @@ class Core:
             if dim == 1:
                 raise OSError('Cannot generate core object without NE namelist!')
             else:
-                print('NE input not available, writing TH input only!')
+                logging.info('NE input not available, writing TH input only!')
         if not isTH and dim != 1:
-            print('TH input not available, writing NE input only!')
+            logging.info('TH input not available, writing NE input only!')
 
         # --- ASSIGN COMMON INPUT DATA
         TfTc = []

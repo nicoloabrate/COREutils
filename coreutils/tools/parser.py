@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from collections import OrderedDict
 from coreutils.tools.utils import uppcasedict, lowcasedict
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist
@@ -87,6 +88,7 @@ def parse(inp):
                 inp = json.load(f)
             except json.JSONDecodeError as err:
                 print(err.args[0])
+                logging.critical(err.args[0])
                 raise ParserError(f"{err.args[0]} in {inp}")
     except FileNotFoundError:
         raise ParserError(f"File {inp} not found!")
@@ -118,7 +120,7 @@ def parse(inp):
 
         if 'TH' in inp.keys():
             if dim != 3:
-                print(f'WARNING: cannot write TH input for {dim}-D core')
+                logging.warning(f'cannot write TH input for {dim}-D core')
             THargs = __parseTH(inp['TH'])
 
         if 'FRENETIC-NML' in inp.keys():
@@ -169,10 +171,10 @@ def __parseCI(inp):
 
     # check non-mandatory arguments
     if 'tEnd'.lower() not in inp.keys():
-        print("WARNING: No final simulation time is provided in CI!")
+        logging.info("No final simulation time is provided in CI!")
 
     if 'nSnap'.lower() not in inp.keys():
-        print("WARNING: No number of time profiles is provided in CI!")
+        logging.info("No number of time profiles is provided in CI!")
 
     # set missing (not mandatory) keys to default value
     for k, v in setToValue['CI'].items():
@@ -230,7 +232,7 @@ def __parseGE(inp):
         warn_keys = ["pin", "lattice", "assembly"]
         for k in warn_keys:
             if k.lower() not in inp.keys():
-                print(f"WARNING: No {k} info is provided in GE!")
+                logging.info(f"No {k} info is provided in GE!")
 
     # set missing (not mandatory) keys to default value
     for k, v in setToValue['GE'].items():

@@ -5,6 +5,7 @@ from warnings import catch_warnings
 import h5py as h5
 import numpy as np
 import itertools
+import logging
 from pathlib import Path
 from numbers import Real
 from numpy.linalg import norm
@@ -396,7 +397,7 @@ class THoutput:
                 raise THoutputError(f"{toolspath} not found!")
         else:
             if not Path(style).exists():
-                print(f'Warning: {style} style sheet not found! \
+                logging.warning(f'{style} style sheet not found! \
                     Switching to default...')
             else:
                 sty1D = style

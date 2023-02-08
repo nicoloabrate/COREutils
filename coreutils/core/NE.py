@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+import logging
 # from tkinter import NE
 import numpy as np
 import coreutils.tools.h5 as myh5
@@ -161,7 +162,7 @@ class NE:
                 self.nPrp = 0 # FIXME TODO!
                 self.nGrp = len(self.PHenergygrid)-1
                 self.nDhp = 1 # FIXME TODO!
-                print("WARNING: DHP set to 1!")
+                logging.info("DHP set to 1!")
             else:
                 self.nPrp = 0
                 self.nGrp = 0
@@ -934,7 +935,7 @@ class NE:
             try:
                 files = [f for f in os.listdir(serpath)]
             except FileNotFoundError as err:
-                print(str(err))
+                logging.warning(str(err))
                 files = []
 
         if not hasattr(self, 'data'):

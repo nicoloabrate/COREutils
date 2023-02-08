@@ -5,6 +5,7 @@ from warnings import catch_warnings
 import h5py as h5
 import numpy as np
 import itertools
+import logging
 from pathlib import Path
 from numpy.linalg import norm
 import matplotlib.pyplot as plt
@@ -398,8 +399,8 @@ class NEoutput:
                 raise NEOutputError(f"{toolspath} not found!")
         else:
             if not Path(style).exists():
-                print(f'Warning: {style} style sheet not found! \
-                    Switching to default...')
+                logging.info(f'{style} style sheet not found! \
+                                Switching to default...')
             else:
                 sty1D = style
 

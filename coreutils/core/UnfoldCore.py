@@ -70,7 +70,7 @@ class UnfoldCore:
         # check that hexagonal symmetry holds
         Nx, Ny = np.shape(coremap)
         if Nx != Ny:
-            print("%d rows and %d columns!" % (Ny, Nx))
+            logging.error(f"The lattice has {Ny} rows and {Nx} columns!")
             raise OSError('The lattice should be squared! Check input file')
 
         # -- compute number of sectors
@@ -100,8 +100,7 @@ class UnfoldCore:
             self.coremap = UnfoldCore.rot45(coremap, Nx)
 
         else:  # no rotation available
-            print("Rotation of %d degree not available. Change rotation angle!"
-                  % rotangle)
+            logging.warning(f"Rotation of {rotangle} degree not available. No rotation performed!")
             self.coremap = coremap
         # assign also input file for reproducibility
         self.inp = coremap0

@@ -182,7 +182,7 @@ class read():
                     enc = item.attrs['encoding'].decode('ascii')
                 except KeyError:
                     enc = 'ascii'
-                    print('Warning: %s of type b''str'' read with'
+                    logging.warning('type b''str'' read with'
                           ' ''ascii'' encoding')
                 val = item.value.decode(enc)
             else:
@@ -300,9 +300,9 @@ class write():
             attributes = [None]
 
         if self.fh5 == -1:
-            print("File not overwritten.")
+            logging.info("HDF5 file not overwritten.")
 
-        print("Writing object in HDF5 file...")
+        logging.info("Writing object in HDF5 file...")
         # --- loop over objects, attributes and group names
         for i, (ob, at, grp) in enumerate(zip(obj, attributes, groupname)):
             if isinstance(ob, (list, tuple, ndarray)):

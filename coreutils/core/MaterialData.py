@@ -1,7 +1,7 @@
 import os
 import json
 import numpy as np
-import warnings
+import logging
 import coreutils
 import serpentTools as st
 import matplotlib.pyplot as plt
@@ -99,7 +99,7 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
         if 'coreutils' not in str(pwd):
             raise OSError(f'Check coreutils tree for NEdata: {pwd}')
         # look into default NEdata dir
-        print(f"WARNING: {datapath} not found, looking in default tree...")
+        logging.warning(f"{datapath} not found, looking in default tree...")
         datapath = str(pwd.joinpath('NEdata', f'{egridname}'))
 
     # look into serpent folder
@@ -389,7 +389,7 @@ class NEMaterial():
                     if Path(fname).exists():
                         self._readjson(fname)
                     else:
-                        print(f'{fname} not found!')
+                        logging.debug(f'{fname} not found!')
                         reader = 'txt'
 
                 if reader == 'txt':
@@ -432,7 +432,7 @@ class NEMaterial():
             try:
                 self.NPF = (self.beta).size
             except AttributeError:
-                print('Kinetic parameters not available!')
+                logging.info('Kinetic parameters not available!')
                 self.NPF = 1
 
             # --- complete data and perform sanity check
@@ -897,8 +897,8 @@ class NEMaterial():
             # FIXME FIXME check Serpent RSD and do correction action
             # self.Chit[self.Chit <= 1E-4] = 0
             if abs(self.Chit.sum() - 1) > 1E-4:
-                print(f'Total fission spectra in {self.UniName} not normalised!'
-                      'Forcing normalisation...')
+                logging.warning(f'Total fission spectra in {self.UniName} not normalised!'
+                                'Forcing normalisation...')
             # ensure pdf normalisation
             self.Chit /= self.Chit.sum()
             if "FissEn" not in self.__dict__.keys():
@@ -937,9 +937,9 @@ class NEMaterial():
                             if abs(self.Chit[g]-chit) > 1E-4:
                                 raise NEMaterialError()
                     except NEMaterialError:
-                        print(f'Fission spectra or delayed fractions'
-                              f' in {self.UniName} not consistent! '
-                              'Forcing consistency acting on chi-prompt...')
+                        logging.warning(f'Fission spectra or delayed fractions'
+                                        f' in {self.UniName} not consistent! '
+                                        'Forcing consistency acting on chi-prompt...')
                     else:
                         self.Chip = (self.Chit-np.dot(self.beta, self.Chid))/(1-self.beta.sum())
                         for g in range(0, self.nE):
@@ -957,7 +957,7 @@ class NEMaterial():
                     self.Chid = np.asarray([self.Chit]*self.NPF)
                     self.Chip = self.Chit
                 else:
-                    print(err)
+                    logging.warning(err)
 
             # ensure pdf normalisation
             if isFiss:

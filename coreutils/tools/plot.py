@@ -7,6 +7,7 @@ Description: Class to plot data from Serpent calculations.
 """
 import numpy as np
 import math
+import logging
 from numbers import Real
 from collections import OrderedDict
 import matplotlib.pyplot as plt
@@ -97,8 +98,8 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         axgesty = str(Path.joinpath(pwd, style))
     else:
         if not Path(style).exists():
-            print(f'Warning: {style} style sheet not found! \
-                  Switching to default...')
+            logging.info(f'{style} style sheet not found! \
+                            Switching to default...')
         else:
             axgesty = style
 
@@ -349,8 +350,8 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
         radgesty = str(Path.joinpath(pwd, style))
     else:
         if not Path(style).exists():
-            print(f'Warning: {style} style sheet not found! \
-                  Switching to default...')
+            logging.info(f'{style} style sheet not found! \
+                        Switching to default...')
         else:
            radgesty = style
 
@@ -581,7 +582,7 @@ def SlabPlot(core, time=0, ax=None, xlabel=None, figname=None, ncols=None, style
         axgesty = str(Path.joinpath(pwd, style))
     else:
         if not Path(style).exists():
-            print(f'Warning: {style} style sheet not found! \
+            logging.info(f'{style} style sheet not found! \
                   Switching to default...')
         else:
             axgesty = style

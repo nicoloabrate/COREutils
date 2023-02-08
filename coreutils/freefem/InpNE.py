@@ -64,7 +64,7 @@ def writeNEdata(core, verbose=False, fmt=1):
 
     # create directory
     if os.path.isdir("NEinputdata"):
-        print("'NEinputdata' directory exists. Overwriting...")
+        logging.info("'NEinputdata' directory exists. Overwriting...")
         ans = "yes" # input()
     else:
         ans = "no"
