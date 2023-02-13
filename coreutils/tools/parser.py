@@ -16,6 +16,7 @@ setToValue = {
                         'power': 1.,
                         'nSnap': 1,
                         'tEnd': 0.,
+                        'coolant': None,
                       },
                 'GE': {
                         'rotation': None,
@@ -417,8 +418,8 @@ def __parseFRN(inp, CIargs, GEargs, NEargs, THargs):
     FRNargs = FreneticNamelist().DefaultValue
 
     # --- check existence of mandatory keys or assign derivate values (many of them assigned later)
-    NE = False if THargs is None else True
-    TH = False if NEargs is None else True
+    NE = False if NEargs is None else True
+    TH = False if THargs is None else True
     for inptype, lst in frenml.mandatory.items(): # check each input type
         for k in lst: # check each kw
             # check each argument
@@ -434,7 +435,7 @@ def __parseFRN(inp, CIargs, GEargs, NEargs, THargs):
                     else:
                         raise ParserError(f"Mandatory '{k}' key missing in FRENETIC-NML dict!")
             elif inptype == "TH":
-                if GEargs["dim"] == 3:
+                if GEargs["dim"] == 3 and TH:
                     if k.lower() not in inp.keys():
                         if k.lower() == "xLengt".lower():
                             if "zmesh" in THargs.keys():

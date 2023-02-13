@@ -178,6 +178,8 @@ class Core:
         self.trans = trans
         self.dim = dim
         self.power = power
+        self.coolant = CIargs['coolant']
+
         if FRNargs is not None:
             self.FreneticNamelist = FRNargs
 

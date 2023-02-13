@@ -1128,7 +1128,7 @@ class NEMaterial():
 
     def isfiss(self):
         """Assess whether the material is fissile"""
-        return self.Fiss.max() > 0
+        return self.Fiss.max() > 0 and self.Nubar.max() > 0
 
 
 class CZdata:

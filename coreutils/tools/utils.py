@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from collections import OrderedDict, UserDict
 from numpy import string_, ndarray, array, asarray
 from numpy import int8, int16, int32, int64, float16, float32, float64, \
@@ -90,6 +91,7 @@ def fortranformatter(value, multiplier=None):
     else:
         raise OSError(f"Cannot convert data of type {type(value)}!")
 
+
 class MyDict(OrderedDict):
 
     def reverse(self):
@@ -116,6 +118,7 @@ def lowcasedict(inpdict):
         raise OSError("Cannot use lowcasedict, keys cannot become case insensitive!")
     else:
         return dict(zip(lowcasekeys, inpdict.values())) 
+
 
 def uppcasedict(inpdict):
     """Convert a dict into an equivalent dict with upper-case keys.

@@ -566,7 +566,6 @@ class NE:
 
     def critical(self, core, prt):
         """
-        
         Enforce criticality, given the static keff of the system
 
         Parameters
@@ -589,7 +588,6 @@ class NE:
             raise OSError(f'Mandatoy key `keff` missing in ''critical'' card for t={time} s')
         
         keff = keff*self.nGro
-
 
     def perturb(self, core, prt, time=0, sanitycheck=True, isfren=True,
                 action='pert'):
@@ -1063,6 +1061,47 @@ class NE:
 
         if self.PHenergygrid[0] < self.PHenergygrid[0]:
             self.PHenergygrid[np.argsort(-self.PHenergygrid)]
+
+    def get_fissile_types(self):
+        """Return fissile assembly types.
+
+        Returns
+        -------
+        fissile_types : list
+            Return fissile assembly types.
+        """
+        fissile_types = []
+        temp = list(self.data.keys())[0]
+        for iType, aType in self.assemblytypes.items():
+            if hasattr(self, "AxialConfig"):
+                regs = set(self.AxialConfig.config_str[aType])
+            else: # 2D object
+                regs = [aType]
+
+            for r in regs:
+                if self.data[temp][r].isfiss():
+                    fissile_types.append(iType)
+                    break
+        return fissile_types
+
+    def get_fissile_SA(self, core, t=0):
+        """Return number of fissile types in a core configuration at time t.
+
+        Parameters
+        ----------
+        core : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        fissile_types = self.get_fissile_types()
+        fissile_SA = []
+        for iType in fissile_types:
+            fissile_SA.extend(core.getassemblylist(iType, self.config[t]))
+        return fissile_SA
 
     @property
     def nReg(self):
