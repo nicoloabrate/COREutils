@@ -1,4 +1,5 @@
 import io
+import numpy as np
 from . import templates
 from coreutils.tools.utils import fortranformatter as ff
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticNamelistError
@@ -27,10 +28,13 @@ def writeCZdata(core):
         # generate input .inp
         f = io.open(inp, 'w', newline='\n')
         f.write(f"{len(core.TH.CZtime)}, \n")
+        N = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
         for t in core.TH.CZtime:
             # loop over each assembly
             data = [t]
             for n in core.Map.fren2serp.keys():
+                if n > N:
+                    break
                 # get data in assembly
                 whichtype = core.getassemblytype(n, core.TH.CZconfig[t], isfren=True)
                 whichtype = core.TH.CZassemblytypes[whichtype]
@@ -59,10 +63,12 @@ def makeTHinput(core):
         f.write(f"&{namelist}\n")
         for key, val in core.FreneticNamelist[namelist].items():
             # format value with FortranFormatter utility
+            is_iterable = True if isinstance(val, (np.ndarray, list)) else False
             val = ff(val)
             # "vectorise" in Fortran input if needed
-            if key in frnnml.vector_inp:
-                val = f"{core.nAss}*{val}"
+            if key in frnnml.vector_inp and not is_iterable:
+                N = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
+                val = f"{N}*{val}"
             f.write(f"{key} = {val}\n")
         # write to file
         f.write("/\n")
@@ -70,7 +76,7 @@ def makeTHinput(core):
 
 def writeTHdata(core):
     """
-    Generate TH input data. User is supposed to complete them manually.
+    Generate TH input data.
 
     Parameters
     ----------
@@ -85,6 +91,7 @@ def writeTHdata(core):
     # FIXME this is a patch, in the future the user should choose these values
     nRadNode = core.FreneticNamelist["ADDTH"]["MaxNRadNode"]-2
     nr = [int(nRadNode*0.6), int(nRadNode*0.2), int(nRadNode*0.2)]
+    N = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
     for nType in core.TH.THassemblytypes.keys():
         for nt, t in enumerate(core.TH.THtime):
             # open new file
@@ -100,7 +107,7 @@ def writeTHdata(core):
                     # "vectorise" in Fortran input if needed
                     if key in frnnml.vector_inp.keys():
                         if frnnml.vector_inp[key] == "nAss":
-                            length = core.nAss
+                            length = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
                         elif frnnml.vector_inp[key] == "nSides":
                             length = 6
                         else:

@@ -10,6 +10,7 @@ from datetime import datetime
 from shutil import move, copyfile, SameFileError
 from . import templates
 from coreutils.tools.utils import fortranformatter as ff
+from coreutils.tools.properties import *
 from coreutils.tools.plot import RadialMap, AxialGeomPlot, SlabPlot
 import matplotlib.pyplot as plt
 from .InpTH import writeTHdata, writeCZdata, makeTHinput
@@ -58,6 +59,7 @@ def fillFreneticNamelist(core):
 
         pitch = core.Geometry.AssemblyGeometry.pitch
         nH = core.nAss
+        N = int(core.nAss/6+1) if core.FreneticNamelist['isSym'] else core.nAss
         try:
             nDiff = len(core.TH.THdata.keys())
         except AttributeError:
@@ -67,11 +69,12 @@ def fillFreneticNamelist(core):
     except AttributeError as err:
         if "object has no attribute 'Map'" in str(err):  # assume 1D core
             nL, nR, nDiff, nH = 1, 1, 1, 1
+            N = 1
             pitch = core.Geometry.AssemblyGeometry.pitch
         else:
             logging.error(err)
 
-    core.FreneticNamelist['nChan'] = nH
+    core.FreneticNamelist['nChan'] = int(nH/6+1) if core.FreneticNamelist['isSym'] else nH
     core.FreneticNamelist['nL'] = nL
     core.FreneticNamelist['nR'] = nR
     core.FreneticNamelist['nDiff'] = nDiff
@@ -151,12 +154,43 @@ def fillFreneticNamelist(core):
         if np.isnan(core.FreneticNamelist['nTimeProf']):
             core.FreneticNamelist['TimeProf'] = TimeNETHConfig
             core.FreneticNamelist['nTimeProf'] = len(core.FreneticNamelist['TimeProf'])
+
+        # smart initialisation
+        if np.isnan(core.FreneticNamelist['temIni']):
+            # get average heat in each HA
+            nFissHA = len(core.NE.get_fissile_SA(core, t=0))
+            qHA = core.power/nFissHA
+            mdot = np.zeros((N,))
+            Tinl = np.zeros((N,))
+            for n in core.Map.fren2serp.keys():
+                # get data in assembly
+                if n > N:
+                    break
+                whichtype = core.getassemblytype(n, core.TH.CZconfig[0], isfren=True)
+                whichtype = core.TH.CZassemblytypes[whichtype]
+                Tinl[n-1] = core.TH.CZdata.temperatures[whichtype]
+                mdot[n-1] = core.TH.CZdata.massflowrates[whichtype]
+
+            # estimate outlet temp. with approx. energy balance
+            if core.coolant == 'Pb':
+                cp = LeadProp.specific_heat(Tinl)
+            else:
+                raise OSError(f"Properties not implemented for coolant {core.coolant}")
+
+            dT = np.divide(qHA, mdot, out=np.zeros_like(mdot), where=mdot!=0)/cp
+            Tout = Tinl+dT
+            if (Tout-Tinl).max() < 0.5:
+                logging.warning("Input power may be too small to heat the coolant!")
+            # Pinl = rho*9.81*h+Pout
+            core.FreneticNamelist['temIni'] = (Tinl+Tout)/2
+
         #  assign THdata in ad hoc keys
         iType = 1
         for THtype, THdata in core.TH.THdata.items():
             core.FreneticNamelist[f'HAType{iType}'] = {}
             HAdict = core.FreneticNamelist[f'HAType{iType}']
-            HAdict['iHA'] = THdata.iHA
+            iHA = [i for i in THdata.iHA if i <= N]
+            HAdict['iHA'] = iHA
 
             # TODO only one lattice axially, more should be considered
             GEtype = core.TH.THtoGE[THtype][0]
@@ -179,11 +213,10 @@ def fillFreneticNamelist(core):
             # FIXME TODO how to account for these? Maybe better to distinguish fissile-nonfissile
             HAdict['dFuelNfX'] = 0.
 
-
             if isHomog:
                 HAdict['ThickGasX'] = 0.
-                HAdict['RCoX'] = 0.
-                HAdict['RCiX'] = 0.
+                HAdict['RCoX'] = pin.radii.max()/100
+                HAdict['RCiX'] = pin.radii.max()/100
             else:
                 HAdict['ThickGasX'] = (pin.radii[n]-pin.radii[n-1])/100
                 n += 1
@@ -702,7 +735,7 @@ def makecommoninput(core):
     """
     frnnml = FreneticNamelist()
     f = io.open('common_input.inp', 'w', newline='\n')
-
+    N = int(core.nAss/6+1) if core.FreneticNamelist["PRELIMINARY"]['isSym'] else core.nAss
     for namelist in frnnml.files["common_input.inp"]:
         f.write(f"&{namelist}\n")
         for key, val in core.FreneticNamelist[namelist].items():
@@ -710,10 +743,10 @@ def makecommoninput(core):
             val = ff(val)
             # "vectorise" in Fortran input if needed
             if key in frnnml.vector_inp:
-                val = f"{core.nAss}*{val}"
+                val = f"{N}*{val}"
             # FIXME in the future there will be no need for (1, 1:nASS)
             if key.casefold() in ["nelref", "xbrefi", "xerefi"]:
-                f.write(f"{key}(1, 1:{core.nAss}) = {val}\n")
+                f.write(f"{key}(1, 1:{N}) = {val}\n")
             else:
                 f.write(f"{key} = {val}\n")
         # write to file
