@@ -13,7 +13,7 @@ import logging
 from collections import OrderedDict
 from numpy import string_, ndarray, array, asarray
 from numpy import int8, int16, int32, int64, float16, float32, float64, \
-                  complex128, zeros, asarray, bytes_
+                  complex128, zeros, asarray, bytes_, dtype
 
 
 _float_types = (float, float16, float32, float64, complex, complex128)
@@ -139,11 +139,11 @@ class read():
             if isinstance(item, h5py._hl.dataset.Dataset):
                 if pytype is str:
                     if item.shape == ():
-                        val = array(item)[()] # .decode()
+                        val = array(item)[()].decode()
                     else:
                         val = []
                         for i in item:
-                            val.append(i)
+                            val.append(i.decode())
                         val = asarray(val)
                 else:
                     if pytype in _scalar_types:
@@ -155,6 +155,10 @@ class read():
                         else:
                             val = zeros(item.shape, dtype=dt)
                             item.read_direct(val)
+                            if dt == dtype(object):
+                                # FIXME TODO temporary patch to avoid b_strings
+                                if isinstance(item[0], bytes):
+                                    val = val.astype(str)
                     else:
                         raise TypeError(f'Cannot read data {item} with type {type(item)}!')
             elif pytype in _scalar_types:
@@ -189,6 +193,8 @@ class read():
                 raise TypeError(f'Cannot read data {item} with type {type(item)}!')
         elif type(item).__name__ == 'Group':
             val = read._h52dict(item, keytype=keytype)
+        elif pytype is None:
+            val = None
         else:
             raise TypeError(f'Cannot read data {item} with type {type(item)}!')
         return val
