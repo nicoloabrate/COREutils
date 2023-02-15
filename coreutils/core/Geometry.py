@@ -181,9 +181,25 @@ class Geometry:
             external file).
         """
         for k, v in inpdict.items():
-            if isinstance(v, bytes):
-                v = v.decode()
-            setattr(self, k, v)
+            if k == "AssemblyGeometry":
+                setattr(self, k, AssemblyGeometry(inpdict=v))
+            elif k == "AssemblyType":
+                setattr(self, k, {})
+                for AssType, inp in v.items():
+                    self.AssemblyType[AssType] = AxialCuts(inpdict=inp)
+            elif k == "LatticeGeometry":
+                setattr(self, k, {})
+                for AssType, inp in v.items():
+                    self.LatticeGeometry[AssType] = LatticeGeometry(inpdict=inp)
+            elif k == "Pin":
+                setattr(self, k, {})
+                for PinType, inp in v.items():
+                    self.Pin[PinType] = PinGeometry(inpdict=inp)
+            else:
+                if isinstance(v, bytes):
+                    v = v.decode()
+                setattr(self, k, v)
+
 
 
 class AssemblyGeometry:
