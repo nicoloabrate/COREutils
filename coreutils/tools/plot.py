@@ -339,6 +339,12 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
     None.
 
     """
+    if hasattr(core, "FreneticNamelist"):
+        isSym = core.FreneticNamelist["PRELIMINARY"]["isSym"]
+    else:
+        isSym = 0
+    # FIXME consider also symmetry for cartesian geometry
+    nAss = int((core.nAss-1)/6)+1 if isSym else core.nAss
     if mycols is None:
         mycols = mycols1
 
@@ -415,7 +421,9 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 continue
             if tallies is not None:
                 idx = amap.serp2fren[k]-1 if fren else k-1
-                if tallies[idx] <= thresh:
+                if idx >= len(tallies) and isSym:
+                    continue
+                elif tallies[idx] <= thresh:
                     continue
                 else:
                     valuesapp(tallies[idx])
@@ -499,7 +507,11 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 for k, coord in (core.Map.serpcentermap).items():
                     # check key is in "which" list
                     idx = amap.serp2fren[k]-1 if fren else k-1
-                    if k not in which or tallies[idx] <= thresh:
+                    if k not in which:
+                        continue
+                    elif idx >= len(tallies) and isSym:
+                        continue
+                    elif tallies[idx] <= thresh:
                         continue
                     else:
                         x, y = coord

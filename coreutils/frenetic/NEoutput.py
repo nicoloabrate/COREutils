@@ -270,6 +270,11 @@ class NEoutput:
                                     No `core.h5` file in {self.casepath}')
 
             # --- PHASE-SPACE PARAMETERS
+            if hasattr(self.core, "FreneticNamelist"):
+                isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
+            else:
+                isSym = 0
+            nhex = int((self.core.nAss-1)/6)+1 if isSym else self.core.nAss
             if hex is not None:
                 # make FRENETIC numeration consistent with python indexing
                 hex = [h-1 for h in hex] if self.core.dim != 1 else [0]
@@ -277,7 +282,7 @@ class NEoutput:
                 if self.core.dim == 1:
                     hex = [0]  # 0 instead of 1 for python indexing
                 else:
-                    hex = np.arange(0, self.core.nAss).tolist()
+                    hex = np.arange(0, nhex).tolist()
 
             # "t" refers to slicing
             if t is None:
@@ -667,9 +672,14 @@ class NEoutput:
         None.
 
         """
+        if hasattr(self.core, "FreneticNamelist"):
+            isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
+        else:
+            isSym = 0
+        nhex = int((self.core.nAss-1)/6)+1 if isSym else self.core.nAss
         # check data type
         if isinstance(what, dict):  # comparison with FRENETIC and other vals.
-            tallies = np.zeros((self.core.nAss, len(what.keys())))
+            tallies = np.zeros((nhex, len(what.keys())))
             for i, k in enumerate(what.keys()):
                 v2 = what[k]
                 v1 = self.get(k, hex=which, t=t,
@@ -681,7 +691,7 @@ class NEoutput:
                 tallies[:, i] = tmp*100
 
         elif isinstance(what, list):  # list of output
-            tallies = np.zeros((self.core.nAss, len(what)))
+            tallies = np.zeros((nhex, len(what)))
             for i, w in enumerate(what):
                 _tmp = self.get(w, hex=which, t=t, z=z, 
                                 pre=pre, gro=gro, grp=grp)
@@ -760,8 +770,9 @@ class NEoutput:
                     IK, IG = None, None
         nElz = len(self.core.NE.AxialConfig.AxNodes) if self.core.dim != 2 else 1
         myIK = 0
+        nhex = int((self.core.nAss-1)/6)+1 if isSym else self.core.nAss
         for iz in range(0, nElz):
-            for ih in range(1, self.core.nAss+1):
+            for ih in range(1, nhex+1):
                 if myIK == IK:
                     # TODO parse each time config.
                     hexty = self.core.getassemblytype(ih, config=core.NE.config[0], isfren=True)
