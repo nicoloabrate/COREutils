@@ -253,18 +253,22 @@ class NEoutput:
 
         if not oldfmt:
             try:
-                datapath = os.path.join(self.NEpath, "output_NE.h5")
+                h5path = os.path.join(self.NEpath, "output_NE.h5")
                 # back compatibility with v1 of FRENETIC 
                 # (commit n.8aaa49a23fcc8ffc01077c2c58facb66fd9aae0c on FRENETIC development)
-                if not os.path.exists(datapath):
-                    datapath = os.path.join(self.NEpath, "output.h5")
-                fh5 = h5.File(datapath, "r")
+                if not os.path.exists(h5path):
+                    h5path = os.path.join(self.NEpath, "output.h5")
+                fh5 = h5.File(h5path, "r")
             except OSError as err:
                 if 'Unable to open file' in str(err):
                     oldfmt = True
                     datapath = os.path.join(self.NEpath, "intpow.out")
                     if not os.path.exists(datapath):
-                        raise NEOutputError(f"No output in directory {self.NEpath}")
+                        if not os.path.exists(h5path):
+                            raise NEOutputError(f"No output in directory {self.NEpath}")
+                        else:
+                            print()
+                            raise NEOutputError(f"{str(err)}\n{h5path} is probably corrupted!")
         else:
             # just to parse time, if needed
             datapath = os.path.join(self.NEpath, "intpow.out")
@@ -363,11 +367,11 @@ class NEoutput:
             if isintegral:
                 if which == 'betaeff':
                     betas = cp(np.array(fh5['integralParameters'][dictkey])[:, [idx]][:, 0, :])
-                    profile = np.zeros((betas.shape[0], 2))
-                    profile[:, 0] = cp(fh5['integralParameters'][dictkey][:, 0])
-                    profile[:, 1] = betas.sum(axis=1)
+                    profile = betas.sum(axis=1)
+                elif which == 'eigenvalue dir.' or which == 'eigenvalue adj.':
+                    profile = np.squeeze(fh5['integralParameters'][dictkey][:, [idx]])
                 else:
-                    profile = fh5['integralParameters'][dictkey][:, [0, idx]][()]
+                    profile = fh5['integralParameters'][dictkey][:, [idx]][()]
             else:
                 # parse specified time, assembly, axial node, group, prec. fam.
                 dims = NEoutput.distrout_dim[which]
@@ -407,7 +411,11 @@ class NEoutput:
         # --- close H5 file
         if not oldfmt:
             fh5.close()
-        return profile[:]
+        if profile.ndim > 0:
+            return profile[:]
+        else:
+            return profile
+
 
     def plot1D(self, which, gro=None, t=None, grp=None, pre=None, prp=None, ax=None,
                abscissas=None, z=None, hex=None, leglabels=None, figname=None, xlabel=None,

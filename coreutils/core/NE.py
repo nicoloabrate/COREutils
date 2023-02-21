@@ -197,13 +197,6 @@ class NE:
                     self.translate(CI, config[time]["translate"], time,
                                    isfren=NEfren)
 
-                if "critical" in config[time]:
-                    self.critical(CI, config[time]["critical"], time)
-
-                if "perturb" in config[time]:
-                    self.perturb(CI, config[time]["perturb"], time,
-                                 isfren=NEfren)
-
                 if "replace" in config[time]:
                     self.replace(CI, config[time]["replace"], time,
                                  isfren=NEfren)
@@ -212,6 +205,12 @@ class NE:
                     self.replaceSA(CI, config[time]["replaceSA"], time,
                                    isfren=NEfren)
 
+                if "critical" in config[time]:
+                    self.critical(CI, config[time]["critical"], time)
+
+                if "perturb" in config[time]:
+                    self.perturb(CI, config[time]["perturb"], time,
+                                 isfren=NEfren)
         # --- CLEAN DATASET 
         # remove unused regions
         if NEdata is not None:
