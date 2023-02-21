@@ -287,12 +287,13 @@ def fillFreneticNamelist(core):
         for key in eraseKeys:
             core.FreneticNamelist.pop(key)
     else:
-        setToValue = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX",
-                      "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX",
-                      "BoxMatX", "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", "ThickGasX", 
-                      "dFuelNfX", "PtoPDistX", "iCRadX" "cNfX" "iCladX" "iGapX" "MaterHX" "HeatGhX", 
-                      "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "PtoPDistX", "nElems", "xLengt", 
-                      "zLayer", "nLayer", "TimeProf", "nTimeProf", "iMatX", "MaterHX", "HeatGhX"]
+        setToValue = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX", 'temIni',
+                      "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX", "iCRadX",
+                      "BoxMatX", "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", 
+                      "ThickGasX", "dFuelNfX", "PtoPDistX", "iCRadX" "cNfX" "iCladX" "iGapX" "MaterHX",
+                      "HeatGhX", "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "PtoPDistX", 
+                      "nElems", "xLengt", "cNfX", "iCladX", "iGapX", "zLayer", "nLayer", "TimeProf",
+                      "nTimeProf", "iMatX", "MaterHX", "HeatGhX"]
         for key in setToValue:
             core.FreneticNamelist[key] = -1
 
@@ -313,7 +314,19 @@ def fillFreneticNamelist(core):
     # --- arrange data in namelists
     frnnml_full = {}
     namelists = FreneticNamelist().namelists
+    inpfiles = FreneticNamelist().files
+    NEnml = inpfiles["NEinput.inp"]
+    THnml = inpfiles["THinput.inp"]+inpfiles["THdatainput.inp"]
+
     for nml, lst in namelists.items():
+
+        if not hasattr(core, "NE"):
+            if nml in NEnml:
+                continue
+        if not hasattr(core, "TH"):
+            if nml in THnml:
+                continue
+
         if nml not in ["COMMONS", "THERMALHYDRAULIC"]:
             frnnml_full[nml] = {}
             for s in lst:

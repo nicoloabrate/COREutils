@@ -204,10 +204,6 @@ class NE:
                     self.perturb(CI, config[time]["perturb"], time,
                                  isfren=NEfren)
 
-                if "perturb" in config[time]:
-                    self.perturb(CI, config[time]["perturb"], time, 
-                                 isfren=NEfren)
-
                 if "replace" in config[time]:
                     self.replace(CI, config[time]["replace"], time,
                                  isfren=NEfren)
@@ -335,10 +331,19 @@ class NE:
             if NEtype not in self.assemblytypes.values():
                 raise OSError(f"SA {NEtype} not defined! Replacement cannot be performed!")
             lst = repl[NEtype]
-            if not isinstance(lst, list):
+            if not isinstance(lst, (list, str)):
                 raise OSError("replaceSA must be a dict with SA name as key and"
                                 "a list with assembly numbers (int) to be replaced"
-                                "as value!")
+                                "as value or the SA name to be replaced!")
+            # ensure current config. is taken when multiple replacement occurs at the same time
+            if time in self.config.keys():
+                current_config = self.config[time]
+            else:
+                current_config = self.config[now]
+
+            if isinstance(lst, str):
+                lst = core.getassemblylist(asstypes[lst], current_config, isfren=isfren)
+
             if core.dim == 1:
                 newcore = [asstypes[NEtype]]
             else:
@@ -351,7 +356,7 @@ class NE:
                 # --- get coordinates associated to these assemblies
                 index = (list(set(index)))
                 rows, cols = np.unravel_index(index, core.Map.type.shape)
-                newcore = self.config[now]+0
+                newcore = current_config+0
                 # --- load new assembly type
                 newcore[rows, cols] = asstypes[NEtype]
 
@@ -460,7 +465,10 @@ class NE:
                     newtype = f"{basetype}-{iR}{action}"
                     oldtype = atype
                 else:
-                    newtype = f"{atype}-{iR}{action}"
+                    if action != "crit":
+                        newtype = f"{atype}-{iR}{action}"
+                    else:
+                        newtype = f"{atype}-{action}"
                     oldtype = newtype
 
                 # --- identify new region number (int)
