@@ -34,8 +34,8 @@ basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
 kinetics = ['lambda', 'beta']
 alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
 
-collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 1))),
-               *list(map(lambda z: "Sp"+str(z), range(0, 1))), 'Invv', 'Diffcoef']
+collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 2))),
+               *list(map(lambda z: "Sp"+str(z), range(0, 2))), 'Invv', 'Diffcoef']
 collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'FissEn']
 
 units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
@@ -826,6 +826,7 @@ class NEMaterial():
         ``None``.
 
         """
+        # TODO if not existing, compute flux assuming an infinite medium
         E = self.energygrid
         datadic = self.__dict__
         datavail = copy(list(datadic.keys()))
@@ -1116,6 +1117,7 @@ class NEMaterial():
             iS = iE
 
         collapsed['Transpxs'] = 1/(3*collapsed['Diffcoef'])
+        self.P1consistent = False # to "preserve" diffcoef
         # overwrite data
         self.energygrid = fewgrp
         self.nE = G

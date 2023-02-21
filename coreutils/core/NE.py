@@ -167,7 +167,7 @@ class NE:
                 self.nPrp = 0
                 self.nGrp = 0
                 self.nDhp = 0
-        
+
         # ------ BUILD NE TIME_DEP. CONFIGURATIONS
         # do replacements if needed at time=0 s
         if NEargs["replacesa"] is not None:
@@ -176,6 +176,8 @@ class NE:
             self.replace(CI, NEargs["replace"], 0, isfren=NEfren)
 
         # build time-dependent core configuration
+        # TODO specify in docs that perturbation at same t should be in the order
+        # consistent with the following one (translate, critical, perturb, replace, replaceSA)
         if config is not None:
             for time in config.keys():
                 if time != '0':
@@ -190,24 +192,29 @@ class NE:
                     nt = self.time.index(float(time))
                     now = self.time[nt-1]
                     self.config[float(time)] = self.config[now]
+
                 if "translate" in config[time]:
-                    self.translate(CI, config[time]["translate"],
-                                   time, isfren=NEfren)
+                    self.translate(CI, config[time]["translate"], time,
+                                   isfren=NEfren)
 
                 if "critical" in config[time]:
                     self.critical(CI, config[time]["critical"], time)
 
                 if "perturb" in config[time]:
-                    self.perturb(CI, config[time]["perturb"],
-                                   time, isfren=NEfren)
+                    self.perturb(CI, config[time]["perturb"], time,
+                                 isfren=NEfren)
+
+                if "perturb" in config[time]:
+                    self.perturb(CI, config[time]["perturb"], time, 
+                                 isfren=NEfren)
 
                 if "replace" in config[time]:
-                    self.replace(CI, config[time]["replace"], 
-                                time, isfren=NEfren)
+                    self.replace(CI, config[time]["replace"], time,
+                                 isfren=NEfren)
 
                 if "replaceSA" in config[time]:
-                    self.replaceSA(CI, config[time]["replaceSA"], 
-                                   time, isfren=NEfren)
+                    self.replaceSA(CI, config[time]["replaceSA"], time,
+                                   isfren=NEfren)
 
         # --- CLEAN DATASET 
         # remove unused regions
@@ -219,6 +226,65 @@ class NE:
                 for u in universes:
                     if u not in self.regions.values():
                         tmp.pop(u)
+
+        # ------ PERFORM COLLAPSING, IF ANY
+        if NEdata is not None and 'collapse' in NEargs:
+            # check path to data
+            if 'path' in NEargs['collapse']:
+                collpath = Path(NEargs['collapse']['path'])
+            else:
+                collpath = None
+                spectrum = None # use default flux in data
+
+            # get few groups and grid name (# TODO merge this with method get_energy_grid)
+            if 'egridname' in NEargs['collapse'].keys():
+                ename = NEargs['collapse']['egridname']
+            else:
+                ename = None
+
+            if 'energygrid' in NEargs['collapse'].keys():
+                fewgrp = NEargs['collapse']['energygrid']
+            else:
+                fewgrp = ename
+
+            if isinstance(fewgrp, (list, np.ndarray, tuple)):
+                nGro = len(fewgrp)-1
+                egridname = f'{self.nGro}G' if ename is None else ename
+                fewgrp = fewgrp
+            elif isinstance(fewgrp, (str, float, int)):
+                pwd = Path(__file__).parent.parent.parent
+                if 'COREutils'.lower() not in str(pwd).lower():
+                    raise OSError(f'Check coreutils tree for NEdata: {pwd}')
+                else:
+                    pwd = pwd.joinpath('NEdata')
+                    if isinstance(fewgrp, str):
+                        fgname = f'{fewgrp}.txt'
+                        egridname = str(fewgrp)
+                    else:
+                        fgname = f'{fewgrp}G.txt'
+                        egridname = str(fewgrp)
+
+                    egridpath = pwd.joinpath('group_structures', fgname)
+                    fewgrp = np.loadtxt(egridpath)
+                    nGro = len(fewgrp)-1
+            else:
+                raise OSError(f'Unknown fewgrp grid for collapsing {type(fewgrp)}')
+
+            if fewgrp[0] < fewgrp[0]:
+                fewgrp[np.argsort(-fewgrp)]
+
+            for temp in CI.TfTc:
+                for u in self.data[temp].keys():
+                    if collpath is not None:
+                        spectrum = np.loadtxt(str(collpath.joinpath(self.egridname, f"{u}.txt")))
+                        if spectrum.shape[0] != self.nGro:
+                            raise OSError(f"Cannot collapse to {len(fewgrp)} with {spectrum.shape[0]} groups!")
+                    self.data[temp][u].collapse(fewgrp, spectrum=spectrum, egridname=egridname)
+
+            # update attributes in self
+            self.nGro = len(fewgrp)-1
+            self.energygrid = fewgrp
+            self.egridname = egridname
 
         # --- ADD OPTIONAL ARGUMENTS
         if "axplot" in NEargs and NEargs["axplot"] is not None:
@@ -564,7 +630,7 @@ class NE:
                         assbly = [assbly]
                     self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
 
-    def critical(self, core, prt):
+    def critical(self, core, prt, time):
         """
         Enforce criticality, given the static keff of the system
 
@@ -573,10 +639,6 @@ class NE:
         core : _type_
             _description_
         """
-        iP = 0  # perturbation counter
-        for p in list(self.regions.values()):
-            if action in p:
-                iP += 1
         if float(time) in self.config.keys():
             now = float(time)
         else:
@@ -584,10 +646,24 @@ class NE:
             now = self.time[nt-1]
 
         # --- dict sanity check
-        if 'keff' not in prtdict.keys():
+        if 'keff' not in prt.keys():
             raise OSError(f'Mandatoy key `keff` missing in ''critical'' card for t={time} s')
-        
-        keff = keff*self.nGro
+        else:
+            keff = prt['keff']
+        # get fissile regions
+        SA_fiss = self.get_fissile_types(t=now)
+        for SA in SA_fiss:
+            SA_reg = self.AxialConfig.config[SA]
+            for ireg in SA_reg:
+                reg = self.regions[ireg]
+                if "crit" in reg:
+                    # replace
+                    self.replaceSA(core, {reg: f"{reg}-crit"}, now)
+                else:
+                    # perturb Nubar
+                    pert = {"region": reg, "howmuch": [1/keff-1],
+                            "what": "Nubar", "which": "all"}
+                    self.perturb(core, pert, time=now, action="crit")
 
     def perturb(self, core, prt, time=0, sanitycheck=True, isfren=True,
                 action='pert'):
@@ -724,14 +800,20 @@ class NE:
                         for i in izpos:
                             zpert.append(list(self.zcoord[i]))
                 # define perturbed region name
-                prtreg = f"{oldreg}-{iP}{action}"
+                if action != "crit":
+                    prtreg = f"{oldreg}-{iP}{action}"
+                else:
+                    prtreg = f"{oldreg}-{action}"
                 # --- perturb data and assign it
                 for temp in core.TfTc:
                     self.data[temp][prtreg] = cp(self.data[temp][oldreg])
                     self.data[temp][prtreg].perturb(perturbation, howmuch, depgro, sanitycheck=sanitycheck)
                 # --- add new assemblies
                 self.regions[self.nReg+1] = prtreg
-                self.labels[prtreg] = f"{self.labels[oldreg]}-{iP}{action}"
+                if action != "crit":
+                    self.labels[prtreg] = f"{self.labels[oldreg]}-{iP}{action}"
+                else:
+                    self.labels[prtreg] = f"{self.labels[oldreg]}-{action}"
                 # --- define replacement dict to introduce perturbation
                 if core.dim == 2:
                     repl = {atype: assbly}
@@ -1062,7 +1144,7 @@ class NE:
         if self.PHenergygrid[0] < self.PHenergygrid[0]:
             self.PHenergygrid[np.argsort(-self.PHenergygrid)]
 
-    def get_fissile_types(self):
+    def get_fissile_types(self, t=0):
         """Return fissile assembly types.
 
         Returns
@@ -1073,15 +1155,17 @@ class NE:
         fissile_types = []
         temp = list(self.data.keys())[0]
         for iType, aType in self.assemblytypes.items():
-            if hasattr(self, "AxialConfig"):
-                regs = set(self.AxialConfig.config_str[aType])
-            else: # 2D object
-                regs = [aType]
+            # TODO check in numpy array
+            if iType in self.config[t]:
+                if hasattr(self, "AxialConfig"):
+                    regs = set(self.AxialConfig.config_str[aType])
+                else: # 2D object
+                    regs = [aType]
 
-            for r in regs:
-                if self.data[temp][r].isfiss():
-                    fissile_types.append(iType)
-                    break
+                for r in regs:
+                    if self.data[temp][r].isfiss():
+                        fissile_types.append(iType)
+                        break
         return fissile_types
 
     def get_fissile_SA(self, core, t=0):
@@ -1097,7 +1181,7 @@ class NE:
         _type_
             _description_
         """
-        fissile_types = self.get_fissile_types()
+        fissile_types = self.get_fissile_types(t=t)
         fissile_SA = []
         for iType in fissile_types:
             fissile_SA.extend(core.getassemblylist(iType, self.config[t]))
