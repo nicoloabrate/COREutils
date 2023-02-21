@@ -46,11 +46,11 @@ class NEoutput:
                 'rrd_srcp', 'rrd_tot', 'rrd_totp', 'tempcool', 'tempfuel']
 
     aliases = {'keff': 'eigenvalue dir.', 'k': 'eigenvalue dir.', 'flux': 'fluxdir',
-               'adjoint': 'fluxadj', 'powerdens': 'powertot', 'rho': 'reactivityn',
+               'keffa': 'eigenvalue adj.','adjoint': 'fluxadj', 'powerdens': 'powertot', 'rho': 'reactivityn',
                'intpowtot': 'power tot.', 'intpowneu': 'power neu.', 'intpowpho': 'power pho.',
                'intpowfis': 'power fis.'}
 
-    post_process_keys = ['precursTot', 'precurspTot']
+    post_process_keys = ['precursTot', 'precurspTot', 'power_radial', 'power_axial']
 
     distrout_attr = {'fluxadj': 'neutron adjoint flux',
                      'fluxadjp': 'photon adjoint flux',
@@ -77,6 +77,11 @@ class NEoutput:
                      'rrd_totp': 'photon total reaction rate density',
                      'tempfuel': 'coolant temperature',
                      'tempcool': 'fuel temperature'}
+
+    post_process_attr = {'precursTot': 'Total precursors conc.',
+                         'precurspTot': 'Total photon precursors conc.',
+                         'power_radial': 'Total power',
+                         'power_axial': 'Linear power'}
 
     distrout_dim = {'fluxadj': ('ntim', 'ngro', 'nelz', 'nhex'),
                     'fluxadjp': ('ntim', 'ngrp', 'nelz', 'nhex'),
@@ -122,6 +127,9 @@ class NEoutput:
                     '[cm^{-3} s^{-1}]', '[cm^{-3} s^{-1}]', '[cm^{-3} s^{-1}]',
                     '[cm^{-3} s^{-1}]', '[cm^{-3} s^{-1}]', '[cm^{-3} s^{-1}]',
                     '[cm^{-3} s^{-1}]', '[cm^{-3} s^{-1}]', '[K]', '[K]']
+
+    post_process_uom = ['[cm^{-3} s^{-1}]', '[cm^{-3} s^{-1}]',
+                        '[W]', '[W/m]']
 
     def __init__(self, path):
         """
@@ -232,6 +240,16 @@ class NEoutput:
                 which = "precursp"
                 sum_dims = ["nprp", "nelz", "nhex"]
                 tot = True
+            elif which == "power_radial":
+                which = "powertot"
+                sum_dims = ["nelz"]
+                tot = True
+                z = None # take all z
+            elif which == "power_axial":
+                which = "powertot"
+                sum_dims = ["nhex"]
+                tot = True
+                hex = None # take all hex
 
         if not oldfmt:
             try:
@@ -274,10 +292,14 @@ class NEoutput:
                 isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
             else:
                 isSym = 0
-            nhex = int((self.core.nAss-1)/6)+1 if isSym else self.core.nAss
+            nhex = int((self.core.nAss-1)/6*isSym)+1 if isSym else self.core.nAss
+
             if hex is not None:
                 # make FRENETIC numeration consistent with python indexing
-                hex = [h-1 for h in hex] if self.core.dim != 1 else [0]
+                if isinstance(hex, int):
+                    hex = [hex-1]
+                else:
+                    hex = [h-1 for h in hex] if self.core.dim != 1 else [0]
             else:
                 if self.core.dim == 1:
                     hex = [0]  # 0 instead of 1 for python indexing
@@ -365,7 +387,19 @@ class NEoutput:
                     dims = self.distrout_dim[which]
                     for sum_dim in sum_dims:
                         sum_ax = dims.index(sum_dim)
-                        profile = profile.sum(axis=sum_ax)
+                        if "power" in which:
+                            if sum_dim == "nhex":
+                                w = self.core.Geometry.AssemblyGeometry.area
+                                profile = w*profile.sum(axis=sum_ax)
+                            elif sum_dim == "nelz":
+                                w = self.core.NE.AxialConfig.dz
+                                profile = np.tensordot(profile, w, axes=([sum_ax], [0]))
+                                profile = profile*self.core.Geometry.AssemblyGeometry.area
+                            else:
+                                raise NEOutputError(f"Cannot get {which} from data!")
+                        else:
+                            profile = profile.sum(axis=sum_ax)
+
                         dims = list(dims)
                         dims.remove(sum_dim)
                         dims = tuple(dims)
@@ -608,12 +642,11 @@ class NEoutput:
                 if figname is not None:
                     ax.savefig(figname)
 
-    def RadialMap(self, what, z=0, t=0, pre=0, gro=0, grp=0,
+    def RadialMap(self, what, z=0, t=0, pre=0, gro=1, grp=0,
                   label=False, figname=None, hex=None,
-                  usetex=False, fill=True, axes=None, cmap='Spectral_r',
+                  usetex=False, fill=True, axes=None, cmap=None,
                   thresh=None, cbarLabel=True, xlabel=None, ylabel=None,
-                  loglog=None, logx=None, logy=None, title=True,
-                  scale=1, fmt="%.2f", **kwargs):
+                  log=None, title=True, scale=1, fmt="%.2f", **kwargs):
         """
         Plot FRENETIC output on the x-y plane.
 
@@ -676,21 +709,20 @@ class NEoutput:
             isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
         else:
             isSym = 0
-        nhex = int((self.core.nAss-1)/6)+1 if isSym else self.core.nAss
+        nhex = int((self.core.nAss-1)/6*isSym)+1 if isSym else self.core.nAss
         # check data type
         if isinstance(what, dict):  # comparison with FRENETIC and other vals.
             tallies = np.zeros((nhex, len(what.keys())))
             for i, k in enumerate(what.keys()):
                 v2 = what[k]
-                v1 = self.get(k, hex=which, t=t,
-                              z=z, pre=pre, gro=gro, grp=grp)
+                v1 = self.get(k, hex=which, t=t, z=z, pre=pre, gro=gro, grp=grp)
                 v1 = np.squeeze(v1)
                 tmp = np.true_divide(norm(v1-v2), norm(v1))
                 tmp[tmp == np.inf] = 0
                 tmp = np.nan_to_num(tmp)
                 tallies[:, i] = tmp*100
 
-        elif isinstance(what, list):  # list of output
+        elif isinstance(what, list):  # list of output # TODO TO BE TESTED
             tallies = np.zeros((nhex, len(what)))
             for i, w in enumerate(what):
                 _tmp = self.get(w, hex=which, t=t, z=z, 
@@ -698,9 +730,11 @@ class NEoutput:
                 tallies[:, i] = np.squeeze(_tmp)
 
         elif isinstance(what, str):  # single output
-            tallies = self.get(what, t=t, z=z,
-                               pre=pre, gro=gro, grp=grp)
+            tallies = self.get(what, t=t, z=z, pre=pre, gro=gro, grp=grp)
             tallies = np.squeeze(tallies)
+        elif isinstance(what, (np.ndarray)):
+            tallies = what.tolist()
+            what = None
         else:
             raise TypeError('Input must be str, dict or list!')
 
@@ -718,10 +752,18 @@ class NEoutput:
                 title = 't=%.2f [s]' % (timeSnap[idt])
 
 
-        if cbarLabel:
-            idx = self.distributions.index(what)
-            dist = self.distributions_descr[what]
-            uom = self.distributions_measure[idx]
+        if cbarLabel is True:
+            if what in self.distributions:
+                idx = self.distributions.index(what)
+                dist = self.distributions_descr[what]
+                uom = self.distributions_measure[idx]
+            elif what in self.post_process_keys:
+                idx = self.post_process_keys.index(what)
+                dist = self.post_process_attr[what]
+                uom = self.post_process_uom[idx]
+            else:
+                raise NEOutputError(f"Cannot plot {what}!")
+
             uom = uom.replace('**', '^')
             changes = ['-1', '-2', '-3']
             for c in changes:
@@ -730,8 +772,38 @@ class NEoutput:
             # uom = '$%s$' % uom if usetex is True else uom
             cbarLabel = r'%s $%s$' % (dist, uom)
 
-        RadialMap(self.core, tallies=tallies, z=z, time=t, pre=pre, gro=gro,
-                  grp=grp, 
+        # autoselect colormap
+        if cmap is None:
+            auto_cmap = {
+                          'fluxadj': 'Spectral_r',
+                          'fluxadjp': 'Spectral_r',
+                          'fluxdir': 'Spectral_r',
+                          'fluxdirp': 'Spectral_r',
+                          'powerfis': 'inferno',
+                          'powerneu': 'inferno',
+                          'powerpho': 'inferno',
+                          'powertot': 'inferno',
+                          'precurs': 'cividis',
+                          'precursp': 'cividis',
+                          'rrd_efis': 'plasma',
+                          'rrd_fis': 'plasma',
+                          'rrd_ker': 'plasma',
+                          'rrd_kerp': 'plasma',
+                          'rrd_lkg': 'plasma',
+                          'rrd_lkgp': 'plasma',
+                          'rrd_nfis': 'plasma',
+                          'rrd_sct': 'plasma',
+                          'rrd_sctp': 'plasma',
+                          'rrd_src': 'plasma',
+                          'rrd_srcp': 'plasma',
+                          'rrd_tot': 'plasma',
+                          'rrd_totp': 'plasma',
+                          'tempfuel': 'coolwarm',
+                          'tempcool': 'coolwarm'
+                        }
+            cmap = auto_cmap[what]
+
+        RadialMap(self.core, tallies=tallies, z=z, time=t, pre=pre, gro=gro, grp=grp, 
                   label=label,
                   figname=figname,
                   which=hex,
@@ -748,9 +820,9 @@ class NEoutput:
                   cbarLabel=cbarLabel,
                   xlabel=xlabel,
                   ylabel=ylabel,
-                  loglog=loglog,
-                  logx=logx, 
-                  logy=logy,
+                  loglog=log,
+                  logx=False, 
+                  logy=False,
                   title=title,
                   scale=scale, 
                   fmt=fmt,
@@ -770,7 +842,7 @@ class NEoutput:
                     IK, IG = None, None
         nElz = len(self.core.NE.AxialConfig.AxNodes) if self.core.dim != 2 else 1
         myIK = 0
-        nhex = int((self.core.nAss-1)/6)+1 if isSym else self.core.nAss
+        nhex = int((self.core.nAss-1)/6*isSym)+1 if isSym else self.core.nAss
         for iz in range(0, nElz):
             for ih in range(1, nhex+1):
                 if myIK == IK:
@@ -803,21 +875,21 @@ class NEoutput:
         if gro is not None:
             # make input iterables
             if isinstance(gro, int):
-                gro = [gro-1]
+                gro = [gro]
             gro = [g-1 for g in gro]
         else:
             gro = np.arange(0, self.core.NE.nGro).tolist()
         if grp is not None:
             if isinstance(grp, int):
-                grp = [grp-1]
+                grp = [grp]
             grp = [g-1 for g in grp]
         if pre is not None:
             if isinstance(pre, int):
-                pre = [pre-1]
+                pre = [pre]
             pre = [p-1 for p in pre]
         if prp is not None:
             if isinstance(prp, int):
-                prp = [prp-1]
+                prp = [prp]
             prp = [p-1 for p in prp]
 
         nodes = self.core.NE.AxialConfig.AxNodes if self.core.dim != 2 else np.array([0])

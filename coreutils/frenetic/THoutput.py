@@ -77,6 +77,7 @@ class THoutput:
                 'T_pin_sur', 'density', 'htc', 'pressure',
                  'q_pin', 'velocity']
 
+
     aliases = {'densOut': ['Densout', 'densout'], 'densIn': ['Densin', 'densin'],
                'enthOut': ['Enthout', 'enthout'], 'enthIn': ['Enthin', 'enthin'],
                'pIn': ['Pin', 'pin'], 'pOut': ['Pout', 'pout'],
@@ -84,7 +85,7 @@ class THoutput:
                'vIn': ['Vin', 'vin'], 'vOut': ['Vout', 'vout'],
                'mdotOut': ['mDotout', 'mdotout', 'mDotout'],
                'mdotIn': ['mDotin', 'mdotin', 'mDotin'],
-               'time': ['Time']
+               'Time': ['time']
               }
 
     distrout_attr = {'timeDistr': 'time instant', 
@@ -187,6 +188,11 @@ class THoutput:
         profile: array
             Output profile requested.
         """
+        if hasattr(self.core, "FreneticNamelist"):
+            isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
+        else:
+            isSym = 0
+        nhex = int((self.core.nAss-1)/6*isSym)+1 if isSym else self.core.nAss
         # check if which is an alias
         for key, alias_list in self.aliases.items():
             if which in alias_list:
@@ -220,17 +226,20 @@ class THoutput:
             # select HAType to be parsed
             whichHexType = {k: [] for k in self.mapHAType.keys()}
             if hex is not None:
-                hex.sort()
-                for h in hex:
-                    for nchan, ass in self.mapHAType.items():
-                        if h in ass:
-                            whichHexType[nchan].append(h)
+                if isinstance(hex, int):
+                    hex = [hex-1]
+                else:
+                    hex.sort()
+                    for h in hex:
+                        for nchan, ass in self.mapHAType.items():
+                            if h in ass:
+                                whichHexType[nchan].append(h)
             else:
                 whichHexType = self.mapHAType
                 if self.core.dim == 1:
                     hex = [0]
                 else:
-                    hex = np.arange(0, self.nAss).tolist()
+                   hex = np.arange(0, nhex).tolist()
 
             # "t" refers to slicing
             if t is None:
@@ -253,7 +262,7 @@ class THoutput:
 
         else:  # InOut or Maximum data
             isdistr = False
-            if which == "Time":
+            if which == "time":
                 group = "maximum"
                 dictkey = which
             else:
@@ -276,22 +285,31 @@ class THoutput:
                     raise THoutputError(f'{which} not found in data!')
 
                 # --- PARAMETERS
+                if hasattr(self.core, "FreneticNamelist"):
+                    isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
+                else:
+                    isSym = 0
+                nhex = int((self.core.nAss-1)/6*isSym)+1 if isSym else self.core.nAss
+
                 if hex is not None:
                     hex = [h-1 for h in hex]
                 else:
                     if self.core.dim == 1:
                         hex = [0]
                     else:
-                        hex = np.arange(0, self.nAss).tolist()
+                        if isinstance(hex, int):
+                            hex = [hex]
+                        else:
+                            hex = np.arange(0, nhex).tolist()
 
                 # "t" refers to slicing
-                times = np.asarray(fh5[group]["Time"])
+                times = np.asarray(fh5[group]["time"])
                 if t is None:
                     if not self.core.trans:
                         idt = [0]  # time instant, not python index!
                     else:
                         # FIXME (here and in FRENETIC) current output misses "timeDistr"
-                        t = cp(np.asarray(fh5[group]["Time"])[()])
+                        t = cp(np.asarray(fh5[group]["time"])[()])
                         idt = np.arange(0, len(t)).tolist()
                 else:
                     if isinstance(t, (list, np.ndarray)):
@@ -313,10 +331,18 @@ class THoutput:
             # look for various assemblies in Type_nH groups
             for nchan in whichHexType:
                 # define 3rd dimension (index of matching hexagons)
-                dimlst[2] = [self.mapHAType[nchan].index(h) for h in whichHexType[nchan]]
+                dimlst[2] = []
+                for h in whichHexType[nchan]:
+                    if h <= nhex:
+                        ih = self.mapHAType[nchan].index(h)
+                        dimlst[2].append(ih)
+
                 if len(dimlst[2]) > 0:
                     # track all hexagons
-                    whichhex = whichhex + whichHexType[nchan]
+                    add_hex = whichHexType[nchan]
+                    if isSym:
+                        add_hex = [h for h in add_hex if h <= nhex]
+                    whichhex = whichhex + add_hex
                     # parse output
                     outprof = np.asarray(fh5[dictkey][f"Type_{nchan:02d}"][which])
                     outprof = outprof[np.ix_(*dimlst)]
@@ -331,7 +357,7 @@ class THoutput:
             # profile = profile[np.ix_(*dimlst)][()]
         else:
             profile = np.asarray(fh5[group][dictkey])
-            if dictkey != "Time":
+            if dictkey != "time":
                 dimlst = [idt, hex]
                 profile = profile[np.ix_(*dimlst)][()]
 
@@ -575,7 +601,7 @@ class THoutput:
 
     def RadialMap(self, what, z=0, t=0,
                   label=False, figname=None, hex=None,
-                  usetex=False, fill=True, axes=None, cmap='Spectral_r',
+                  usetex=False, fill=True, axes=None, cmap=None,
                   thresh=None, cbarLabel=True, xlabel=None, ylabel=None,
                   log=None, title=True, scale=1, fmt="%.2f", **kwargs):
         """Plot FRENETIC output on the x-y plane.
@@ -624,6 +650,11 @@ class THoutput:
         ------
         ``None``
         """
+        if hasattr(self.core, "FreneticNamelist"):
+            isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
+        else:
+            isSym = 0
+        nhex = int((self.core.nAss-1)/6*isSym)+1 if isSym else self.core.nAss
         # check data type
         if isinstance(what, dict):  # comparison with FRENETIC and other vals.
             tallies = np.zeros((self.nAss, len(what.keys())))
@@ -641,7 +672,9 @@ class THoutput:
             for i, w in enumerate(what):
                 _tmp = self.get(w, hex=hex, t=t, z=z)
                 tallies[:, i] = np.squeeze(_tmp)
-
+        elif isinstance(what, (np.ndarray)):
+            tallies = what.tolist()
+            what = None
         elif isinstance(what, str):  # single output
             tallies = self.get(what, t=t, z=z)
             tallies = np.squeeze(tallies)
@@ -661,7 +694,7 @@ class THoutput:
                 idz = 0
                 title = 't=%.2f [s]' % (timeSnap[idt])
 
-        if cbarLabel:
+        if cbarLabel is True:
             if what in self.distributions_descr.keys():
                 dist = self.distributions_descr[what]
                 uom = self.distributions_measure[what]
@@ -682,7 +715,46 @@ class THoutput:
             # uom = '$%s$' % uom if usetex is True else uom
             cbarLabel = r'%s $%s$' % (dist, uom)
 
-        RadialMap(self.core, tallies=tallies, z=z, time=t, label=label,
+        # autoselect colormap
+        if cmap is None:
+            auto_cmap = {
+                        'densOut': "cividis", 
+                        'densIn': "cividis",
+                        'enthOut': "magma",
+                        'enthIn': "magma",
+                        'pIn': "plasma",
+                        'pOut': "plasma",
+                        'TOut': 'coolwarm',
+                        'TIn': 'coolwarm',
+                        'vIn': "viridis",
+                        'vOut': "viridis",
+                        'mdotOut': "viridis",
+                        'mdotIn': "viridis",
+                        'Tcoolant': 'coolwarm',
+                        'Tpin_average': 'coolwarm',
+                        'Tpin_center': 'coolwarm', 
+                        'Tpin_surface': 'coolwarm',
+                        'pressure': "plasma",
+                        'zMax_pressure': 'BrBG',
+                        'zMax_Tcoolant': 'BrBG',
+                        'zMax_Tpin_average': 'BrBG', 
+                        'zMax_Tpin_center': 'BrBG',
+                        'zMax_Tpin_surface': 'BrBG',
+                        'T_coolant': 'coolwarm',
+                        'T_pin_avg': 'coolwarm',
+                        'T_pin_ctr': 'coolwarm', 
+                        'T_pin_sur': 'coolwarm',
+                        'density': "cividis",
+                        'htc': "Reds",
+                        'pressure': "plasma",
+                        'q_pin': "inferno",
+                        'velocity': "viridis"
+                        }
+            cmap = auto_cmap[what]
+
+
+        RadialMap(self.core, tallies=tallies, z=z, time=t, 
+                  label=label,
                   figname=figname,
                   which=hex,
                   fren=True,
