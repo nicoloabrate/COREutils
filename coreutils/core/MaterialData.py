@@ -856,10 +856,10 @@ class NEMaterial():
             self.bad_data = True
         self.Tot[self.Tot <= 0] = 1E-8
 
-
-        avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
-        v = np.sqrt(2*avgE/1.674927351e-27)
-        self.Invv = 1/(v*100)  # s/cm
+        if not hasattr(self, "fine_energygrid"):
+            avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
+            v = np.sqrt(2*avgE/1.674927351e-27)
+            self.Invv = 1/(v*100)  # s/cm
 
         # --- compute diffusion coefficient and transport xs
         if self.P1consistent:
@@ -968,7 +968,7 @@ class NEMaterial():
         else:
             if isFiss:
                 self.Chip = self.Chit
-                self.Chid = self.Chit
+                self.Chid = np.tile(self.Chit, (self.NPF, self.nE))
             else:
                 self.Chit = np.zeros((self.nE, ))
                 self.Chip = np.zeros((self.nE, ))
@@ -1119,6 +1119,7 @@ class NEMaterial():
         collapsed['Transpxs'] = 1/(3*collapsed['Diffcoef'])
         self.P1consistent = False # to "preserve" diffcoef
         # overwrite data
+        self.fine_energygrid = self.energygrid+0
         self.energygrid = fewgrp
         self.nE = G
         self.egridname = egridname if egridname else f'{G}G'

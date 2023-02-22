@@ -180,7 +180,7 @@ class NE:
         # consistent with the following one (translate, critical, perturb, replace, replaceSA)
         if config is not None:
             for time in config.keys():
-                if time != '0':
+                if float(time) != 0:
                     t = float(time)
                     # increment time list
                     self.time.append(t)
