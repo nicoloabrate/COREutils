@@ -59,7 +59,8 @@ def fillFreneticNamelist(core):
 
         pitch = core.Geometry.AssemblyGeometry.pitch
         nH = core.nAss
-        N = int(core.nAss/6+1) if core.FreneticNamelist['isSym'] else core.nAss
+        isSym = core.FreneticNamelist['isSym']
+        N = int(core.nAss/6*isSym+1) if isSym else core.nAss
         try:
             nDiff = len(core.TH.THdata.keys())
         except AttributeError:
@@ -74,7 +75,8 @@ def fillFreneticNamelist(core):
         else:
             logging.error(err)
 
-    core.FreneticNamelist['nChan'] = int(nH/6+1) if core.FreneticNamelist['isSym'] else nH
+    isSym = core.FreneticNamelist['isSym']
+    core.FreneticNamelist['nChan'] = int(nH/6*isSym+1) if isSym else nH
     core.FreneticNamelist['nL'] = nL
     core.FreneticNamelist['nR'] = nR
     core.FreneticNamelist['nDiff'] = nDiff
@@ -748,7 +750,8 @@ def makecommoninput(core):
     """
     frnnml = FreneticNamelist()
     f = io.open('common_input.inp', 'w', newline='\n')
-    N = int(core.nAss/6+1) if core.FreneticNamelist["PRELIMINARY"]['isSym'] else core.nAss
+    isSym = core.FreneticNamelist["PRELIMINARY"]['isSym']
+    N = int(core.nAss/6*isSym+1) if isSym else core.nAss
     for namelist in frnnml.files["common_input.inp"]:
         f.write(f"&{namelist}\n")
         for key, val in core.FreneticNamelist[namelist].items():

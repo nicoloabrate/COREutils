@@ -28,7 +28,8 @@ def writeCZdata(core):
         # generate input .inp
         f = io.open(inp, 'w', newline='\n')
         f.write(f"{len(core.TH.CZtime)}, \n")
-        N = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
+        isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
+        N = int(core.nAss/6*isSym+1) if isSym else core.nAss
         for t in core.TH.CZtime:
             # loop over each assembly
             data = [t]
@@ -67,7 +68,8 @@ def makeTHinput(core):
             val = ff(val)
             # "vectorise" in Fortran input if needed
             if key in frnnml.vector_inp and not is_iterable:
-                N = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
+                isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
+                N = int(core.nAss/6*isSym+1) if isSym else core.nAss
                 val = f"{N}*{val}"
             f.write(f"{key} = {val}\n")
         # write to file
@@ -90,8 +92,9 @@ def writeTHdata(core):
     frnnml = FreneticNamelist()
     # FIXME this is a patch, in the future the user should choose these values
     nRadNode = core.FreneticNamelist["ADDTH"]["MaxNRadNode"]-2
+    isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
     nr = [int(nRadNode*0.6), int(nRadNode*0.2), int(nRadNode*0.2)]
-    N = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
+    N = int(core.nAss/6*isSym+1) if isSym else core.nAss
     for nType in core.TH.THassemblytypes.keys():
         for nt, t in enumerate(core.TH.THtime):
             # open new file
@@ -107,7 +110,8 @@ def writeTHdata(core):
                     # "vectorise" in Fortran input if needed
                     if key in frnnml.vector_inp.keys():
                         if frnnml.vector_inp[key] == "nAss":
-                            length = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
+                            isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
+                            length = int(core.nAss/6*isSym+1) if isSym else core.nAss
                         elif frnnml.vector_inp[key] == "nSides":
                             length = 6
                         else:

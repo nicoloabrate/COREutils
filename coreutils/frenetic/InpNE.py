@@ -442,7 +442,8 @@ def writeConfig(core):
     """
     f1 = io.open('config.inp', 'w', newline='\n')
     NAssTypes = len(core.NE.assemblytypes)
-    nAss = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
+    isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
+    nAss = int(core.nAss/6*isSym+1) if isSym else core.nAss
     nZ = len(core.NE.AxialConfig.zcuts)-1 if core.dim != 2 else 1
 
     writer = pd.ExcelWriter("configurationsNE.xlsx", engine='xlsxwriter')
@@ -589,7 +590,8 @@ def makeNEinput(core, H5fmt=2):
             val = ff(val)
             # "vectorise" in Fortran input if needed
             if key in frnnml.vector_inp:
-                N = int(core.nAss/6+1) if core.FreneticNamelist['PRELIMINARY']['isSym'] else core.nAss
+                isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
+                N = int(core.nAss/6*isSym+1) if isSym else core.nAss
                 val = f"{N}*{val}"
             f.write(f"{key} = {val}\n")
         # write to file

@@ -344,7 +344,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
     else:
         isSym = 0
     # FIXME consider also symmetry for cartesian geometry
-    nAss = int((core.nAss-1)/6)+1 if isSym else core.nAss
+    nAss = int((core.nAss-1)/6)*isSym+1 if isSym else core.nAss
     if mycols is None:
         mycols = mycols1
 
