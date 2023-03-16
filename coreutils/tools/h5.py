@@ -156,6 +156,7 @@ class read():
                             val = zeros(item.shape, dtype=dt)
                             item.read_direct(val)
                             if dt == dtype(object):
+                                # FIXME TODO fix case when "beginwith" is None
                                 # FIXME TODO temporary patch to avoid b_strings
                                 if isinstance(item[0], bytes):
                                     val = val.astype(str)

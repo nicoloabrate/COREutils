@@ -367,25 +367,29 @@ class NEMaterial():
                         jpath = path.join(datapath, "json")
                     else:
                         jpath = datapath
+
+                    if '.json' not in str(filename):
+                        filename = f'{str(filename)}.{reader}'
+                    else:
+                        filename = filename
+
                     # check for temperatures
                     if temp:
-                        dirTfTc = f"Tf_{Tf}_Tc_{Tc}"
-                        dirTcTf = f"Tc_{Tc}_Tf_{Tf}"
+                        dirTfTc = f"Tf_{Tf:g}_Tc_{Tc:g}"
+                        dirTcTf = f"Tc_{Tc:g}_Tf_{Tf:g}"
+
                         if Path(path.join(jpath, dirTfTc)).exists():
-                            jpath = path.join(jpath, dirTfTc, filename)
+                            jpath = path.join(jpath, dirTfTc)
                         elif Path(path.join(jpath, dirTcTf)).exists():
-                            path.join(jpath, dirTcTf, filename)
+                            jpath = path.join(jpath, dirTcTf)
 
-                        # if dirTcTf not in filename and dirTfTc not in filename:
-                    else:
-                        fname = path.join(jpath, filename)
-                    
-                    if '.json' not in str(filename):
-                        fname = f'{str(filename)}.{reader}'
-                    else:
-                        fname = filename
+                    fname = path.join(jpath, filename)
 
-                    fname = path.join(jpath, fname)
+                    # if '.json' not in str(filename):
+                    #     fname = f'{str(filename)}.{reader}'
+                    # else:
+                    #     fname = filename
+
                     if Path(fname).exists():
                         self._readjson(fname)
                     else:
