@@ -124,8 +124,12 @@ def fillFreneticNamelist(core):
         core.FreneticNamelist['nElez0'] = NZ
         core.FreneticNamelist['Meshz0'] = meshz
         core.FreneticNamelist['SplitZ'] = splitz
+        if isinstance(core.FreneticNamelist['TimeProfNE'], list):
+            core.FreneticNamelist['nTimeProfNE'] = len(core.FreneticNamelist['TimeProfNE'])
         # set power
         core.FreneticNamelist['power'] = core.power
+        if core.NE.nGrp == 0:
+            core.FreneticNamelist['ioPowerp'] = 0
     else:
         core.FreneticNamelist['iRun'] = -1
         core.FreneticNamelist['nConf'] = -1
@@ -153,9 +157,9 @@ def fillFreneticNamelist(core):
                 core.FreneticNamelist['zLayer'] = np.linspace(core.TH.zmesh[0], core.TH.zmesh[1], 
                                                               core.FreneticNamelist['nLayer'])
 
-        if np.isnan(core.FreneticNamelist['nTimeProf']):
-            core.FreneticNamelist['TimeProf'] = TimeNETHConfig
-            core.FreneticNamelist['nTimeProf'] = len(core.FreneticNamelist['TimeProf'])
+        if np.isnan(core.FreneticNamelist['nTimeProfTH']):
+            core.FreneticNamelist['TimeProfTH'] = TimeNETHConfig
+            core.FreneticNamelist['nTimeProfTH'] = len(core.FreneticNamelist['TimeProfTH'])
 
         # smart initialisation
         if np.isnan(core.FreneticNamelist['temIni']):
@@ -204,7 +208,7 @@ def fillFreneticNamelist(core):
             isHomog = len(pin.materials) < 3
             n = 2 if pin.isAnnular else 1
 
-            HAdict['iPinSolidX'] = 1 if isHomog else 0
+            HAdict['iRadHom'] = 1 if isHomog else 0
             HAdict['nFuelX'] = lattice.nPins
             # FIXME TODO how to account for these? Maybe better to distinguish fissile-nonfissile
             HAdict['nNonHeatedX'] = 0
@@ -254,7 +258,7 @@ def fillFreneticNamelist(core):
 
             # TODO TODO material
             HAdict['iFuelX'] = pin.materials[1] if pin.isAnnular else pin.materials[0]
-            HAdict['cNfX'] = "Default"
+            HAdict['NonFuelMat'] = "Default"
 
             if isHomog:
                 HAdict['iGapX'] = "Default"
@@ -283,18 +287,18 @@ def fillFreneticNamelist(core):
 
         eraseKeys = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX",
                      "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX", "BoxMatX", 
-                     "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", "ThickGasX",
+                     "iHpbPinX", "iTyFrictX", "iChCouplX", "iRadHom", "RCoX", "RCiX", "ThickGasX",
                      "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "dFuelNfX", "PtoPDistX", 
-                     "iCRadX", "cNfX", "iCladX", "iGapX", "MaterHX", "HeatGhX"]
+                     "iCRadX", "NonFuelMat", "iCladX", "iGapX", "MaterHX", "HeatGhX"]
         for key in eraseKeys:
             core.FreneticNamelist.pop(key)
     else:
         setToValue = ["iHA", "nFuelX", "nNonHeatedX", "iFuelX", "dFuelX", 'temIni',
                       "dFuelInX", "ThickBoxX", "ThickClearX", "FPeakX", "QBoxX", "iCRadX",
-                      "BoxMatX", "iHpbPinX", "iTyFrictX", "iChCouplX", "iPinSolidX", "RCoX", "RCiX", 
-                      "ThickGasX", "dFuelNfX", "PtoPDistX", "iCRadX" "cNfX" "iCladX" "iGapX" "MaterHX",
+                      "BoxMatX", "iHpbPinX", "iTyFrictX", "iChCouplX", "iRadHom", "RCoX", "RCiX", 
+                      "ThickGasX", "dFuelNfX", "PtoPDistX", "iCRadX" "NonFuelMat" "iCladX" "iGapX" "MaterHX",
                       "HeatGhX", "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "PtoPDistX", 
-                      "nElems", "xLengt", "cNfX", "iCladX", "iGapX", "zLayer", "nLayer", "TimeProf",
+                      "nElems", "xLengt", "NonFuelMat", "iCladX", "iGapX", "zLayer", "nLayer", "TimeProf",
                       "nTimeProf", "iMatX", "MaterHX", "HeatGhX"]
         for key in setToValue:
             core.FreneticNamelist[key] = -1

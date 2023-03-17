@@ -77,7 +77,10 @@ def writemacro(core, nmix, vel, lambda0, beta0, temps,
     f.write(f'\nlambda0(1:{core.NE.nPre}) = ')
 
     for iprec in range(core.NE.nPre):
-        f.write(f'{ff(lambda0[iprec])},')
+        if iprec == core.NE.nPre-1:
+            f.write(f'{ff(lambda0[iprec])} \n')
+        else:
+            f.write(f'{ff(lambda0[iprec])},')
 
     if core.NE.nDhp > 0:
         f.write(' \n lambdaDHP0(1:1) = 1.000000d+99,\n') # FIXME FIXME FIXME large value for steady state
@@ -88,6 +91,7 @@ def writemacro(core, nmix, vel, lambda0, beta0, temps,
     f.write(f'iSigS(1:{nmix}) = {nmix}*2,\n')
 
     if core.NE.nGrp > 0:
+        # FIXME KERMA should be placed in another if.. statement
         f.write(f'iKERMA(1:{nmix}) = {nmix}*2,\n')
         f.write(f'iSigP(1:{nmix}) = {nmix}*2,\n')
         f.write(f'iDiffP(1:{nmix}) = {nmix}*2,\n')
@@ -97,7 +101,6 @@ def writemacro(core, nmix, vel, lambda0, beta0, temps,
 
     f.write(f'TempFuel0 = {ff(Tf)},\n')
     f.write(f'TempCool0 = {ff(Tc)},\n')
-    f.write(f'iSigS(1:{nmix}) = {nmix}*2,\n')
 
     for imix in range(nmix):
 
