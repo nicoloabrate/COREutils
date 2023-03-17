@@ -205,7 +205,9 @@ class THoutput:
             if 'Unable to open file' in str(err):
                 if not os.path.exists(datapath):
                     raise THoutputError(f"No output in directory {self.NEpath}")
-
+                else:
+                    print()
+                    raise NEOutputError(f"{str(err)}\n{h5path} is probably corrupted!")
         if which in self.distributions:
             if which == "timeDistr":
                 times = cp(np.asarray(fh5["distributions"]["timeDistr"])[()])

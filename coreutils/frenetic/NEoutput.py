@@ -24,7 +24,7 @@ class NEoutput:
 
     # default keys for integral parameters (namelist)
     intout = {'errint': ['NC error', 'LE flux', 'LE shape', 'distortion',
-                         'NC iterations', 'DTF iterations', 'DTR steps'],
+                         'NC iterations', 'DTS iterations', 'DTR steps'],
               'errsol': ['n. outer', 'n. inn./out.', 'error keff',
                          'error flux', 'cpu time', 'comp. type'],
               'geometry': ['x-centre', 'y-centre', 'z-centre', 'volume',
@@ -505,8 +505,8 @@ class NEoutput:
             if not oldfmt:
                 datapath = os.path.join(self.NEpath, "output.h5")
             if isintegral:
-                times = prof[:, 0]
-                y = prof[:, 1]
+                times = self.get('timeDistr')
+                y = prof
             else:
                 if oldfmt:
                     times = np.loadtxt(datapath, comments="#", usecols=(0))
@@ -791,6 +791,7 @@ class NEoutput:
                           'powerneu': 'inferno',
                           'powerpho': 'inferno',
                           'powertot': 'inferno',
+                          'power_radial': 'inferno',
                           'precurs': 'cividis',
                           'precursp': 'cividis',
                           'rrd_efis': 'plasma',
@@ -809,7 +810,8 @@ class NEoutput:
                           'tempfuel': 'coolwarm',
                           'tempcool': 'coolwarm'
                         }
-            cmap = auto_cmap[what]
+            if what in auto_cmap.keys():
+                cmap = auto_cmap[what]
 
         RadialMap(self.core, tallies=tallies, z=z, time=t, pre=pre, gro=gro, grp=grp, 
                   label=label,
