@@ -298,8 +298,8 @@ def fillFreneticNamelist(core):
                       "BoxMatX", "iHpbPinX", "iTyFrictX", "iChCouplX", "iRadHom", "RCoX", "RCiX", 
                       "ThickGasX", "dFuelNfX", "PtoPDistX", "iCRadX" "NonFuelMat" "iCladX" "iGapX" "MaterHX",
                       "HeatGhX", "InBoxInsideX", "InBoxOutsideX", "dWireX", "pWireX", "PtoPDistX", 
-                      "nElems", "xLengt", "NonFuelMat", "iCladX", "iGapX", "zLayer", "nLayer", "TimeProf",
-                      "nTimeProf", "iMatX", "MaterHX", "HeatGhX"]
+                      "nElems", "xLengt", "NonFuelMat", "iCladX", "iGapX", "zLayer", "nLayer", "TimeProfTH",
+                      "nTimeProfTH", "iMatX", "MaterHX", "HeatGhX"]
         for key in setToValue:
             core.FreneticNamelist[key] = -1
 
@@ -464,9 +464,14 @@ def inpgen(core, json):
         # --- get kinetic parameters (equal for each material)
         mat0 = core.NE.data[temp[0]][core.NE.regions[1]]
         vel = 1/mat0.Invv
-        beta0 = mat0.beta
-        lambda0 = mat0.__dict__['lambda']
-
+        if core.NE.NEdata["nPrec"] is None:
+            beta0 = mat0.beta
+            lambda0 = mat0.__dict__['lambda']
+        elif core.NE.NEdata["nPrec"] == 1:
+            beta0 = [mat0.beta_tot]
+            lambda0 = [mat0.__dict__['lambda_tot']]
+        else:
+            raise OSError("Cannot deal with 'nPrec'!=1!")
         # --- write macro.nml
         writemacro(core, nmix, vel, lambda0, beta0,
                    (Tf, Tc), core.NE.regions, H5fmt=2)

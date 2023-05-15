@@ -49,13 +49,18 @@ def writemacro(core, nmix, vel, lambda0, beta0, temps,
 
     nFrenCuts = len(core.NE.AxialConfig.zcuts)-1 if core.dim != 2 else 1
     (Tf, Tc) = temps
+
+    if core.NE.NEdata["nPrec"] is None:
+        nPre = core.NE.nPre
+    else:
+        nPre = core.NE.NEdata["nPrec"]
     # -- write macro.nml file
     asstypeN = 0
     f = io.open('macro.nml', 'w', newline='\n')
     f.write('&MACROXS0\n')
     f.write(f'nMat = {nmix} \n')
     f.write(f'nGro = {core.NE.nGro} \n')
-    f.write(f'nPre = {core.NE.nPre} \n')
+    f.write(f'nPre = {nPre} \n')
     f.write(f'nDhp = {core.NE.nDhp} \n')
     f.write(f'nGrp = {core.NE.nGrp } \n')
     f.write(f'nPrp = {core.NE.nPrp } \n')
@@ -73,11 +78,10 @@ def writemacro(core, nmix, vel, lambda0, beta0, temps,
         # therefore hardcode value
         #for igrp in range(core.NE.nGrp):
         #    f.write('%s,' % ff(velp[igrp]))
+    f.write(f'\nlambda0(1:{nPre}) = ')
 
-    f.write(f'\nlambda0(1:{core.NE.nPre}) = ')
-
-    for iprec in range(core.NE.nPre):
-        if iprec == core.NE.nPre-1:
+    for iprec in range(nPre):
+        if iprec == nPre-1:
             f.write(f'{ff(lambda0[iprec])} \n')
         else:
             f.write(f'{ff(lambda0[iprec])},')
@@ -142,11 +146,11 @@ def writemacro(core, nmix, vel, lambda0, beta0, temps,
                 v = chid[imixF, 0, igro]
             else:
                 v = chid[imixF, igro]
-            f.write(f'\nchiD0({imix+1:d},{igro+1:d},1:{core.NE.nPre:d}) = {core.NE.nPre:d}*{ff(v)},')
+            f.write(f'\nchiD0({imix+1:d},{igro+1:d},1:{nPre:d}) = {nPre:d}*{ff(v)},')
         f.write('\n')
         imixF = imixF+1
-        f.write(f'beta0({imix+1},1:{core.NE.nPre}) = ')
-        for iprec in range(core.NE.nPre):
+        f.write(f'beta0({imix+1},1:{nPre}) = ')
+        for iprec in range(nPre):
             f.write(f'{ff(beta0[iprec])},')
 
         f.write('\n')

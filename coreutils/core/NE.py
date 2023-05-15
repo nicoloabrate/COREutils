@@ -9,6 +9,7 @@ import coreutils.tools.h5 as myh5
 from copy import deepcopy as cp
 # from collections import OrderedDict
 from pathlib import Path
+from collections import OrderedDict
 from coreutils.tools.utils import MyDict
 from coreutils.core.UnfoldCore import UnfoldCore
 from coreutils.core.MaterialData import *
@@ -268,14 +269,143 @@ class NE:
             if fewgrp[0] < fewgrp[0]:
                 fewgrp[np.argsort(-fewgrp)]
 
-            for temp in CI.TfTc:
-                for u in self.data[temp].keys():
-                    if collpath is not None:
-                        spectrum = np.loadtxt(str(collpath.joinpath(self.egridname, f"{u}.txt")))
-                        if spectrum.shape[0] != self.nGro:
-                            raise OSError(f"Cannot collapse to {len(fewgrp)} with {spectrum.shape[0]} groups!")
-                    self.data[temp][u].collapse(fewgrp, spectrum=spectrum, egridname=egridname)
+            # check existence of multiple collapsing spectra
+            if 'config' in NEargs['collapse'].keys():
+                xs_config = NEargs['collapse']['config']
+                # sanity check on xs collapsing times
+                for k in xs_config.keys():
+                    if k not in config.keys():
+                        raise OSError(f"t={k} [s] for collapsing not included in NE config. times!")
+                # sanity check on config times
+                for k in config.keys():
+                    if k not in xs_config.keys():
+                        raise OSError(f"t={k} [s] for collapsing not included in collapsing config. times!")
+                transient = True 
+                nConf = len(xs_config.keys())
+            else:
+                xs_config = {"0.0": collpath}
+                transient = False
 
+            new_config = {}
+            data = {}
+            labels = {}
+            regions = MyDict()
+            assemblytypes = MyDict()
+            assemblylabel = MyDict()
+            if CI.dim != 2:
+                AxialConfig_config = MyDict()
+                AxialConfig_config_str = MyDict() # orderedict
+                AxialConfig_cuts = MyDict()
+                AxialConfig_cutslabels = MyDict()
+                AxialConfig_cutsregions = MyDict()
+                AxialConfig_cutsweights = MyDict()
+                AxialConfig_labels = MyDict()
+                AxialConfig_regions = MyDict()
+
+            nT = 1 # configuration counter
+            for t in xs_config.keys():
+                conf = xs_config[t]
+                # add new regions
+                tf = float(t)
+                new_config[tf] = self.config[tf]+0
+                # get SAs @ t=tf and corresponding universes
+                sa_types = np.unique(self.config[tf])
+                sa_types = sa_types[sa_types != 0]
+                univ_at_t = []
+                # update SA-related objects
+                for sa in sa_types:
+                    sa_name = cp(self.assemblytypes[sa])
+                    if CI.dim != 2:
+                        univ = self.AxialConfig.config_str[sa_name]
+                        univ_str_newT = [f"{u}-T{nT}" for u in univ]
+                        sa_name_new = f"{sa_name}-T{nT}"
+                        AxialConfig_config_str[sa_name_new] = univ_str_newT
+                        n_SA = len(AxialConfig_config_str.keys())
+                        if n_SA == 1:
+                            nU = 0
+                            nR = 1
+                        else:
+                            nU = AxialConfig_config[n_SA-1][-1]
+                            nR = len(AxialConfig_config[n_SA-1])
+                        univ_int_newT = np.arange(nU+1, nU+len(univ_str_newT)+1).tolist()
+                        AxialConfig_config[n_SA] = univ_int_newT
+                        AxialConfig_cuts[sa_name_new] = cp(self.AxialConfig.cuts[sa_name])
+                        AxialConfig_cutsregions[sa_name_new] = cp(self.AxialConfig.cutsregions[sa_name])
+                        AxialConfig_cutslabels[sa_name_new] = cp(self.AxialConfig.cutslabels[sa_name])
+                        AxialConfig_cutsweights[sa_name_new] = cp(self.AxialConfig.cutsweights[sa_name])
+                        # update names of the axial regions
+                        for i, name in enumerate(AxialConfig_cuts[sa_name_new].reg):
+                            AxialConfig_cuts[sa_name_new].reg[i] = f"{name}-T{nT}"
+                            for M in AxialConfig_cutsregions[sa_name_new].keys():
+                                AxialConfig_cutsregions[sa_name_new][M][i] = f"{name}-T{nT}"
+                        for n in range(nR):
+                            regions[n+nU+1] = univ_str_newT[n]
+                            AxialConfig_regions[n+nU+1] = univ_str_newT[n]
+                        assemblytypes[n_SA] = sa_name_new
+                        which = list(self.assemblytypes.values()).index(sa_name)
+                        assemblylabel[n_SA] = self.assemblylabel[which+1]
+                        labels[sa_name_new] = self.labels[sa_name]
+                        AxialConfig_labels[sa_name_new] = self.labels[sa_name]
+                        univ_at_t.extend(univ)
+
+                        # update config
+                        lst = CI.getassemblylist(sa, self.config[tf])
+                        lst = [i-1 for i in lst]
+                        lst = (list(set(lst)))
+                        rows, cols = np.unravel_index(lst, CI.Map.type.shape)
+                        new_config[tf][rows, cols] = n_SA
+                    else:
+                        sa_name_new = f"{sa_name}-T{nT}"
+                        nR = len(assemblytypes.keys())
+                        regions[nR+1] = sa_name_new
+                        assemblytypes[nR+1] = sa_name_new
+                        which = list(self.assemblytypes.values()).index(sa_name)
+                        assemblylabel[nR+1] = cp(self.assemblylabel[which+1])
+                        labels[sa_name_new] = cp(self.labels[sa_name])
+                        univ_at_t.append(sa_name)
+                        # update config
+                        lst = CI.getassemblylist(sa, self.config[tf])
+                        lst = [i-1 for i in lst]
+                        lst = (list(set(lst)))
+                        rows, cols = np.unravel_index(lst, CI.Map.type.shape)
+                        new_config[tf][rows, cols] = nR+1
+
+                for temp in CI.TfTc:
+                    Tf, Tc = temp
+                    if temp not in data.keys():
+                        data[temp] = {}
+                    for u in self.data[temp].keys():
+                        if u in univ_at_t:
+                            new_u = f"{u}-T{nT}"
+                            data[temp][new_u] = cp(self.data[temp][u])
+
+                            if collpath is not None:
+                                fname = str(collpath.joinpath(conf, f"Tf_{Tf:g}_Tc_{Tc:g}", self.egridname, f"{u}.txt"))
+                                if not Path(fname).exists():
+                                    fname = str(collpath.joinpath(conf, f"Tc_{Tc:g}_Tf_{Tf:g}", self.egridname, f"{u}.txt"))
+                                spectrum = np.loadtxt(fname)
+
+                                if spectrum.shape[0] != self.nGro:
+                                    raise NEError(f"Cannot collapse to {len(fewgrp)} with {spectrum.shape[0]} groups!",
+                                                f"Check {fname} file!")
+                            data[temp][new_u].collapse(fewgrp, spectrum=spectrum, egridname=egridname)
+
+                nT += 1
+            # update regions
+            self.config = new_config
+            self.regions = regions
+            if CI.dim != 2:
+                self.AxialConfig.config = AxialConfig_config
+                self.AxialConfig.config_str = AxialConfig_config_str
+                self.AxialConfig.cuts = AxialConfig_cuts
+                self.AxialConfig.cutslabels = AxialConfig_cutslabels
+                self.AxialConfig.cutsweights = AxialConfig_cutsweights
+                self.AxialConfig.cutsregions = AxialConfig_cutsregions
+
+            self.assemblytypes = assemblytypes
+            self.assemblylabel = assemblylabel
+            self.labels = labels
+            self.data = data
             # update attributes in self
             self.nGro = len(fewgrp)-1
             self.energygrid = fewgrp
@@ -440,6 +570,7 @@ class NE:
                     for ipos, coord in self.zcoord.items(): # check in zcoords
                         if tuple(rplZ) == coord:
                             notfound = False
+                            # incuts = True
                             axposapp(ipos)
                             break
                     if notfound: # check in cuts defining axial regions (e.g., from Serpent)
@@ -461,8 +592,12 @@ class NE:
                 if action in atype:
                     regex = rf"\-[0-9]{action}" # TODO test with basename like `IF-1-XXX-1repl`
                     basetype = re.split(regex, atype, maxsplit=1)[0]
-                    newtype = f"{basetype}-{iR}{action}"
-                    oldtype = atype
+                    if action != "crit":
+                        newtype = f"{basetype}-{iR}{action}"
+                        oldtype = atype
+                    else:
+                        newtype = f"{basetype}-{action}"
+                        oldtype = atype
                 else:
                     if action != "crit":
                         newtype = f"{atype}-{iR}{action}"
@@ -511,7 +646,11 @@ class NE:
                         newlab_str = self.labels[newreg_str]
                     else:
                         newreg_int = False
+                        # if action != 'crit':
                         idx = self.AxialConfig.cuts[atype].reg.index(newreg_str)
+                        # else:
+                        #     non_crit_reg = newreg_str.split('-crit')[0]
+                        #     idx = self.AxialConfig.cuts[atype].reg.index(non_crit_reg)
                         newlab_str = self.AxialConfig.cuts[atype].labels[idx]
                 else:
                     raise OSError("'with' key in replacemente must be list or string!")
@@ -542,9 +681,20 @@ class NE:
                         for iz, zc in enumerate(list(zip(loz, upz))):
                             if tuple(rplZ) == zc:
                                 break
-                        reg.insert(iz, newreg_str)
-                        lab.insert(iz, newlab_str)
+                        if action != 'crit':
+                            reg.insert(iz, newreg_str)
+                            lab.insert(iz, newlab_str)
+                        else: # critical region must replace old region
+                            reg[iz] = newreg_str
+                            lab[iz] = newlab_str
+
                         self.AxialConfig.cuts[newtype] = AxialCuts(upz, loz, reg, lab)
+                        cuts = list(zip(cuts.reg, cuts.labels, cuts.loz, cuts.upz))
+                        zr, zl, zw = self.AxialConfig.mapFine2Coarse(cuts, self.AxialConfig.zcuts)
+                        # --- update info for homogenisation
+                        self.AxialConfig.cutsregions[newtype] = zr
+                        self.AxialConfig.cutslabels[newtype] = zl
+                        self.AxialConfig.cutsweights[newtype] = zw
                         # TODO add new data if replaced region is missing
                         # if withreg not in self.data[core.TfTc[0]].keys():
                         #     self.get_material_data([withreg], core, datacheck=datacheck)
@@ -651,6 +801,7 @@ class NE:
         else:
             nt = self.time.index(float(time))
             now = self.time[nt-1]
+            time = self.time[nt]
 
         # --- dict sanity check
         if 'keff' not in prt.keys():
@@ -660,17 +811,21 @@ class NE:
         # get fissile regions
         SA_fiss = self.get_fissile_types(t=now)
         for SA in SA_fiss:
-            SA_reg = self.AxialConfig.config[SA]
+            if hasattr(self, "AxialConfig"):
+                SA_reg = self.AxialConfig.config[SA]
+            else: # 2D object
+                SA_reg = [SA]
+
             for ireg in SA_reg:
                 reg = self.regions[ireg]
-                if "crit" in reg:
-                    # replace
-                    self.replaceSA(core, {reg: f"{reg}-crit"}, now)
-                else:
-                    # perturb Nubar
-                    pert = {"region": reg, "howmuch": [1/keff-1],
-                            "what": "Nubar", "which": "all"}
-                    self.perturb(core, pert, time=now, action="crit")
+                # if "crit" in reg:
+                #     # replace
+                #     self.replaceSA(core, {reg: f"{reg}-crit"}, now)
+                # else:
+                # perturb Nubar
+                pert = {"region": reg, "howmuch": [1/keff-1],
+                        "what": "Nubar", "which": "all"}
+                self.perturb(core, pert, time=time, action="crit")
 
     def perturb(self, core, prt, time=0, sanitycheck=True, isfren=True,
                 action='pert'):
@@ -703,7 +858,10 @@ class NE:
             nt = self.time.index(float(time))
             now = self.time[nt-1]
         
-        zcoord = self.zcoord
+        if core.dim != 2:
+            zcoord = self.zcoord
+        else:
+            zcoord = None
         # loop over perturbations
         for prtdict in prt:
             # check perturbation
@@ -731,11 +889,17 @@ class NE:
             # parse all SAs including the "region" if specified by the user
             if prtdict['which'] == 'all':
                 # determine integer type of SAs according to "region" and "where" keys
-                for iSA, SA_str in enumerate(self.AxialConfig.config_str.keys()):
-                    if prtdict['region'] in self.AxialConfig.config_str[SA_str]:
-                        atype = iSA+1
+                if core.dim != 2:
+                    for iSA, SA_str in enumerate(self.AxialConfig.config_str.keys()):
+                        if prtdict['region'] in self.AxialConfig.config_str[SA_str]:
+                            atype = iSA+1
+                else:
+                    for iSA, SA_str in enumerate(self.assemblytypes.values()):
+                        if SA_str == prtdict['region']:
+                            atype = iSA+1
+
                 prtdict['which'] = core.getassemblylist(atype, config=self.config[now], isfren=isfren)
-            
+
             # arrange which into list of lists according to SA type
             whichlst = {}
             for w in prtdict['which']:
@@ -823,7 +987,12 @@ class NE:
                     self.labels[prtreg] = f"{self.labels[oldreg]}-{action}"
                 # --- define replacement dict to introduce perturbation
                 if core.dim == 2:
-                    repl = {atype: assbly}
+                    # --- update info in object
+                    if prtreg not in self.assemblytypes.keys():
+                        nTypes = len(self.assemblytypes.keys())
+                        self.assemblytypes.update({nTypes+1: prtreg})
+                        self.assemblylabel.update({nTypes+1: prtreg})       
+                    repl = {prtreg: assbly}
                     self.replaceSA(core, repl, time, isfren=isfren)
                 else:
                     repl = {"which": [assbly], "with": [prtreg], "where": [zpert]}
@@ -1011,6 +1180,8 @@ class NE:
             self.NEdata["checktempdep"] = 0
         if "P1consistent" not in self.NEdata.keys():
             self.NEdata["P1consistent"] = 0
+        if "nPrec" not in self.NEdata.keys():
+            self.NEdata["nPrec"] = None
 
         try:
             files = self.NEdata['beginwith']
@@ -1197,3 +1368,7 @@ class NE:
     @property
     def nReg(self):
         return len(self.regions.keys())
+
+
+class NEError(Exception):
+    pass

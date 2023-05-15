@@ -404,8 +404,8 @@ class NEMaterial():
                         tpath = datapath
 
                     if temp:
-                        dirTfTc = f"Tf_{Tf}_Tc_{Tc}"
-                        dirTcTf = f"Tc_{Tc}_Tf_{Tf}"
+                        dirTfTc = f"Tf_{Tf:g}_Tc_{Tc:g}"
+                        dirTcTf = f"Tc_{Tc:g}_Tf_{Tf:g}"
                         if Path(path.join(tpath, dirTfTc)).exists():
                             spath = path.join(tpath, dirTfTc, filename)
                         elif Path(path.join(tpath, dirTcTf)).exists():
@@ -1044,9 +1044,9 @@ class NEMaterial():
         H = len(multigrp)-1
         G = len(fewgrp)-1
         # sanity check
-        if G > H:
-            raise OSError(f'Collapsing failed: few-group structure should \
-                          have less than {H} group')
+        if G >= H:
+            raise OSError(f'Collapsing failed: few-group structure should',
+                          ' have less than {H} group')
         if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
             raise OSError('Collapsing failed: few-group structure'
                           'boundaries do not match with multi-group'
