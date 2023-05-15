@@ -37,7 +37,7 @@ class NEoutput:
                          'lifetimep', 'reactivityp', 'seffp', ],
               'intpow': ['power tot.', 'power fis.', 'power neu.',
                          'power pho.'],
-              'intsrc': ['gro=', 'total', 'totalp']}
+              'intsrc': ['gro=', 'total', 'grp=', 'totalp']}
 
     distrout = ['timeDistr', 'fluxadj', 'fluxadjp', 'fluxdir', 'fluxdirp', 'powerfis',
                 'powerneu', 'powerpho', 'powertot', 'precurs', 'precursp',
@@ -147,7 +147,20 @@ class NEoutput:
         self.NEpath = os.path.join(path, 'NE')
         # looking for core file
         self.core = Core(os.path.join(path, 'core.h5'))
+        self.ngro = self.core.NE.nGro
+        self.ngrp = self.core.NE.nGrp
+        if "nPrec" in self.core.NE.NEdata.keys():
+            self.npre = self.core.NE.NEdata["nPrec"]
+            self.nprp = self.core.NE.nPrp
+        else:
+            self.npre = self.core.NE.nPre
+            self.nprp = self.core.NE.nPrp
 
+        self.nhex = self.core.nAss
+        if self.core.dim != 2:
+            self.nelz = self.core.NE.AxialConfig.splitz.sum()
+        else:
+            self.nelz = 1
         self.integralParameters = NEoutput.intout
         self.distributions = NEoutput.distrout
         self.integralParameters_measure = NEoutput.intout_uom
@@ -156,7 +169,8 @@ class NEoutput:
         try:
             lst = self.integralParameters['intpar']
             idy = lst.index('betaeff(')
-            for i in range(self.core.NE.nPre):
+
+            for i in range(self.npre):
                 self.integralParameters['intpar'].insert(idy, f'betaeff({i+1})')
                 uom = self.integralParameters_measure['intpar'][idy]
                 self.integralParameters_measure['intpar'].insert(idy, uom)
@@ -168,7 +182,7 @@ class NEoutput:
 
             lst = self.integralParameters['intsrc']
             idy = lst.index('gro=')
-            for i in range(self.core.NE.nGro):
+            for i in range(1,self.ngro+1):
                 self.integralParameters['intsrc'].insert(idy, f'gro={i}')
                 uom = self.integralParameters_measure['intsrc'][idy]
                 self.integralParameters_measure['intsrc'].insert(idy, uom)
@@ -180,7 +194,7 @@ class NEoutput:
 
             lst = self.integralParameters['intamp']
             idy = lst.index('ceff(')
-            for i in range(self.core.NE.nPre):
+            for i in range(1, self.npre+1):
                 self.integralParameters['intamp'].insert(idy, f'ceff({i})')
                 uom = self.integralParameters_measure['intamp'][idy]
                 self.integralParameters_measure['intamp'].insert(idy, uom)
@@ -193,7 +207,7 @@ class NEoutput:
         except ValueError:
             pass
 
-    def get(self, which, hex=None, t=None, z=None, pre=None,
+    def get(self, which, t=None, z=None, hex=None, pre=None,
             gro=None, grp=None, prp=None, oldfmt=False):
         """
         Get profile from output.
@@ -231,12 +245,12 @@ class NEoutput:
             which = self.aliases[which]
         elif which in self.post_process_keys:
             if which == "precursTot":
-                pre = np.arange(1, self.core.NE.nPre+1)
+                pre = np.arange(1, self.npre+1)
                 which = "precurs"
                 sum_dims = ["npre", "nelz", "nhex"]
                 tot = True
             elif which == "precurspTot":
-                pre = np.arange(1, self.core.NE.nPrp+1)
+                pre = np.arange(1, self.nprp+1)
                 which = "precursp"
                 sum_dims = ["nprp", "nelz", "nhex"]
                 tot = True
@@ -351,10 +365,14 @@ class NEoutput:
                         if oldfmt:
                             fname = 'intpar.out'
                         idx = []
-                        for p in range(self.core.NE.nPre):
+                        for p in range(self.npre):
                             idx.append(v.index(f'betaeff({p+1})')+skip)
                         notfound = False
                         break
+                elif which == 'time':
+                    idx = skip-1
+                    dictkey = 'intpar'
+                    notfound = False
 
             if notfound:
                 raise NEOutputError(f'{which} not found in data!')
@@ -381,10 +399,21 @@ class NEoutput:
                     x = dimdict[d]
                     if x is None:
                         x = 0 if x == 'ntim' else slice(None)
-
                     dimlst.append(x)
 
-                profile = np.asarray(fh5[dictkey][which])
+                if which == "powertot":
+                    if which not in fh5[dictkey].keys():
+                        ntim = len(np.asarray(fh5[dictkey]["timeDistr"]))
+                        profile = np.zeros((ntim, self.nelz, self.nhex))
+                        for p in ["powerfis", "powerneu", "powerpho"]:
+                            if p in fh5[dictkey].keys():
+                                powr = np.asarray(fh5[dictkey][p])
+                            else:
+                                powr = np.zeros((ntim, self.nelz, self.nhex))
+                            profile += powr
+                else:
+                    profile = np.asarray(fh5[dictkey][which])
+
                 profile = profile[np.ix_(*dimlst)]
 
                 if tot:
@@ -415,6 +444,57 @@ class NEoutput:
             return profile[:]
         else:
             return profile
+
+    def eplot(self, eflx=None, t=None, z=None, hex=None, ax=None,
+              pre=False, title=None, figname=None, egrid=False,
+              lethargynorm=True, logx=True, logy=True, **kwargs, ):
+        """
+        Plot solution along energy for a certain portion of the phase space.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        None.
+
+        """
+        if logx and logy:
+            loglog = True
+        else:
+            loglog = False
+
+        E = self.core.NE.energygrid
+        if eflx is None:
+            raise OSError("TODO: implement automatic space integration")
+
+        if lethargynorm:
+            u = np.log(E[0]/E)
+            eflx = eflx/np.diff(u)
+        ax = ax or plt.gca()
+
+        yr = np.zeros((len(eflx)+1,))
+        yr[0] = eflx[0]
+        yr[1:] = eflx
+
+        plt.step(E, yr, where='pre', **kwargs)
+
+        if loglog or logx:
+            ax.set_xscale('log')
+        if loglog or logy:
+            ax.set_yscale('log')
+
+        if egrid:
+            for e in E:
+                ax.axvline(e, c='k', lw=0.5, ls=':')
+
+        plt.grid(which='both', alpha=0.2)
+        ax.set_xlabel('E [MeV]')
+        if title is not None:
+            plt.title(title)
+        if figname:
+            plt.tight_layout()
+            plt.savefig(f"{figname}.pdf")
 
 
     def plot1D(self, which, gro=None, t=None, grp=None, pre=None, prp=None, ax=None,
@@ -452,12 +532,12 @@ class NEoutput:
                 sty1D = style
 
         if which == "precursTot":
-            pre = np.arange(1, self.core.NE.nPre+1)
+            pre = np.arange(1, self.npre+1)
             which = "precurs"
             sum_dims = ["npre", "nelz", "nhex"]
             tot = True
         elif which == "precurspTot":
-            pre = np.arange(1, self.core.NE.nPrp+1)
+            pre = np.arange(1, self.nprp+1)
             which = "precursp"
             sum_dims = ["nprp", "nelz", "nhex"]
             tot = True
@@ -505,7 +585,10 @@ class NEoutput:
             if not oldfmt:
                 datapath = os.path.join(self.NEpath, "output.h5")
             if isintegral:
-                times = self.get('timeDistr')
+                if which != "precursTot":
+                    times = self.get('time')
+                else:
+                    times = self.get('timeDistr')
                 y = prof
             else:
                 if oldfmt:
@@ -741,7 +824,7 @@ class NEoutput:
             tallies = self.get(what, t=t, z=z, pre=pre, gro=gro, grp=grp)
             tallies = np.squeeze(tallies)
         elif isinstance(what, (np.ndarray)):
-            tallies = what.tolist()
+            tallies = what+0
             what = None
         else:
             raise TypeError('Input must be str, dict or list!')
@@ -770,7 +853,12 @@ class NEoutput:
                 dist = self.post_process_attr[what]
                 uom = self.post_process_uom[idx]
             else:
-                raise NEOutputError(f"Cannot plot {what}!")
+                if what is None:
+                    idx = ""
+                    dist = ""
+                    uom = ""
+                else:
+                    raise NEOutputError(f"Cannot plot {what}!")
 
             uom = uom.replace('**', '^')
             changes = ['-1', '-2', '-3']
@@ -889,18 +977,27 @@ class NEoutput:
             gro = [g-1 for g in gro]
         else:
             gro = np.arange(0, self.core.NE.nGro).tolist()
+
         if grp is not None:
             if isinstance(grp, int):
                 grp = [grp]
             grp = [g-1 for g in grp]
+        else:
+            grp = np.arange(0, self.core.NE.nGrp).tolist()
+
         if pre is not None:
             if isinstance(pre, int):
                 pre = [pre]
             pre = [p-1 for p in pre]
+        else:
+            pre = np.arange(0, self.npre).tolist()
+
         if prp is not None:
             if isinstance(prp, int):
                 prp = [prp]
             prp = [p-1 for p in prp]
+        else:
+            prp = np.arange(0, self.nprp).tolist()
 
         nodes = self.core.NE.AxialConfig.AxNodes if self.core.dim != 2 else np.array([0])
         if z is not None:

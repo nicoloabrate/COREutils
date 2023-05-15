@@ -66,7 +66,10 @@ class THoutput:
     # default keys for integral parameters (namelist)
     inout = ['densOut', 'densIn', 'enthOut', 'enthIn', 'pIn',
              'pOut', 'TOut', 'TIn', 'vIn', 'vOut', 'mdotOut',
-             'mdotIn', 'time']
+             'mdotIn', 
+            #  'time' (currently missing, it should be added despite it would be a copy of `time`
+            #  in the `maximum` group)
+             ]
 
     maximum = ['Tcoolant', 'Tpin_average', 'Tpin_center', 
                'Tpin_surface', 'pressure', 'zMax_pressure',
@@ -85,7 +88,7 @@ class THoutput:
                'vIn': ['Vin', 'vin'], 'vOut': ['Vout', 'vout'],
                'mdotOut': ['mDotout', 'mdotout', 'mDotout'],
                'mdotIn': ['mDotin', 'mdotin', 'mDotin'],
-               'Time': ['time']
+               'time': ['Time']
               }
 
     distrout_attr = {'timeDistr': 'time instant', 
@@ -138,8 +141,8 @@ class THoutput:
                          'q_pin': '[W/m^2]', 'velocity': '[m/s]'}
 
     maximum_uom = {'Tcoolant': '[K]', 'Tpin_average': '[K]', 
-                   'T_pin_center': '[K]', 
-                   'T_pin_surface': '[K]', 
+                   'Tpin_center': '[K]', 
+                   'Tpin_surface': '[K]', 
                    'pressure': '[Pa]',
                    'zMax_pressure': '[m]',
                    'zMax_Tcoolant': '[m]', 'zMax_Tpin_average': '[m]',
@@ -294,7 +297,10 @@ class THoutput:
                 nhex = int((self.core.nAss-1)/6*isSym)+1 if isSym else self.core.nAss
 
                 if hex is not None:
-                    hex = [h-1 for h in hex]
+                    if isinstance(hex, int):
+                        hex = [hex-1]
+                    else:
+                        hex = [h-1 for h in hex]
                 else:
                     if self.core.dim == 1:
                         hex = [0]
@@ -431,6 +437,7 @@ class THoutput:
                 sty1D = style
 
         # check if which is an alias
+        label = which
         for key, alias_list in self.aliases.items():
             if which in alias_list:
                 which = key
@@ -473,9 +480,14 @@ class THoutput:
             times = None # np.array([0])
         else:  # parse time from h5 file
             datapath = os.path.join(self.THpath, "output_TH.h5")
-            times = cp(self.get('timeDistr')[()])
-            if plotvstime:
-                t = times
+            if isdistr:
+                times = cp(self.get('timeDistr')[()])
+                if plotvstime:
+                    t = times
+            else:
+                times = cp(self.get('time')[()])
+                if plotvstime:
+                    t = times
 
         if t is None:
             t = [0]  # initial condition
@@ -497,6 +509,7 @@ class THoutput:
                     x = abscissas
                 else:
                     x = times
+                y = prof
                 lin1, = ax.plot(x, y, **kwargs)
                 ax.set_xlabel(xlabel)
                 if ylabel is None:
