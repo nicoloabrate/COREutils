@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import logging
 import coreutils
-import shutils as sh
+import shutil as sh
 import serpentTools as st
 import matplotlib.pyplot as plt
 from coreutils.tools.utils import uppcasedict, lowcasedict
