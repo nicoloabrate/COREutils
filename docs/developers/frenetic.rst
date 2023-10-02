@@ -26,13 +26,14 @@ Input generation
 
 Output post-processing
 --------------------------------
-.. currentmodule:: coreutils.frenetic
+.. currentmodule:: coreutils.frenetic.NEoutput
 
 .. autoclass:: NEoutput
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__
 
+.. currentmodule:: coreutils.frenetic.THoutput
 .. autoclass:: THoutput
     :members:
     :special-members:
