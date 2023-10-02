@@ -1,5 +1,6 @@
 sphinx>=3.4
 sphinx_rtd_theme
+sphinx-copybutton
 ipykernel
 nbsphinx
 pandas
