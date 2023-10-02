@@ -1,8 +1,10 @@
-h5py
-matplotlib
 numpy
-pytest
-serpenttools
 scipy
+pandas
+matplotlib
+h5py
+pytest
+shutil
 gitpython
 datetime
+serpenttools
