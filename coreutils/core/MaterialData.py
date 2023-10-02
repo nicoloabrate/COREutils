@@ -1,8 +1,10 @@
 import os
 import json
 import numpy as np
+import pandas as pd
 import logging
 import coreutils
+import shutils as sh
 import serpentTools as st
 import matplotlib.pyplot as plt
 from coreutils.tools.utils import uppcasedict, lowcasedict
@@ -11,11 +13,11 @@ from pathlib import Path
 from serpentTools import read
 from serpentTools.settings import rc as rcst
 from copy import deepcopy as copy
-from matplotlib import rc, checkdep_usetex
-
+from matplotlib import rc
 from os.path import join
 
-usetex = checkdep_usetex(True)
+usetex = True if sh.which('latex') else False
+
 rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
 rc("text", usetex=usetex)
 
@@ -173,7 +175,7 @@ def Homogenise(materials, weights, mixname):
         FISPRD += w*mat.Flx*mat.Fiss*mat.Nubar  # fiss. production
 
     nMat = i
-    setattr(homogmat, 'flx', TOTFLX)
+    setattr(homogmat, 'Flx', TOTFLX)
 
     for key in [*collapse_xs, *collapse_xsf]: # loop over data
         for i, name in enumerate(materials.keys()): # sum over sub-regions
@@ -412,7 +414,7 @@ class NEMaterial():
                             path.join(tpath, dirTcTf, filename)
 
                     else:
-                        fname = path.join(tpath, filename)    
+                        fname = path.join(tpath, filename)
                     
                     if '.txt' not in str(fname):
                         fname = f'{str(fname)}.{reader}'
@@ -733,7 +735,7 @@ class NEMaterial():
         what : str
             Type of perturbation. If ``what="density"``, the density of the 
             material is perturbed, otherwise the other data can be perturbed by
-            indicating the data. For instance, ``what="Fiss"`` or ``what="Nubar"`.
+            indicating the data. For instance, ``what="Fiss"`` or ``what="Nubar"``.
         howmuch : list or float
             Magnitude of the perturbation. If list, its length must be equal to
             ``nE``, and the perturbation is applied to each group. If it is a float,
@@ -1030,8 +1032,8 @@ class NEMaterial():
         if spectrum is not None:
             flx = spectrum
         else:
-            if 'Flx' not in self.__dict__.keys():
-                raise OSError('Collapsing failed: weighting flux missing in'
+            if not hasattr(self, 'Flx'):
+                raise OSError('Collapsing failed: weighting flux missing in '
                               f'{self.UniName}')
             else:
                 flx = self.Flx
@@ -1138,9 +1140,8 @@ class NEMaterial():
         return self.Fiss.max() > 0 and self.Nubar.max() > 0
 
 
-class CZdata:
-    """
-    Assign TH material data to the reactor core.
+class CZdata():
+    """Assign Cooling Zones material data to the reactor core.
 
     Parameters
     ----------
@@ -1156,7 +1157,7 @@ class CZdata:
 
     Attributes
     ----------
-    mflow: dict
+    massflowrates: dict
         Dict with mass flow rates. The keys are the cooling zone.
     pressures: dict
         Dict with pressures. The keys are the cooling zone.
@@ -1189,6 +1190,30 @@ class CZdata:
 
 
 class THHexData():
+    """Assign TH material data to the reactor core.
+
+    Parameters
+    ----------
+    which: list
+        List of assemblies assigned to the current type.
+    inpdict: dict
+
+
+    Attributes
+    ----------
+    iHA: list
+        List of assemblies assigned to the current type.
+    frictMult: float
+        Friction factor multiplier
+    htcMult: float
+        Heat Transfer Coefficient multiplier
+    htcCorr: str
+        Heat Transfer Coefficient correlation
+    frictCorr: str
+        Friction factors correlations
+    chanCouplCorr: str
+        Correlation for coupling channels
+    """
     def __init__(self, which, inpdict):
         inpdict = lowcasedict(inpdict)
         # assign assemblies to type 
@@ -1199,6 +1224,7 @@ class THHexData():
         self.htcCorr = inpdict["htc_corr"]
         self.frictCorr = inpdict["frict_corr"]
         self.chanCouplCorr = inpdict["chan_coupling_corr"]
+
 
 class NEMaterialError(Exception):
     pass
