@@ -1,7 +1,7 @@
 # Config file for read the docs
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
 
-version : 2
+version: 2
 build:
   os: "ubuntu-22.04"
   tools:
@@ -18,7 +18,7 @@ formats:
 
 # Configure python environment
 python:
-    version: 3.6
+    version: 3.11
     install:
         - requirements: requirements.txt
         - requirements: docs/requirements.txt
