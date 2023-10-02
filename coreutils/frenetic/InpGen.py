@@ -534,151 +534,146 @@ def auxNE(core, AUXpathNE):
     AUXpathNE : str
         Path to auxiliary NE directory.
     """
-    plotNE = core.NE.plot if hasattr(core.NE, "plot") else None
     # plot configurations
     if core.dim == 3:
         offset = core.Map.fren2serp[1]
         angle = np.radians(60)
         whichSA = None
-        if plotNE is not None:
-            if 'offset' in plotNE.keys():
-                offset = core.Map.fren2serp[plotNE['offset']]
-            if 'angle' in plotNE.keys():
-                angle = plotNE['angle']
-            if 'offset' in plotNE.keys():
-                whichSA = plotNE['whichSA']
 
     AUX_NE_plot = []
     asslabel = core.NE.assemblytypes
     # --- plot core radial configuration
-    if core.dim != 1:
-        for fmt in figfmt:
-            # assembly numbers
-            figname = f'NE-rad-map.{fmt}'
-            AUX_NE_plot.append(figname)
-            RadialMap(core, label=True, fren=True, whichconf="NE", 
-                        legend=True, asstype=True, figname=figname)
-            # radial configurations
-            for itime, t in enumerate(core.NE.time):
-                figname = f'NE-rad-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+    if core.NE.plot['radplot']:
+        if core.dim != 1:
+            for fmt in figfmt:
+                # assembly numbers
+                figname = f'NE-rad-map.{fmt}'
                 AUX_NE_plot.append(figname)
-                RadialMap(core, time=t, label=True, fren=True, 
-                            whichconf="NE", dictname=asslabel,
+                RadialMap(core, label=True, fren=True, whichconf="NE", 
                             legend=True, asstype=True, figname=figname)
-            # --- user-defined custom figures
-            if "plot" in core.NE.__dict__.keys():
-                if "radplot" in core.NE.plot.keys():
-                    for iconf, conf in enumerate(core.NE.plot["radplot"]):
-                        labeldict = None
-                        asstype = True
-                        figname = f'NE-rad-custom{iconf}.{fmt}'
-                        AUX_NE_plot.append(figname)
+                # radial configurations
+                for itime, t in enumerate(core.NE.time):
+                    figname = f'NE-rad-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    AUX_NE_plot.append(figname)
+                    RadialMap(core, time=t, label=True, fren=True, 
+                                whichconf="NE", dictname=asslabel,
+                                legend=True, asstype=True, figname=figname)
+                # --- user-defined custom figures
+                if "plot" in core.NE.__dict__.keys():
+                    if "radplot" in core.NE.plot.keys():
+                        for iconf, conf in enumerate(core.NE.plot["radplot"]):
+                            labeldict = None
+                            asstype = True
+                            figname = f'NE-rad-custom{iconf}.{fmt}'
+                            AUX_NE_plot.append(figname)
 
-                        if "sext" in conf:
-                            whichSA = core.Map.getSAsextant(conf["sext"])
-                        elif "whichSA" in conf:
-                            whichSA = conf["whichSA"]
-                        else:
-                            whichSA = None
-
-                        radtime = conf["time"] if "time" in conf else 0
-
-                        if "labels" in conf:
-                            if len(whichSA) != len(conf["labels"]):
-                                logging.warning("plot: label numbers do not match with whichSA key!")
+                            if "sext" in conf:
+                                whichSA = core.Map.getSAsextant(conf["sext"])
+                            elif "whichSA" in conf:
+                                whichSA = conf["whichSA"]
                             else:
-                                labeldict = {}
-                                for i, l in enumerate(conf["labels"]):
-                                    for j in whichSA[i]:
-                                        labeldict[j] = l
                                 whichSA = None
-                                asstype = False
 
-                        RadialMap(core, time=radtime, label=True, fren=True, 
-                                    whichconf="NE", dictname=labeldict, which=whichSA,
-                                    legend=True, asstype=asstype, figname=figname)
+                            radtime = conf["time"] if "time" in conf else 0
+
+                            if "labels" in conf:
+                                if len(whichSA) != len(conf["labels"]):
+                                    logging.warning("plot: label numbers do not match with whichSA key!")
+                                else:
+                                    labeldict = {}
+                                    for i, l in enumerate(conf["labels"]):
+                                        for j in whichSA[i]:
+                                            labeldict[j] = l
+                                    whichSA = None
+                                    asstype = False
+
+                            RadialMap(core, time=radtime, label=True, fren=True, 
+                                        whichconf="NE", dictname=labeldict, which=whichSA,
+                                        legend=True, asstype=asstype, figname=figname)
 
     # --- plot core axial configurations
-    if core.dim != 2:
-        x0 = []
-        y0 = []
-        sextI = []
-        x0y0 = core.Map.serpcentermap[offset]
-        for n, xy in core.Map.serpcentermap.items():
-            n = core.Map.serp2fren[n]
-            if abs(xy[1]) < 1E-4:
-                x0.append(n)
-            if abs(xy[0]) < 1E-4:
-                y0.append(n)
-            if abs(np.tan(angle) - (xy[1]-x0y0[1])/(xy[0]-x0y0[0])) < 1E-4:
-                sextI.append(n)
-    else:
-        SAs = None
+    if core.NE.plot['axplot']:
+        if core.dim != 2:
+            x0 = []
+            y0 = []
+            sextI = []
+            x0y0 = core.Map.serpcentermap[offset]
+            for n, xy in core.Map.serpcentermap.items():
+                n = core.Map.serp2fren[n]
+                if abs(xy[1]) < 1E-4:
+                    x0.append(n)
+                if abs(xy[0]) < 1E-4:
+                    y0.append(n)
+                if abs(np.tan(angle) - (xy[1]-x0y0[1])/(xy[0]-x0y0[0])) < 1E-4:
+                    sextI.append(n)
+        else:
+            SAs = None
 
-    for fmt in figfmt:
-        for itime, t in enumerate(core.NE.time):
-            if core.dim == 1:
-                figname = f'NE-slab-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-                AUX_NE_plot.append(figname)
-                SlabPlot(core, time=t, figname=figname, )
-                plt.close()
-            elif core.dim == 3:
-                # --- default plot
-                # plot one SA per each kind at each time
-                # add one assembly per type
-                allassbly = []
-                config = core.NE.config[t]
-                lst = np.unique(config.flatten())
-                for l in lst:
-                    if l != 0:
-                        a = core.getassemblylist(l, config, isfren=True)
-                        allassbly.append(min(a))
-                allassbly.sort()
-
-                figname = f'NE-ax-alltypes-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-                AUX_NE_plot.append(figname)
-                AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
-                            figname=figname, legend=True, floating=True)
-                plt.close()
-
-                figname = f'NE-ax-alltypes-splitz-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-                AUX_NE_plot.append(figname)
-                AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
-                                splitz=True, figname=figname, legend=True, floating=True)
-                plt.close()
-
-                # plot y=0 SAs
-                figname = f'NE-ax-x0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-                AUX_NE_plot.append(figname)
-                AxialGeomPlot(core, x0, time=t, fren=True, zcuts=True,
-                            figname=figname, legend=True)
-                plt.close()
-                # plot x=0 SAs
-                figname = f'NE-ax-y0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-                AUX_NE_plot.append(figname)
-                AxialGeomPlot(core, y0, time=t, fren=True, zcuts=True,
-                            figname=figname, legend=True, floating=True)
-                plt.close()
-                # plot along 1st sextant
-                figname = f'NE-ax-sextI-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-                AUX_NE_plot.append(figname)
-                AxialGeomPlot(core, sextI, time=t, fren=True, zcuts=True,
-                            figname=figname, legend=True, floating=True)
-                plt.close()
-                # custom plot
-                if whichSA is not None:
-                    figname = f'NE-ax-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+        for fmt in figfmt:
+            for itime, t in enumerate(core.NE.time):
+                if core.dim == 1:
+                    figname = f'NE-slab-conf{itime}-t{1E3*t:g}_ms.{fmt}'
                     AUX_NE_plot.append(figname)
-                    AxialGeomPlot(core, SAs, time=t, fren=True, zcuts=True,
-                                figname=figname, legend=True)
+                    SlabPlot(core, time=t, figname=figname, )
+                    plt.close()
+                elif core.dim == 3:
+                    # --- default plot
+                    # plot one SA per each kind at each time
+                    # add one assembly per type
+                    allassbly = []
+                    config = core.NE.config[t]
+                    lst = np.unique(config.flatten())
+                    for l in lst:
+                        if l != 0:
+                            a = core.getassemblylist(l, config, isfren=True)
+                            allassbly.append(min(a))
+                    allassbly.sort()
 
-    f = 'configurationsNE.xlsx'
-    try:
-        move(f, join(AUXpathNE, f))
-    except SameFileError:
-        os.remove(join(AUXpathNE, f))
-        logging.warning('Overwriting file {}'.format(f))
-        move(f, join(AUXpathNE, f))
+                    figname = f'NE-ax-alltypes-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    AUX_NE_plot.append(figname)
+                    AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
+                                figname=figname, legend=True, floating=True)
+                    plt.close()
+
+                    figname = f'NE-ax-alltypes-splitz-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    AUX_NE_plot.append(figname)
+                    AxialGeomPlot(core, allassbly, time=t, fren=True, zcuts=True,
+                                    splitz=True, figname=figname, legend=True, floating=True)
+                    plt.close()
+
+                    # plot y=0 SAs
+                    figname = f'NE-ax-x0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    AUX_NE_plot.append(figname)
+                    AxialGeomPlot(core, x0, time=t, fren=True, zcuts=True,
+                                figname=figname, legend=True)
+                    plt.close()
+                    # plot x=0 SAs
+                    figname = f'NE-ax-y0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    AUX_NE_plot.append(figname)
+                    AxialGeomPlot(core, y0, time=t, fren=True, zcuts=True,
+                                figname=figname, legend=True, floating=True)
+                    plt.close()
+                    # plot along 1st sextant
+                    figname = f'NE-ax-sextI-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    AUX_NE_plot.append(figname)
+                    AxialGeomPlot(core, sextI, time=t, fren=True, zcuts=True,
+                                figname=figname, legend=True, floating=True)
+                    plt.close()
+                    # custom plot
+                    if whichSA is not None:
+                        figname = f'NE-ax-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                        AUX_NE_plot.append(figname)
+                        AxialGeomPlot(core, SAs, time=t, fren=True, zcuts=True,
+                                    figname=figname, legend=True)
+
+    if core.NE.worksheet:
+        f = 'configurationsNE.xlsx'
+        try:
+            move(f, join(AUXpathNE, f))
+        except SameFileError:
+            os.remove(join(AUXpathNE, f))
+            logging.warning('Overwriting file {}'.format(f))
+            move(f, join(AUXpathNE, f))
 
     # move files in directory
     for f in AUX_NE_plot:
@@ -700,38 +695,31 @@ def auxTH(core, AUXpathTH):
     AUXpathTH : str
         Path to auxiliary TH directory.
     """
-    # plotTH = core.TH.plotTH
     # plot configurations
     if core.dim == 3:
         offset = core.Map.fren2serp[1]
         angle = np.radians(60)
         whichSA = None
-        # if plotTH is not None:
-        #     if 'offset' in plotTH.keys():
-        #         offset = core.Map.fren2serp[plotTH['offset']]
-        #     if 'angle' in plotTH.keys():
-        #         angle = plotTH['angle']
-        #     if 'offset' in plotTH.keys():
-        #         whichSA = plotTH['whichSA']
 
     AUX_TH_plot = []
     # --- plot core radial configuration
-    if core.dim != 1:
-        for fmt in figfmt:
-            for conftype in ['TH', 'CZ']:
-                asslabel = core.TH.__dict__[f"{conftype}assemblytypes"]
-                # assembly numbers
-                figname = f'{conftype}-rad-map.{fmt}'
-                AUX_TH_plot.append(figname)
-                RadialMap(core, label=True, fren=True, whichconf=conftype, 
-                            legend=True, asstype=True, figname=figname)
-                # radial configurations
-                for itime, t in enumerate(core.TH.__dict__[f"{conftype}time"]):
-                    figname = f'{conftype}-rad-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+    if core.TH.plot['radplot']:
+        if core.dim != 1:
+            for fmt in figfmt:
+                for conftype in ['TH', 'CZ']:
+                    asslabel = core.TH.__dict__[f"{conftype}assemblytypes"]
+                    # assembly numbers
+                    figname = f'{conftype}-rad-map.{fmt}'
                     AUX_TH_plot.append(figname)
-                    RadialMap(core, time=t, label=True, fren=True, 
-                            whichconf=conftype, dictname=asslabel,
-                            legend=True, asstype=True, figname=figname)
+                    RadialMap(core, label=True, fren=True, whichconf=conftype, 
+                                legend=True, asstype=True, figname=figname)
+                    # radial configurations
+                    for itime, t in enumerate(core.TH.__dict__[f"{conftype}time"]):
+                        figname = f'{conftype}-rad-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                        AUX_TH_plot.append(figname)
+                        RadialMap(core, time=t, label=True, fren=True, 
+                                whichconf=conftype, dictname=asslabel,
+                                legend=True, asstype=True, figname=figname)
 
 
     # move files in directory

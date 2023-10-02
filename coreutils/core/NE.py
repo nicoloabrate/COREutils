@@ -313,39 +313,51 @@ class NE:
                 sa_types = sa_types[sa_types != 0]
                 univ_at_t = []
                 # update SA-related objects
+                nReg = 0
                 for sa in sa_types:
                     sa_name = cp(self.assemblytypes[sa])
                     if CI.dim != 2:
                         univ = self.AxialConfig.config_str[sa_name]
-                        univ_str_newT = [f"{u}-T{nT}" for u in univ]
-                        sa_name_new = f"{sa_name}-T{nT}"
+                        univ_str_newT = [f"({u})-T{nT}" for u in univ]
+                        sa_name_new = f"({sa_name})-T{nT}"
                         AxialConfig_config_str[sa_name_new] = univ_str_newT
                         n_SA = len(AxialConfig_config_str.keys())
+                        # FIXME nR
                         if n_SA == 1:
                             nU = 0
-                            nR = 1
+                            nR = len(AxialConfig_config_str[sa_name_new]) # len()  # 1
                         else:
                             nU = AxialConfig_config[n_SA-1][-1]
-                            nR = len(AxialConfig_config[n_SA-1])
-                        univ_int_newT = np.arange(nU+1, nU+len(univ_str_newT)+1).tolist()
-                        AxialConfig_config[n_SA] = univ_int_newT
+                            nR = len(AxialConfig_config_str[sa_name_new])
+                        AxialConfig_config[n_SA] = [-1]*nR
+                        # copy starting objects (only strings change, coordinates are fixed)
                         AxialConfig_cuts[sa_name_new] = cp(self.AxialConfig.cuts[sa_name])
                         AxialConfig_cutsregions[sa_name_new] = cp(self.AxialConfig.cutsregions[sa_name])
                         AxialConfig_cutslabels[sa_name_new] = cp(self.AxialConfig.cutslabels[sa_name])
                         AxialConfig_cutsweights[sa_name_new] = cp(self.AxialConfig.cutsweights[sa_name])
-                        # update names of the axial regions
+                        # update names of the axial regions (assuming that different spectra are used at different times)
                         for i, name in enumerate(AxialConfig_cuts[sa_name_new].reg):
-                            AxialConfig_cuts[sa_name_new].reg[i] = f"{name}-T{nT}"
+                            AxialConfig_cuts[sa_name_new].reg[i] = f"({name})-T{nT}"
                             for M in AxialConfig_cutsregions[sa_name_new].keys():
-                                AxialConfig_cutsregions[sa_name_new][M][i] = f"{name}-T{nT}"
-                        for n in range(nR):
-                            regions[n+nU+1] = univ_str_newT[n]
-                            AxialConfig_regions[n+nU+1] = univ_str_newT[n]
+                                for iCell in range(len(AxialConfig_cutsregions[sa_name_new][M])):
+                                    if AxialConfig_cutsregions[sa_name_new][M][iCell] != 0:
+                                        AxialConfig_cutsregions[sa_name_new][M][iCell] = f"({name})-T{nT}"
+                        for n in range(1, nR+1):
+                            if univ_str_newT[n-1] not in regions.values():
+                                nReg += 1
+                                AxialConfig_config[n_SA][n-1] = nReg
+                                # univ_int_newT = np.arange(nU+1, nU+len(univ_str_newT)+1).tolist()
+                                regions[nReg] = univ_str_newT[n-1]
+                                lbl_key = univ_str_newT[n-1].split(f"-T{nT}")[0][1:-1]
+                                labels[univ_str_newT[n-1]] = self.labels[lbl_key]
+                            else:
+                                AxialConfig_config[n_SA][n-1] = list(regions.values()).index(univ_str_newT[n-1])+1
+
+                            AxialConfig_regions[n+nU+1] = univ_str_newT[n-1]
                         assemblytypes[n_SA] = sa_name_new
                         which = list(self.assemblytypes.values()).index(sa_name)
                         assemblylabel[n_SA] = self.assemblylabel[which+1]
-                        labels[sa_name_new] = self.labels[sa_name]
-                        AxialConfig_labels[sa_name_new] = self.labels[sa_name]
+                        AxialConfig_labels[sa_name_new] = self.AxialConfig.cuts[sa_name].labels
                         univ_at_t.extend(univ)
 
                         # update config
@@ -355,7 +367,7 @@ class NE:
                         rows, cols = np.unravel_index(lst, CI.Map.type.shape)
                         new_config[tf][rows, cols] = n_SA
                     else:
-                        sa_name_new = f"{sa_name}-T{nT}"
+                        sa_name_new = f"({sa_name})-T{nT}"
                         nR = len(assemblytypes.keys())
                         regions[nR+1] = sa_name_new
                         assemblytypes[nR+1] = sa_name_new
@@ -376,7 +388,7 @@ class NE:
                         data[temp] = {}
                     for u in self.data[temp].keys():
                         if u in univ_at_t:
-                            new_u = f"{u}-T{nT}"
+                            new_u = f"({u})-T{nT}"
                             data[temp][new_u] = cp(self.data[temp][u])
 
                             if collpath is not None:
@@ -387,7 +399,7 @@ class NE:
 
                                 if spectrum.shape[0] != self.nGro:
                                     raise NEError(f"Cannot collapse to {len(fewgrp)} with {spectrum.shape[0]} groups!",
-                                                f"Check {fname} file!")
+                                                  f"Check {fname} file!")
                             data[temp][new_u].collapse(fewgrp, spectrum=spectrum, egridname=egridname)
 
                 nT += 1
@@ -411,15 +423,11 @@ class NE:
             self.energygrid = fewgrp
             self.egridname = egridname
 
-        # --- ADD OPTIONAL ARGUMENTS
-        if "axplot" in NEargs and NEargs["axplot"] is not None:
-            if not hasattr(self, "plot"):
-                self.plot = {}
-            self.plot['axplot'] = NEargs["axplot"]
-        if "radplot" in NEargs and NEargs["radplot"] is not None:
-            if not hasattr(self, "plot"):
-                self.plot = {}
-            self.plot['radplot'] = NEargs["radplot"]
+        # --- ADD OPTIONAL OUTPUT ARGUMENTS
+        self.plot = {}
+        self.plot['axplot'] = NEargs["axplot"]
+        self.plot['radplot'] = NEargs["radplot"]
+        self.worksheet = NEargs["worksheet"]
 
     def from_dict(self, inpdict):
         mydicts = ["assemblytypes", "regions", "zcoord", "assemblylabel"]
@@ -743,12 +751,12 @@ class NE:
                             if r in regs[:jReg]:
                                 iMix += 1 
                             # add SAs type
-                            newmixname = f'{atype}{iMix}_{r}'
+                            newmixname = f'{atype}n.{iMix}: {r}'
                             if newmixname not in self.regions.values():
-                                newmix.append(f'{newtype}{iMix}_{r}')
-                                self.regions[self.nReg+1] = f'{newtype}{iMix}_{r}'
-                                self.labels[f'{newtype}{iMix}_{r}'] = f'{lbls[jReg]}'
-                                newaxregions_str[jReg] = f'{newtype}{iMix}_{r}'
+                                newmix.append(f'{newtype}n.{iMix}: {r}')
+                                self.regions[self.nReg+1] = f'{newtype}n.{iMix}: {r}'
+                                self.labels[f'{newtype}n.{iMix}: {r}'] = f'{lbls[jReg]}'
+                                newaxregions_str[jReg] = f'{newtype}n.{iMix}: {r}'
                                 newaxregions[jReg] = self.nReg
                         else:
                             if r not in self.regions.values():
@@ -961,7 +969,7 @@ class NE:
                             if "+" in r:
                                 if oldreg in r:
                                     raise OSError('Cannot perturb region which is both alone and'
-                                                  'in mix! Use separate perturbation cards!')                     
+                                                  ' in mix! Use separate perturbation cards!')                     
                         if izpos == []:  # look in xscuts
                             for i, r in enumerate(self.AxialConfig.cuts[atype].reg):
                                 if r == oldreg:
@@ -1112,17 +1120,17 @@ class NE:
                                 if r in regs[:jReg]:
                                     iMix += 1
                                 # add SAs type
-                                newmixname = f'{newtype}{iMix}_{r}'
+                                newmixname = f'{newtype}:{iMix}:_{r}'
                                 if newmixname not in self.regions.values():
-                                    newmix.append(f'{newtype}{iMix}_{r}')
-                                    self.regions[self.nReg+1] = f'{newtype}{iMix}_{r}'
-                                    self.labels[f'{newtype}{iMix}_{r}'] = f'{lbls[jReg]}'
-                                    newaxregions_str[jReg] = f'{newtype}{iMix}_{r}'
+                                    newmix.append(f'{newtype}:{iMix}:_{r}')
+                                    self.regions[self.nReg+1] = f'{newtype}:{iMix}:_{r}'
+                                    self.labels[f'{newtype}:{iMix}:_{r}'] = f'{lbls[jReg]}'
+                                    newaxregions_str[jReg] = f'{newtype}:{iMix}:_{r}'
                                     newaxregions[jReg] = self.nReg
                                 else:
                                     str2int = self.regions.reverse()
-                                    newaxregions[jReg] = str2int[f'{newtype}_{r}']
-                                    newaxregions_str[jReg] = f"{newtype}_{r}"  # or oldtype?
+                                    newaxregions[jReg] = str2int[f'{newtype}:_{r}']
+                                    newaxregions_str[jReg] = f"{newtype}:_{r}"  # or oldtype?
                             else:
                                 if r not in self.regions.values():
                                     self.regions[self.nReg+1] = r
@@ -1230,9 +1238,9 @@ class NE:
                     for u0 in self.regions.values():
                         if "+" in u0: # homogenisation is needed
                             # identify SA type and subregions
-                            strsplt = re.split(r"\d_", u0, maxsplit=1)
-                            NEty = strsplt[0]
-                            names = re.split(r"\+", strsplt[1])
+                            strsplt = re.split(r"\d: ", u0, maxsplit=1)
+                            NEty = strsplt[0].split("_n.")[0]
+                            names = re.split(r" \+ ", strsplt[1])
                             # parse weights
                             w = np.zeros((len(names), ))
                             for iM, mixname in enumerate(names):

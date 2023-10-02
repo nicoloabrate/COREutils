@@ -144,9 +144,9 @@ def writeNEdata(core, verbose=False, fmt=1):
                             xsdata = FissEn*fiss*1.60217653e-13
                     # save in txt file
                     if 'S0' in data:
-                        tmp = np.array(xsdata.reshape(core.NE.nGro, core.NE.nGro), dtype=np.float)
+                        tmp = np.array(xsdata.reshape(core.NE.nGro, core.NE.nGro), dtype=float)
                     else:
-                        tmp = np.array(xsdata, dtype=np.float)
+                        tmp = np.array(xsdata, dtype=float)
                     txtname = f"{dataname}_{ireg}_{tmpgrp}"
                     mysavetxt_noTemp(txtname, tmp)
 

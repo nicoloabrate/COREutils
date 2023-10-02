@@ -49,7 +49,7 @@ def readfeinput(fname, datamap, NG, matrixfmt=False):
     data = pd.DataFrame([string[0].split() for string in lines]).to_numpy()
     data = data.reshape((data.size, ), order='C')
     data = data[0:n_elem]
-    data = data.astype(np.float)
+    data = data.astype(float)
 
     idx = 0
     for key in datamap:
@@ -133,7 +133,7 @@ def readfearray(fname, datamap):
 
     data = pd.DataFrame([string[0].split() for string in lines]).to_numpy()
     data = data.reshape((data.size, ), order='C')
-    data = data.astype(np.float)
+    data = data.astype(float)
 
     return data
 

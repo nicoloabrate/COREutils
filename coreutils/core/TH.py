@@ -132,16 +132,11 @@ class TH:
             which = CI.getassemblylist(atype, self.THconfig[0], match=True, isfren=True)
             self.THdata[HAtype] = THHexData(which, data)
 
-        # --- ADD OPTIONAL ARGUMENTS
-        if "axplot" in THargs:
-            if not hasattr(self, "thplot"):
-                self.THplot = {}
-            self.THplot['axplot'] = THargs["axplot"]
-
-        if "radplot" in THargs:
-                    if not hasattr(self, "thplot"):
-                        self.THplot = {}
-                    self.THplot['radplot'] = THargs["radplot"]
+        # --- ADD OPTIONAL OUTPUT ARGUMENTS
+        self.plot = {}
+        self.plot['axplot'] = THargs["axplot"]
+        self.plot['radplot'] = THargs["radplot"]
+        self.worksheet = THargs["worksheet"]
 
         if THargs["nelems"] is not None:
             self.nVol = THargs["nelems"]

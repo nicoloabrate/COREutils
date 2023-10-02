@@ -315,7 +315,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                                         # write txt file
                                         mysavetxt(txtname, frendata)
                                     # save in h5 file
-                                    tmp = np.array(frendata, dtype=np.float)
+                                    tmp = np.array(frendata, dtype=float)
                                     fh5.create_dataset(txtname, data=tmp)
 
                     else:
@@ -333,7 +333,7 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                                     # write txt file
                                     mysavetxt(txtname, frendata)
                                 # save in h5 file
-                                tmp = np.array(frendata, dtype=np.float)
+                                tmp = np.array(frendata, dtype=float)
                                 fh5.create_dataset(txtname, data=tmp)
 
     elif H5fmt == 2:
@@ -364,9 +364,9 @@ def writeNEdata(core, verbose=False, txt=False, H5fmt=2):
                             xsdata = FissEn*fiss*1.60217653e-13         
                     # save in h5 file
                     if 'S0' in data:
-                        tmp = np.array(xsdata.reshape(core.NE.nGro, core.NE.nGro), dtype=np.float)
+                        tmp = np.array(xsdata.reshape(core.NE.nGro, core.NE.nGro), dtype=float)
                     else:
-                        tmp = np.array(xsdata, dtype=np.float)
+                        tmp = np.array(xsdata, dtype=float)
 
                     irgrp = f'{ireg}'
                     if irgrp not in fh5_TfTc.keys():
@@ -452,41 +452,43 @@ def writeConfig(core):
     isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
     nAss = int(core.nAss/6*isSym+1) if isSym else core.nAss
     nZ = len(core.NE.AxialConfig.zcuts)-1 if core.dim != 2 else 1
-
-    writer = pd.ExcelWriter("configurationsNE.xlsx", engine='xlsxwriter')
-    workbook=writer.book
+    if core.NE.worksheet:
+        writer = pd.ExcelWriter("configurationsNE.xlsx", engine='xlsxwriter')
+        workbook=writer.book
 
     ax_config = {}
     rad_config = {}
     if core.dim != 1: # write map
         SAnumbers = core.writecorelattice(fname=None, numbers=True, string=False, fren=True)
-        df_geom1 = pd.DataFrame(data=SAnumbers, index=np.arange(1, core.Map.Nx+1),
-                                columns=np.arange(1, core.Map.Ny+1))
-        df_geom1.name = 'HA numbering according to FRENETIC'
+        if core.NE.worksheet:
+            df_geom1 = pd.DataFrame(data=SAnumbers, index=np.arange(1, core.Map.Nx+1),
+                                    columns=np.arange(1, core.Map.Ny+1))
+            df_geom1.name = 'HA numbering according to FRENETIC'
 
     if core.dim != 2:
         z_cuts = np.asarray(core.NE.AxialConfig.zcuts)
         z_centre = (z_cuts[:-1]+z_cuts[1:])/2
         ax_nodes = np.array([z_cuts[:-1], z_cuts[1:], core.NE.AxialConfig.splitz])
-        df_geom2 = pd.DataFrame(data=ax_nodes, index=["upper z", "lower z", "splitz"],
-                                columns=np.arange(1, len(z_cuts)))
-        df_geom2.name = 'Axial subdivision'
+        if core.NE.worksheet:
+            df_geom2 = pd.DataFrame(data=ax_nodes, index=["upper z", "lower z", "splitz"],
+                                    columns=np.arange(1, len(z_cuts)))
+            df_geom2.name = 'Axial subdivision'
 
-    sheetname = 'geometry'
-    worksheet=workbook.add_worksheet(sheetname)
-    writer.sheets[sheetname] = worksheet
+    if core.NE.worksheet:
+        sheetname = 'geometry'
+        worksheet=workbook.add_worksheet(sheetname)
+        writer.sheets[sheetname] = worksheet
+        offset = 0
+        startrow = 1
+        if core.dim != 1:
+            worksheet.write_string(0, 0, df_geom1.name)
+            df_geom1.to_excel(writer, sheet_name=sheetname, startrow=1 , startcol=0)
+            offset = df_geom1.shape[0] + 4
+            startrow = df_geom1.shape[0] + 5
 
-    offset = 0
-    startrow = 1
-    if core.dim != 1:
-        worksheet.write_string(0, 0, df_geom1.name)
-        df_geom1.to_excel(writer, sheet_name=sheetname, startrow=1 , startcol=0)
-        offset = df_geom1.shape[0] + 4
-        startrow = df_geom1.shape[0] + 5
-
-    if core.dim != 2:
-        worksheet.write_string(offset, 0, df_geom2.name)
-        df_geom2.to_excel(writer, sheet_name=sheetname, startrow=startrow, startcol=0)
+        if core.dim != 2:
+            worksheet.write_string(offset, 0, df_geom2.name)
+            df_geom2.to_excel(writer, sheet_name=sheetname, startrow=startrow, startcol=0)
 
     for t in core.NE.time:  # loop over time
         # configuration dicts
@@ -519,33 +521,35 @@ def writeConfig(core):
             f1.write('\n')
 
         # --- write dataframes for human-readable configuration file
-        # dataframes for human-readable configuration file
-        if core.dim != 2:
-            df_ax = pd.DataFrame.from_dict(config_str)
-            df_ax.name = 'Axial configuration'
-            df_ax.index = z_centre
+        if core.NE.worksheet:
+            # dataframes for human-readable configuration file
+            if core.dim != 2:
+                df_ax = pd.DataFrame.from_dict(config_str)
+                df_ax.name = 'Axial configuration'
+                df_ax.index = z_centre
 
-        if core.dim != 1:
-            df_rad = pd.DataFrame.from_dict(rad_config[t])
-            df_rad.name = 'Radial configuration'
-        
-        sheetname = f't={t:.15e} (s)'
-        worksheet=workbook.add_worksheet(sheetname)
-        writer.sheets[sheetname] = worksheet
+            if core.dim != 1:
+                df_rad = pd.DataFrame.from_dict(rad_config[t])
+                df_rad.name = 'Radial configuration'
+            
+            sheetname = f't={t:.15e} (s)'
+            worksheet=workbook.add_worksheet(sheetname)
+            writer.sheets[sheetname] = worksheet
 
-        offset = 0
-        startrow = 1
-        if core.dim != 2:
-            worksheet.write_string(0, 0, df_ax.name)
-            df_ax.to_excel(writer, sheet_name=sheetname, startrow=1 , startcol=1)
-            offset = df_ax.shape[0] + 4
-            startrow = df_ax.shape[0] + 5
+            offset = 0
+            startrow = 1
+            if core.dim != 2:
+                worksheet.write_string(0, 0, df_ax.name)
+                df_ax.to_excel(writer, sheet_name=sheetname, startrow=1 , startcol=1)
+                offset = df_ax.shape[0] + 4
+                startrow = df_ax.shape[0] + 5
 
-        if core.dim != 1:
-            worksheet.write_string(offset, 0, df_rad.name)
-            df_rad.to_excel(writer, sheet_name=sheetname, startrow=startrow, startcol=0)
+            if core.dim != 1:
+                worksheet.write_string(offset, 0, df_rad.name)
+                df_rad.to_excel(writer, sheet_name=sheetname, startrow=startrow, startcol=0)
 
-    writer.save()
+            writer.close()
+            writer.handles = None
 
 
 def makeNEinput(core, H5fmt=2):

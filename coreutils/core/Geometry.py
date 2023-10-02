@@ -74,8 +74,8 @@ class Geometry:
             # TODO add sanity check on axlat
 
             nZ = len(axlat)
-            upz = np.array((nZ,), dtype=float)
-            loz = np.array((nZ,), dtype=float)
+            upz = np.zeros((nZ,), dtype=float)
+            loz = np.zeros((nZ,), dtype=float)
             reg = [None]*nZ
             for iax, s in enumerate(axlat):
                 reg[iax] = s[0]
@@ -199,7 +199,6 @@ class Geometry:
                 if isinstance(v, bytes):
                     v = v.decode()
                 setattr(self, k, v)
-
 
 
 class AssemblyGeometry:
@@ -568,6 +567,8 @@ class AxialConfig:
         xscuts = cuts['xscuts']
         # homogenisation cuts
         self.zcuts = [float(z) for z in cuts['zcuts']]
+        if len(self.zcuts) != len(set(self.zcuts)):
+            raise GeometryError(f"Axial cuts are repeated and/or not sorted --> {cuts['zcuts']}")
         self.zcuts.sort()
 
         self.nZ = len(self.zcuts)-1
@@ -637,8 +638,8 @@ class AxialConfig:
                     else:
                         mystr = val[iz]
                         if mystr != 0: # mix name
-                            regs[iz] = f'{regs[iz]}+{mystr}'
-                            lbls[iz] = f'{lbls[iz]}+{labels[mystr]}'
+                            regs[iz] = f'{regs[iz]} + {mystr}'
+                            lbls[iz] = f'{lbls[iz]} + {labels[mystr]}'
             # make mixture name unique wrt iType and axial coordinates
             iMix = 1
             for jReg, r in enumerate(regs): # axial loop
@@ -647,7 +648,7 @@ class AxialConfig:
                     if r in regs[:jReg]:
                         iMix += 1 
                     # add SAs type
-                    regs[jReg] = f'{asstype}{iMix}_{r}'
+                    regs[jReg] = f'{asstype}_n.{iMix}: {r}'
                     l = lbls[jReg]
                     lbls[jReg] = f'{l}'
             # get unique regions without changing list order
