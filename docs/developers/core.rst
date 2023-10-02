@@ -70,29 +70,31 @@ Map class
 
 MaterialData class
 -----------------------------------
+.. currentmodule:: coreutils.core.MaterialData
 
-.. automodule:: coreutils.core.MaterialData
+.. autoclass:: NEMaterial
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__
 
-.. automodule:: coreutils.core.MaterialData.CZdata
+
+.. autoclass:: CZdata
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__
 
 
-.. automodule:: coreutils.core.MaterialData.THHexData
+.. autoclass:: THHexData
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__
 
-.. automodule:: coreutils.core.NEMaterialError
+.. autoclass:: NEMaterialError
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__
 
-.. automodule:: coreutils.core.MaterialData.THDataError
+.. autoclass:: THDataError
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__

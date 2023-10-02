@@ -12,7 +12,13 @@
 #
 import os
 import sys
-print(os.path.abspath('.'))
+# print(sys.path)
+sys.path.insert(0, os.path.abspath('..'))
+# print(sys.path)
+
+# -- readthedocs -------------------------------------------------------------
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+
 
 # -- Project information -----------------------------------------------------
 
@@ -21,10 +27,11 @@ copyright = "2020, Nicolò Abrate"
 author = "Nicolò Abrate"
 
 # The full version, including alpha/beta/rc tags
-release = '1.0.0'
+release = '0.0.1'
 
 
 # -- General configuration ---------------------------------------------------
+master_doc = 'index'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -78,5 +85,7 @@ nbsphinx_execute_arguments = [
     "--InlineBackend.figure_formats={'svg', 'pdf'}",
     "--InlineBackend.rc={'figure.dpi': 150}"]
 
-import os
-os.environ['COREUTILS_PATH'] = os.path.abspath('../../')
+# import os
+# os.environ['COREUTILS_PATH'] = os.path.abspath('../')
+# print(os.environ['COREUTILS_PATH'])
+# import coreutils
