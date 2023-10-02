@@ -16,7 +16,7 @@ from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 from coreutils.tools.plot import RadialMap
 from coreutils.core import Core
 from matplotlib import rcParams
-rcParams['text.usetex']= True if shutil.which('latex') else False
+rcParams['text.usetex']= True if sh.which('latex') else False
 
 class NEoutput:
     """
