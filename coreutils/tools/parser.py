@@ -36,7 +36,9 @@ setToValue = {
                         'replace': None,
                         'replaceSA': None,
                         'assemblylabel': None,
-                        'axplot': None,
+                        'axplot': False,
+                        'radplot': False,
+                        'worksheet': False,
                       },
                 'TH': {
                         'fren': True,
@@ -50,6 +52,9 @@ setToValue = {
                         'CZlabels': None,
                         'THlabels' : None,
                         'BCs': None,
+                        'axplot': False,
+                        'radplot': False,
+                        'worksheet': False,
                        },
                 "FRENETIC-NML": None
               }
