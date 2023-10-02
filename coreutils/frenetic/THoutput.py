@@ -1,7 +1,8 @@
 import os
 import re
-from copy import deepcopy as cp
 from warnings import catch_warnings
+from copy import deepcopy as cp
+import shutil as sh
 import h5py as h5
 import numpy as np
 import itertools
@@ -16,7 +17,7 @@ from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 from coreutils.tools.plot import RadialMap
 from coreutils.core import Core
 from matplotlib import rcParams
-
+rcParams['text.usetex']= True if sh.which('latex') else False
 
 class THoutput:
     """

@@ -8,6 +8,7 @@ Description: Class to plot data from Serpent calculations.
 import numpy as np
 import math
 import logging
+import shutil as sh
 from numbers import Real
 from collections import OrderedDict
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ from matplotlib.collections import PatchCollection
 from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 from matplotlib import rc, rcParams, colors, cm
 
+rcParams['text.usetex']= True if sh.which('latex') else False
 
 mycols1 = ["#19647e", "#28afb0", "#ee964b", # generated with Coloor
            "#ba324f", "#1f3e9e", "#efd28d",
@@ -398,7 +400,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
 
     if thresh is None:
         thresh = -np.inf
-    elif not isinstance(thresh, (Real, int, np.float)):
+    elif not isinstance(thresh, (Real, int, float)):
         raise TypeError(
             "thresh should be real, not {}".format(type(thresh)))
     # open figure

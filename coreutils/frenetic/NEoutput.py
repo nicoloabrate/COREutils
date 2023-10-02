@@ -6,6 +6,7 @@ import h5py as h5
 import numpy as np
 import itertools
 import logging
+import shutil as sh
 from pathlib import Path
 from numpy.linalg import norm
 import matplotlib.pyplot as plt
@@ -15,7 +16,7 @@ from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 from coreutils.tools.plot import RadialMap
 from coreutils.core import Core
 from matplotlib import rcParams
-
+rcParams['text.usetex']= True if shutil.which('latex') else False
 
 class NEoutput:
     """
@@ -150,13 +151,21 @@ class NEoutput:
         self.ngro = self.core.NE.nGro
         self.ngrp = self.core.NE.nGrp
         if "nPrec" in self.core.NE.NEdata.keys():
-            self.npre = self.core.NE.NEdata["nPrec"]
+            if self.core.NE.NEdata["nPrec"] is None:
+                self.npre = self.core.NE.nPre
+            else:
+                self.npre = self.core.NE.NEdata["nPrec"]
             self.nprp = self.core.NE.nPrp
         else:
             self.npre = self.core.NE.nPre
             self.nprp = self.core.NE.nPrp
 
-        self.nhex = self.core.nAss
+        if hasattr(self.core, "FreneticNamelist"):
+            isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
+        else:
+            isSym = 0
+        self.nhex = int((self.core.nAss-1)/6*isSym)+1 if isSym else self.core.nAss
+
         if self.core.dim != 2:
             self.nelz = self.core.NE.AxialConfig.splitz.sum()
         else:
