@@ -560,7 +560,7 @@ def auxNE(core, AUXpathNE):
                                 legend=True, asstype=True, figname=figname)
                 # --- user-defined custom figures
                 if "plot" in core.NE.__dict__.keys():
-                    if "radplot" in core.NE.plot.keys():
+                    if isinstance(core.NE.plot['radplot'], list):
                         for iconf, conf in enumerate(core.NE.plot["radplot"]):
                             labeldict = None
                             asstype = True
