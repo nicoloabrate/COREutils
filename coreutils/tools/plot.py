@@ -267,9 +267,10 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         if legend:
             handles, labels = plt.gca().get_legend_handles_labels()
             by_label = OrderedDict(zip(labels, handles))
-            plt.legend(by_label.values(), by_label.keys(), ncol=4,
+            plt.legend(by_label.values(), by_label.keys(), ncol=8,
                        loc="upper center", bbox_transform=ax.transData,
-                       bbox_to_anchor=(np.mean(xx), zmin-0.1))
+                       bbox_to_anchor=(np.mean(xx), zmin-0.1),
+                       fontsize=8)
         plt.tight_layout()
         # save figure
         if figname is not None:
