@@ -1,11 +1,10 @@
 import io
 import numpy as np
-from . import templates
 from coreutils.tools.utils import fortranformatter as ff
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticNamelistError
 
 
-def writeCZdata(core):
+def writeBCdata(core):
     """
     Generate TH input data related to cooling zones.
 
@@ -18,29 +17,22 @@ def writeCZdata(core):
     -------
     ``None``
     """
-    input_files = {'mdot.inp': 'massflowrates', 
-                   'tempinl.inp': 'temperatures', 
-                   'pressout.inp': 'pressures',
-                #    FIXME TODO specify outlet/inlet temperatures
-                #    'pressinl.inp': 'pressures_inl'
+    input_files = {'mdot.inp': 'massflowrate', 
+                   'tempinl.inp': 'temperature', 
+                   'pressout.inp': 'pressure',
                    }
     for inp in input_files.keys():
+        what = input_files[inp]
         # generate input .inp
         f = io.open(inp, 'w', newline='\n')
-        f.write(f"{len(core.TH.CZtime)}, \n")
+        f.write(f"{len(core.TH.BCs[what]["time"])}, \n")
         isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
         N = int(core.nAss/6*isSym+1) if isSym else core.nAss
-        for t in core.TH.CZtime:
+        values = core.TH.BCs[what]["values"]
+        for it, t in enumerate(core.TH.BCs[what]["time"]):
             # loop over each assembly
             data = [t]
-            for n in core.Map.fren2serp.keys():
-                if n > N:
-                    break
-                # get data in assembly
-                whichtype = core.getassemblytype(n, core.TH.CZconfig[t], isfren=True)
-                whichtype = core.TH.CZassemblytypes[whichtype]
-                val = core.TH.CZdata.__dict__[input_files[inp]][whichtype]
-                data.append(float(val))
+            data.extend(values[it, :].tolist())
             # write to file
             f.write(f'{ff(data)} \n')
 
@@ -76,7 +68,7 @@ def makeTHinput(core):
         f.write("/\n")
 
 
-def writeTHdata(core):
+def writeHTdata(core):
     """
     Generate TH input data.
 
@@ -95,8 +87,8 @@ def writeTHdata(core):
     isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
     nr = [int(nRadNode*0.6), int(nRadNode*0.2), int(nRadNode*0.2)]
     N = int(core.nAss/6*isSym+1) if isSym else core.nAss
-    for nType in core.TH.THassemblytypes.keys():
-        for nt, t in enumerate(core.TH.THtime):
+    for nType in core.TH.HTassemblytypes.keys():
+        for nt, t in enumerate(core.TH.HTtime):
             # open new file
             f = io.open(f'HA_{nType:02d}_{nt+1:02d}.inp', 'w', newline='\n')
             for namelist in frnnml.files["THdatainput.inp"]:

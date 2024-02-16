@@ -23,7 +23,7 @@ from coreutils.frenetic.InpGen import inpgen, fillFreneticNamelist
 
 class Core:
     """
-    Define NE, TH and CZ core configurations.
+    Define NE and TH core configurations.
 
     Parameters
     ----------
@@ -105,9 +105,9 @@ class Core:
         OSError
             If NE input is not provided
         OSError
-            If CZ and NE assembly map are not consistent
+            If BC and NE assembly map are not consistent
         OSError
-            If CZ and TH assembly map are not consistent
+            If BC and TH assembly map are not consistent
 
         """
         if ".json" not in inpjson:
@@ -217,10 +217,10 @@ class Core:
         # --- TH OBJECT
         if isTH and dim != 1:
             # --- assign TH map
-            assemblynames = THargs['thnames']
+            assemblynames = THargs['htnames']
             nAssTypes = len(assemblynames)
             assemblynames = MyDict(dict(zip(assemblynames, np.arange(1, nAssTypes+1))))
-            THcore = UnfoldCore(THargs['thdata']['filename'], THargs['rotation'], assemblynames).coremap
+            THcore = UnfoldCore(THargs['htdata']['filename'], THargs['rotation'], assemblynames).coremap
             if not hasattr(self, 'Map'):
                 self.Map = Map(THcore, THargs['rotation'], self.Geometry.AssemblyGeometry, inp=tmp.inp)
             if not hasattr(self, 'Nass'):
@@ -231,28 +231,28 @@ class Core:
         # --- NE and TH CONSISTENCY CHECK
         if isNE and isTH:
             # dimensions consistency check
-            CZcore = self.TH.CZconfig[0]
-            if CZcore.shape != NEcore.shape:
+            BCcore = self.TH.BCconfig[0]
+            if BCcore.shape != NEcore.shape:
                 raise OSError("NE and TH core dimensions mismatch:" +
-                              f"{CZcore.shape} vs. {NEcore.shape}")
+                              f"{BCcore.shape} vs. {NEcore.shape}")
 
             # non-zero elements location consistency check
-            tmp1 = cp(CZcore)
+            tmp1 = cp(BCcore)
             tmp1[tmp1 != 0] = 1
 
             tmp2 = cp(NEcore)
             tmp2[tmp2 != 0] = 1
 
-            if THargs['thdata'] is not None:
+            if THargs['htdata'] is not None:
                 tmp3 = cp(THcore)
                 tmp3[tmp3 != 0] = 1
 
             if (tmp1 != tmp2).all():
-                raise OSError("Assembly positions in CZ and NE mismatch. " +
+                raise OSError("Assembly positions in BC and NE mismatch. " +
                               "Check core input file!")
 
             if (tmp1 != tmp3).all():
-                raise OSError("Assembly positions in CZ and TH mismatch. " +
+                raise OSError("Assembly positions in BC and TH mismatch. " +
                               "Check core input file!")
 
         # --- complete FRENETIC namelist and make input, if any

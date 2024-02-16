@@ -78,13 +78,13 @@ MaterialData class
     :exclude-members: __init__, __dict__, __weakref__
 
 
-.. autoclass:: CZdata
+.. autoclass:: BCdata
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__
 
 
-.. autoclass:: THHexData
+.. autoclass:: HTHexData
     :members:
     :special-members:
     :exclude-members: __init__, __dict__, __weakref__

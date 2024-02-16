@@ -136,8 +136,17 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         # assign random colours
         for icol in range(N):
             mycols1.append(np.random.randint(3,))
+
     # color dict
-    asscol = dict(zip(reg, mycols1))
+    if isinstance(core.NE.plot["regionsplot"], dict):
+        # get labels
+        reg_lbl = []
+        for v in core.NE.plot["regionsplot"].values():
+            if v not in reg_lbl:
+                reg_lbl.append(v)
+        asscol = dict(zip(reg_lbl, mycols1))
+    else:
+        asscol = dict(zip(reg, mycols1))
 
     # open figure
     idx = 0
@@ -178,6 +187,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
             zmin = min(loz)
             zmax = max(upz)
             deltaz = upz-loz
+            back_cols = []
             for iz, dz in enumerate(deltaz):
                 # scale coordinate
                 coord = ((x-L/2)*scale, loz[iz]*scale)
@@ -186,9 +196,16 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                 ylo = coord[1] if coord[1] < ylo else ylo
                 xup = coord[0] if coord[0] > xup else xup
                 yup = coord[1] if coord[1] > yup else yup
+                # define legend label
+                if isinstance(core.NE.plot["regionsplot"], dict):
+                    axlabel = core.NE.plot["regionsplot"][lab[iz]]
+                else:
+                    axlabel = lab[iz]
+                # background colors used for b/w decorations (dots and lines)
+                back_cols.append(asscol[axlabel])
                 # define assembly patch
-                asspatch = Rectangle(coord, L, dz, color=asscol[lab[iz]],
-                                    label=lab[iz], ec='k', lw=0.5, **kwargs)
+                asspatch = Rectangle(coord, L, dz, color=asscol[axlabel],
+                                    label=axlabel, ec='k', lw=0.5, **kwargs)
                 ax.add_patch(asspatch)
 
                 if dictname is None:
@@ -198,7 +215,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                             txt = str(core.Map.serp2fren[key])  # translate keys
                         else:
                             txt = str(key)
-                        txtcol = 'w' if isDark(asscol[lab[iz]]) else 'k'
+                        txtcol = 'w' if isDark(asscol[axlabel]) else 'k'
                         plt.text(x*scale, (loz[iz]+dz/2)*scale, txt, ha='center',
                                 va='center', color=txtcol, fontsize=fontsize)
                 else:
@@ -214,11 +231,12 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
             # add my cuts on top of patch
             upz = core.NE.AxialConfig.cuts[asstype].upz
             loz = core.NE.AxialConfig.cuts[asstype].loz
+            nZ = len(upz)
             iz = 0
             if zcuts and 'zcuts' in core.NE.AxialConfig.__dict__.keys():
                 for myz in core.NE.AxialConfig.zcuts:
                     # parse which color is in background
-                    zcol = 'w' if isDark(asscol[lab[iz]]) else 'k'
+                    zcol = 'w' if isDark(asscol[axlabel]) else 'k'
                     plt.hlines(myz*scale, (x-L/2)*scale, (x+L/2)*scale,
                                linestyles='-.', linewidth=0.5, edgecolor=zcol)
                 if myz > loz[iz]:
@@ -226,7 +244,8 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
 
             # add node splitting on top of patch
             if splitz and 'AxNodes' in core.NE.AxialConfig.__dict__.keys():
-                iz1, izn, iz2 = 0, 0, 0
+                iz1, iz2 = 0, 0
+                izn = 0
                 nS = 0
                 iNode = 0
                 for iCut, z1z2 in core.NE.zcoord.items(): # span het. cuts
@@ -241,22 +260,38 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
                         # parse which color is in background
                         if zn1 > upz[iz1]:
                             iz1 += 1
-                        zcol = 'w' if isDark(asscol[lab[iz1]]) else 'k'
+
+                        # define legend label
+                        if isinstance(core.NE.plot["regionsplot"], dict):
+                            axlabel = core.NE.plot["regionsplot"][lab[iz1]]
+                        else:
+                            axlabel = lab[iz1]
+
+                        zcol = 'w' if isDark(asscol[axlabel]) else 'k'
                         plt.hlines(zn1*scale, (x-L/2)*scale, (x+L/2)*scale,
                                    linestyles='-', linewidth=0.1, edgecolor=zcol)
                         # parse which color is in background
-                        zcol = 'w' if isDark(asscol[lab[iz2]]) else 'k'
+                        # define legend label
+                        if isinstance(core.NE.plot["regionsplot"], dict):
+                            axlabel = core.NE.plot["regionsplot"][lab[iz2]]
+                        else:
+                            axlabel = lab[iz2]
+
+                        zcol = 'w' if isDark(asscol[axlabel]) else 'k'
                         plt.hlines(zn2*scale, (x-L/2)*scale, (x+L/2)*scale,
                                    linestyles='-', linewidth=0.1, edgecolor=zcol)
                         if zn2 > upz[iz2]:
                             iz2 += 1
                         # --- plot node center
-                        # parse which color is in background
-                        if node > upz[izn]:
-                            izn += 1
-                        zcol = 'w' if isDark(asscol[lab[izn]]) else 'k'
+                        for izcol in range(izn, nZ):
+                            if node >= loz[izcol] and node <= upz[izcol]:
+                                izn = izcol
+                                break
+
+                        zcol = 'w' if isDark(back_cols[izcol]) else 'k'
                         plt.scatter(x*scale, node*scale, s=1, c=zcol)
                         iNode += 1
+
                     nS = nE
 
         plt.axis('off')
@@ -267,7 +302,7 @@ def AxialGeomPlot(core, which, time=0, label=False, dictname=None,
         if legend:
             handles, labels = plt.gca().get_legend_handles_labels()
             by_label = OrderedDict(zip(labels, handles))
-            plt.legend(by_label.values(), by_label.keys(), ncol=8,
+            plt.legend(by_label.values(), by_label.keys(), ncol=4,
                        loc="upper center", bbox_transform=ax.transData,
                        bbox_to_anchor=(np.mean(xx), zmin-0.1),
                        fontsize=8)
@@ -390,6 +425,10 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
             raise OSError("Need more colours to plot!")
         asscol = dict(zip(coretype, mycols))
 
+    else:
+        if len(tallies.shape) > 1:
+            raise OSError("tallies must have only one dimension!")
+
     # check which variable
     amap = core.Map
     if which is None:  # consider all assemblies
@@ -412,8 +451,8 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
         fig = plt.figure()
         ax = fig.add_subplot(111)
         usetex = True if rcParams['text.usetex'] else False
-        if usetex:
-            rcParams.update({'text.usetex' : False})
+        # if usetex:
+        #     rcParams.update({'text.usetex' : False})
         patches, coord, values = [], [], []
         patchesapp = patches.append
         coordapp = coord.append
@@ -447,8 +486,8 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 # get type
                 if whichconf == 'NE':
                     SAslabels = core.NE.assemblylabel
-                elif whichconf == 'CZ':
-                    SAslabels = core.TH.CZlabels
+                elif whichconf == 'BC':
+                    SAslabels = core.TH.BClabels
                 elif whichconf == 'TH':
                     SAslabels = core.TH.THassemblylabels
 
@@ -470,8 +509,8 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
             if title is None:
                 if whichconf == 'NE':
                     times = np.array(core.NE.time)
-                elif whichconf == 'CZ':
-                    times = np.array(core.TH.CZtime)
+                elif whichconf == 'BC':
+                    times = np.array(core.TH.BCtime)
                 elif whichconf == 'TH':
                     times = np.array(core.TH.THtime)
                 
@@ -479,10 +518,10 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                 if core.dim != 2:
                     nodes = core.NE.AxialConfig.AxNodes if whichconf == 'NE' else core.TH.zcoord
                     idz = np.argmin(abs(z-nodes))
-                    title = f'z={nodes[idz]:.2f} [cm], t={t:.2f} [s]'
+                    title = f'z={nodes[idz]:.2f} [cm], t={time:.2f} [s]'
                 else:
                     if len(times) > 1:
-                        title = f't={t:.2f} [s]'
+                        title = f't={time:.2f} [s]'
                     else:
                         title = None
 

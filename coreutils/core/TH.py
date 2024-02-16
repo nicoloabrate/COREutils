@@ -11,10 +11,9 @@ from copy import deepcopy as cp
 from pathlib import Path
 from coreutils.tools.utils import MyDict
 from coreutils.core.UnfoldCore import UnfoldCore
-from coreutils.core.MaterialData import THHexData, CZdata
+from coreutils.core.MaterialData import HTHexData
 from coreutils.core.Geometry import Geometry, AxialConfig, AxialCuts
-
-
+from coreutils.input.TH_input import *
 class TH:
     """
     Define TH core configurations.
@@ -52,52 +51,66 @@ class TH:
     def _init(self, THargs, CI):
         # parse inp args
         dim = CI.dim  # it could be useful in the future for 1D and 2D cases
-        CZassemblynames = THargs['cznames']
-        CZconfig = THargs['czconfig']
-        THconfig = THargs['thconfig']
-        THdata = THargs['thdata']
+        BCassemblynames = THargs['bcnames']
+        BCconfig = THargs['bcconfig']
+        HTconfig = THargs['htconfig']
+        HTdata = THargs['htdata']
         # sort list
-        assnum = np.arange(1, len(CZassemblynames)+1)
+        assnum = np.arange(1, len(BCassemblynames)+1)
 
-        CZassemblynames = MyDict(dict(zip(CZassemblynames, assnum)))
+        BCassemblynames = MyDict(dict(zip(BCassemblynames, assnum)))
         # define dict between strings and ints for assembly type
-        self.CZassemblytypes = MyDict(dict(zip(assnum, CZassemblynames)))
-        if 'czlabels' not in THargs.values():
-            self.CZlabels = self.CZassemblytypes
+        self.BCassemblytypes = MyDict(dict(zip(assnum, BCassemblynames)))
+        if 'bclabels' not in THargs.values():
+            self.BClabels = self.BCassemblytypes
         else:
-            self.CZlabels = MyDict(dict(zip(assnum, THargs['czlabels'])))
+            self.BClabels = MyDict(dict(zip(assnum, THargs['bclabels'])))
         # define TH core with assembly types
-        CZcore = UnfoldCore(THargs['czfile'], THargs['rotation'], CZassemblynames).coremap
+        BCcore = UnfoldCore(THargs['bcfile'], THargs['rotation'], BCassemblynames).coremap
 
         # --- define THcore
-        THassemblynames = THargs['thnames'].keys()
-        self.THtoGE = THargs['thnames']
-        assnum = np.arange(1, len(THassemblynames)+1)
-        THassemblynames = MyDict(dict(zip(THassemblynames, assnum)))
+        HTassemblynames = THargs['htnames'].keys()
+        self.HTtoGE = THargs['htnames']
+        assnum = np.arange(1, len(HTassemblynames)+1)
+        HTassemblynames = MyDict(dict(zip(HTassemblynames, assnum)))
         # define dict between strings and ints for assembly type
-        self.THassemblytypes = MyDict(dict(zip(assnum, THassemblynames)))
-        if 'assemblylabels' not in THdata.values():
-            self.THassemblylabels = self.THassemblytypes
+        self.HTassemblytypes = MyDict(dict(zip(assnum, HTassemblynames)))
+        if 'assemblylabels' not in HTdata.values():
+            self.HTassemblylabels = self.HTassemblytypes
         else:
-            self.THassemblylabels = MyDict(dict(zip(assnum, THdata['assemblylabels'])))
+            self.HTassemblylabels = MyDict(dict(zip(assnum, HTdata['assemblylabels'])))
 
-        THinp = THdata['filename']
-        tmp = UnfoldCore(THinp, THargs['rotation'], THassemblynames)
-        THcore = tmp.coremap
-        THinp = tmp.inp
+        HTinp = HTdata['filename']
+        tmp = UnfoldCore(HTinp, THargs['rotation'], HTassemblynames)
+        HTcore = tmp.coremap
+        HTinp = tmp.inp
 
-        if THcore.shape != CZcore.shape:
-            raise OSError("CZ and TH core dimensions mismatch!")
+        if HTcore.shape != BCcore.shape:
+            raise OSError("BC and HT core dimensions mismatch!")
 
-        self.CZtime = [0.]
-        self.THtime = [0.]
-        self.CZconfig = {}
-        self.THconfig = {}
-        self.CZconfig[0] = CZcore
-        self.THconfig[0] = THcore
+        self.BCtime = [0.]
+        self.HTtime = [0.]
+        self.BCs = {}
+        self.BCconfig = {}
+        self.HTconfig = {}
+        self.BCconfig[0] = BCcore
+        self.HTconfig[0] = HTcore
+        # --- set initial value of Boundary Conditions
+        self.BCs = {
+                    "massflowrate": {"time": [0.], "values" : np.zeros((1, CI.nAss))},
+                    "temperature": {"time": [0.], "values" : np.zeros((1, CI.nAss))},
+                    "pressure": {"time": [0.], "values" : np.zeros((1, CI.nAss))},
+                    }
+        for n in CI.Map.fren2serp.keys():
+            if n > CI.nAss:
+                break
+            # get data in assembly
+            idx = CI.getassemblytype(n, BCcore, isfren=True) - 1
+            for field in ["massflowrate", "temperature", "pressure"]:
+                self.BCs[field]["values"][0, n-1] = THargs[field][idx]
 
-        # --- build time-dependent TH and CZ core configuration
-        configurations = {'THconfig': THconfig, 'CZconfig': CZconfig}
+        # --- build time-dependent TH and BC core configuration
+        configurations = {'HTconfig': HTconfig, 'BCconfig': BCconfig}
         for name, config in configurations.items():
             configtype = name.split('config')[0]
             if config is not None:
@@ -109,28 +122,18 @@ class TH:
                     else:
                         # set initial condition
                         t = 0
-                    # check operation
-                    if config[time] == {}:  # enforce constant properties
-                        nt = self.__dict__[f"{configtype}time"].index(float(time))
-                        now = self.__dict__[f"{configtype}time"][nt-1]
-                        self.__dict__[name][float(time)] = self.__dict__[name][now]
 
                     if "perturbBCs" in config[time]:
-                        self.perturb(CI, config[time]["perturb"], time, configtype=configtype, isfren=True)
+                        self.perturbBCs(CI, config[time]["perturbBCs"], time=time, isfren=True)
 
                     if "replace" in config[time]:
                         self.replaceSA(CI, config[time]["replace"], time, configtype=configtype, isfren=True)
 
-        # assign material properties
-        cz = CZdata(THargs['massflowrates'], THargs['pressures'], 
-                            THargs['temperatures'], self.CZassemblytypes.values())
-        self.CZdata = cz
-
-        self.THdata = {}
-        for HAtype, data in THdata['data'].items():
-            atype = THassemblynames[HAtype]
-            which = CI.getassemblylist(atype, self.THconfig[0], match=True, isfren=True)
-            self.THdata[HAtype] = THHexData(which, data)
+        self.HTdata = {}
+        for HAtype, data in HTdata['data'].items():
+            atype = HTassemblynames[HAtype]
+            which = CI.getassemblylist(atype, self.HTconfig[0], match=True, isfren=True)
+            self.HTdata[HAtype] = HTHexData(which, data)
 
         # --- ADD OPTIONAL OUTPUT ARGUMENTS
         self.plot = {}
@@ -162,7 +165,7 @@ class TH:
             else:
                 setattr(self, k, v)
 
-    def replaceSA(self, core, repl, time, configtype="CZ", isfren=False):
+    def replaceSA(self, core, repl, time, configtype="BC", isfren=False):
         """
         Replace full assemblies.
 
@@ -178,12 +181,12 @@ class TH:
         ``None``
 
         """
-        if configtype == "CZ":
-            asstypes = self.CZassemblytypes.reverse()
-            config = self.CZconfig
-        elif configtype == "TH":
-            asstypes = self.THassemblytypes.reverse()
-            config = self.THconfig
+        if configtype == "BC":
+            asstypes = self.BCassemblytypes.reverse()
+            config = self.BCconfig
+        elif configtype == "HT":
+            asstypes = self.HTassemblytypes.reverse()
+            config = self.HTconfig
         else:
             raise OSError(f"{configtype} configtype argument unknown!")
         
@@ -220,7 +223,7 @@ class TH:
 
             config[float(time)] = newcore
 
-    def perturbBC(self, core, pertconfig, time, isfren=False):
+    def perturbBCs(self, core, pert, time, isfren=False):
         """
         Spatially perturb cooling zone boundary conditions.
 
@@ -238,61 +241,53 @@ class TH:
         ``None``
 
         """
-        print("TODO: this method is an older version, it should be updated!")
-        # check input type
         try:
-            # check consistency between dz and which
-            if len(pertconfig['which']) != len(pertconfig['what']):
-                raise OSError('Groups of assemblies and perturbations do' +
-                              'not match in TH "BCs"!')
-
-            if len(pertconfig['with']) != len(pertconfig['what']):
-                raise OSError('Each new value in TH "BCs"' +
-                              ' must come with its identifying parameter!')
-
-            pconf = zip(pertconfig['which'], pertconfig['with'],
-                        pertconfig['what'])
-
+            pert =  perturbBCs_obj(**pert)
+        except ValidationError as e:
+            print("ValidationError. Check the .json input file!")
+            raise THError(e.errors())
+        # check input type
+        i_pert = 0
+        for what in pert.model_fields_set:
+            p = pert.__dict__[what]
             newcore = None
-            if float(time) in self.CZconfig.keys():
+            if float(time) in self.BCconfig.keys():
                 now = float(time)
             else:
-                nt = self.CZtime.index(float(time))
-                now = self.CZtime[nt-1]
+                nt = self.BCtime.index(float(time))
+                now = self.BCtime[nt-1]
 
-            p = 0
-            for which, withpar, whatpar in pconf:
-                p = p + 1
-                for assbly in which:
-                    nt = self.CZtime.index(float(time))
-                    atype = core.getassemblytype(assbly, self.CZconfig[now], isfren=isfren)
-                    what = self.CZassemblytypes[atype]
-                    basename = re.split(r"_t\d+.\d+_p\d+", what)[0]
-                    newname = "%s_t%s_p%d" % (basename, time, p)
+            n_tim, n_ass = self.BCs[what]["values"].shape
 
-                    # take region name
-                    if newname not in self.CZassemblytypes.values():
-                        nass = len(self.CZassemblytypes.keys())
-                        self.CZassemblytypes[nass + 1] = newname
-                        # update values inside parameters
-                        self.CZdata.__dict__[whatpar][newname] = withpar
+            if hasattr(p, "func"):
+                for f in p.func:
+                    for func in f.keys():
+                        dt = f[func].dt
+                        var = f[func].variation
 
-                    # replace assembly
-                    if newcore is None:
-                        # take previous time-step configuration
-                        newcore = self.replace(nass+1, assbly, isfren,
-                                               self.CZconfig[now])
-                    else:
-                        # take "newcore"
-                        newcore = self.replace(nass+1, assbly, isfren,
-                                               newcore)
-            # update cooling zones
-            self.CZconfig[float(time)] = newcore
+                        if func == "step" or func == "linear":
+                            if func == "step":
+                                if dt == 0 or dt > 1E-3:
+                                    dt = 1E-12
 
-        except KeyError:
-            raise OSError('"which" and/or "with" and/or "what" keys missing' +
-                          ' in "BCs" in TH!')
+                            self.BCs[what]["time"].append(float(time))
+                            self.BCs[what]["time"].append(float(time)+dt)
+                            tmp = np.zeros((n_tim + 2, n_ass))
+                            # copy previous array
+                            tmp[0:n_tim, :] = self.BCs[what]["values"][:]
+                            # same configuration at t=time
+                            tmp[n_tim, :] = tmp[n_tim-1, :][:]
+                            # perturb at time+dt
+                            tmp[n_tim+1, :] = tmp[n_tim-1, :][:]
+                            for w in p.which[i_pert]:
+                                tmp[n_tim+1, w - 1] = tmp[n_tim+1, w - 1]*(1+var/100)
 
+                            self.BCs[what]["values"] = tmp
+
+                        else:
+                            raise THError(f"{func} type not implemented!")
+
+            i_pert += 1
 
 def meshTH1d(zmin, zmax, nvol, nvolref=None, 
              zminref=None, zmaxref=None):
@@ -360,3 +355,6 @@ def meshTH1d(zmin, zmax, nvol, nvolref=None,
             zcoord[iz] = z0 + axstep[iz]
 
     return zcoord, axstep
+
+class THError(Exception):
+    pass

@@ -1,0 +1,350 @@
+{
+"MapVersion" : {
+                "1.0" : {
+                            "data": {
+                                    "integralParameters": {
+                                                        "errint": ["NC error", "LE flux", "LE shape", "distortion",
+                                                            "NC iterations", "DTS iterations", "DTR steps"],
+                                                        "errsol": ["n. outer", "n. inn./out.", "error keff",
+                                                                    "error flux", "cpu time", "comp. type"],
+                                                        "geometry": ["x-centre", "y-centre", "z-centre", "volume",
+                                                                    "surf-xy", "surf-z"],
+                                                        "intamp": ["amplituden", "ceff[", "[dampn/dt]/ampn",
+                                                                    "amplitudep", "geff[", "[dampp/dt]/ampp"],
+                                                        "inteig": ["eigenvalue dir.", "eigenvalue adj.",
+                                                                    "reactivity"],
+                                                        "intpar": ["lifetimen", "betaeff[", "reactivityn", "seffn",
+                                                                    "lifetimep", "gammaff[", "reactivityp", "seffp"],
+                                                        "intpow": ["power tot.", "power fis.", "power neu.",
+                                                                    "power pho."],
+                                                        "intsrc": ["gro=", "total", "grp=", "totalp"]
+                                                        },
+                                    "distributions": [
+                                                    "timeDistr", "fluxadj", "fluxadjp", "fluxdir", "fluxdirp", 
+                                                    "powerfis", "powerneu", "powerpho", "powertot", "precurs", 
+                                                    "precursp", "rrd_efis", "rrd_fis", "rrd_ker", "rrd_kerp", "rrd_lkg",
+                                                    "rrd_lkgp", "rrd_nfis", "rrd_sct", "rrd_sctp", "rrd_src",
+                                                    "rrd_srcp", "rrd_tot", "rrd_totp", "tempcool", "tempfuel"
+                                                    ]
+                                    },
+                            "metadata": {
+                                    "distributions": { 
+                                                        "description": {
+                                                                        "fluxadj": "neutron adjoint flux",
+                                                                        "fluxadjp": "photon adjoint flux",
+                                                                        "fluxdir": "neutron direct flux",
+                                                                        "fluxdirp": "photon direct flux",
+                                                                        "powerfis": "fission power density",
+                                                                        "powerneu": "KERMA power density",
+                                                                        "powerpho": "photon power density",
+                                                                        "powertot": "total power density",
+                                                                        "precurs": "delayed neutron precursor concentrations",
+                                                                        "precursp": "delayed photon precursor concentrations",
+                                                                        "rrd_efis": "neutron fission energy production rate density",
+                                                                        "rrd_fis": "neutron fission reaction rate density",
+                                                                        "rrd_ker": "neutron kerma energy production rate density",
+                                                                        "rrd_kerp": "photon kerma energy production rate density",
+                                                                        "rrd_lkg": "neutron leakage rate density",
+                                                                        "rrd_lkgp": "photon leakage rate density",
+                                                                        "rrd_nfis": "neutron fission neutron production rate density",
+                                                                        "rrd_sct": "neutron scattering reaction rate density",
+                                                                        "rrd_sctp": "photon scattering reaction rate density",
+                                                                        "rrd_src": "neutron source emission density",
+                                                                        "rrd_srcp": "photon source emission density",
+                                                                        "rrd_tot": "neutron total reaction rate density",
+                                                                        "rrd_totp": "photon total reaction rate density",
+                                                                        "tempfuel": "coolant temperature",
+                                                                        "tempcool": "fuel temperature"
+                                                                        },
+                                                        "dim": {
+                                                                        "fluxadj": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "fluxadjp": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "fluxdir": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "fluxdirp": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "powerfis": ["iTime", "iAxNode", "iHexNode"],
+                                                                        "powerneu": ["iTime", "iAxNode", "iHexNode"],
+                                                                        "powerpho": ["iTime", "iAxNode", "iHexNode"],
+                                                                        "powertot": ["iTime", "iAxNode", "iHexNode"],
+                                                                        "precurs": ["iTime", "Family", "iAxNode", "iHexNode"],
+                                                                        "precursp": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_efis": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_fis": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_ker": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_kerp": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_lkg": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_lkgp": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_nfis": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_sct": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_sctp": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_src": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_srcp": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_tot": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "rrd_totp": ["iTime", "Group", "iAxNode", "iHexNode"],
+                                                                        "tempfuel": ["iTime", "iAxNode", "iHexNode"],
+                                                                        "tempcool": ["iTime", "iAxNode", "iHexNode"]
+                                                                },
+                                                        "uom": {
+                                                                        "fluxadj":  "[cm^{-2}s^{-1}]",
+                                                                        "fluxadjp": "[cm^{-2}s^{-1}]",
+                                                                        "fluxdir":  "[cm^{-2}s^{-1}]",
+                                                                        "fluxdirp": "[cm^{-2}s^{-1}]",
+                                                                        "powerfis": "[Wcm^{-3}]",
+                                                                        "powerneu": "[Wcm^{-3}]",
+                                                                        "powerpho": "[Wcm^{-3}]",
+                                                                        "powertot": "[Wcm^{-3}]",
+                                                                        "precurs":  "[cm^{-3}]",
+                                                                        "precursp": "[cm^{-3}]",
+                                                                        "rrd_efis": "[Wcm^{-3}]",
+                                                                        "rrd_fis":  "[cm^{-3} s^{-1}]",
+                                                                        "rrd_ker":  "[cm^{-3} s^{-1}]",
+                                                                        "rrd_kerp": "[cm^{-3} s^{-1}]",
+                                                                        "rrd_lkg":  "[cm^{-3} s^{-1}]",
+                                                                        "rrd_lkgp": "[cm^{-3} s^{-1}]",
+                                                                        "rrd_nfis": "[cm^{-3} s^{-1}]",
+                                                                        "rrd_sct":  "[cm^{-3} s^{-1}]",
+                                                                        "rrd_sctp": "[cm^{-3} s^{-1}]",
+                                                                        "rrd_src":  "[cm^{-3} s^{-1}]",
+                                                                        "rrd_srcp": "[cm^{-3} s^{-1}]",
+                                                                        "rrd_tot":  "[cm^{-3} s^{-1}]",
+                                                                        "rrd_totp": "[cm^{-3} s^{-1}]",
+                                                                        "tempfuel": "[K]",
+                                                                        "tempcool": "[K]"
+                                                                },
+                                                        "colormap": {
+                                                                        "fluxadj": "Spectral_r",
+                                                                        "fluxadjp": "Spectral_r",
+                                                                        "fluxdir": "Spectral_r",
+                                                                        "fluxdirp": "Spectral_r",
+                                                                        "powerfis": "inferno",
+                                                                        "powerneu": "inferno",
+                                                                        "powerpho": "inferno",
+                                                                        "powertot": "inferno",
+                                                                        "power_radial": "inferno",
+                                                                        "precurs": "cividis",
+                                                                        "precursp": "cividis",
+                                                                        "rrd_efis": "plasma",
+                                                                        "rrd_fis": "plasma",
+                                                                        "rrd_ker": "plasma",
+                                                                        "rrd_kerp": "plasma",
+                                                                        "rrd_lkg": "plasma",
+                                                                        "rrd_lkgp": "plasma",
+                                                                        "rrd_nfis": "plasma",
+                                                                        "rrd_sct": "plasma",
+                                                                        "rrd_sctp": "plasma",
+                                                                        "rrd_src": "plasma",
+                                                                        "rrd_srcp": "plasma",
+                                                                        "rrd_tot": "plasma",
+                                                                        "rrd_totp": "plasma",
+                                                                        "tempfuel": "coolwarm",
+                                                                        "tempcool": "coolwarm"
+                                                                }
+                                                     },
+                                    "integralParameters": {
+                                                        "description": {
+                                                                        "errint": "error of temporal integration algorithm",
+                                                                        "errsol": "error of spatial solution algorithm",
+                                                                        "intamp": "relative amplitudes of flux and precursors",
+                                                                        "inteig": "integral parameters [exact/asymptotic]",
+                                                                        "intpar": "kinetics parameters [integral or perturbation]",
+                                                                        "intpow": "total power and repartition by reaction type",
+                                                                        "intsrc": "integral emission rate of independent source"
+                                                                       },
+                                                        "dim": {},
+                                                        "uom": {
+                                                                        "errint": ["[pcm]", "[-]", "[-]", "[-]", "[-]", "[-]", "[-]", "[-]"],
+                                                                        "errsol": ["[-]", "[-]", "[-]", "[-]", "[-]", "[s]", "[-]"],
+                                                                        "geometry": ["[cm]", "[cm]", "[cm]", "cm^3", "[cm^2]", "[cm^2]"],
+                                                                        "intamp": ["[-]", "[-]", "[s^{-1}]", "[-]", "[-]", "[s^{-1}]"],
+                                                                        "inteig": ["[s]", "[-]", "[-]", "[-]"],
+                                                                        "intpar": ["[s]", "[-]", "[-]", "[s^{-1}]", "[s]", "[-]", "[-]",
+                                                                                   "[s^{-1}]"],
+                                                                        "intpow": ["[W]", "[W]", "[W]", "[W]"],
+                                                                        "intsrc": ["[s^{-1}], [s^{-1}], [s^{-1}], [s^{-1}]"]
+                                                        }
+                                                          }
+                                        },
+                            "alias" : {"keff": "eigenvalue dir.", "k": "eigenvalue dir.", "flux": "fluxdir",
+                                        "keffa": "eigenvalue adj.","adjoint": "fluxadj", "powerdensity": "powertot", 
+                                        "rho": "reactivityn", "intpowtot": "power tot.", "intpowneu": "power neu.", 
+                                        "intpowpho": "power pho.", "intpowfis": "power fis."}
+                       },
+                "2.0" : {
+                            "data" : {
+                                    "distributions": {
+                                                        "neutrons": [
+                                                                    "flux", "flux_adj", "i_current", "o_current", 
+                                                                    "i_current_adj", "o_current_adj", "precursors"
+                                                                    ],
+                                                        "photons": [
+                                                                    "flux", "flux_adj", "i_current", "o_current",
+                                                                    "i_current_adj", "o_current_adj", "precursors"
+                                                                   ],
+                                                        "power_density": ["fission", "neutron_kerma", "photon_kerma", "total"],
+                                                        "reaction_rate_density": {
+                                                                                "neutrons": [
+                                                                                            "fission", "fission_energy", "fission_production",
+                                                                                            "kerma", "leakage", "scattering", "source", "total"
+                                                                                            ],
+                                                                                "photons": [
+                                                                                            "kerma", "leakage", "scattering", "source", "total"
+                                                                                           ]
+                                                                                 },
+                                                        "temperatures": ["fuel", "coolant"],
+                                                        "time": []
+                                                     },
+                                    "integralParameters": {
+                                                        "amplitude": {
+                                                                    "neutrons": [
+                                                                                "flux amplitude (A)", "(dA/dt)/A",
+                                                                                "c_eff_*"
+                                                                                ],
+                                                                    "photons": [
+                                                                                "flux amplitude (A)", "(dA/dt)/A",
+                                                                                "g_eff_*"
+                                                                                ]
+                                                                    },
+                                                        "kinetics": {
+                                                                    "neutrons": [
+                                                                                "reactivity", "effective_lifetime",
+                                                                                 "source_eff", "beta_eff_tot", "beta_eff_*"
+                                                                                ],
+                                                                    "photons": [
+                                                                                "reactivity", "effective_lifetime",
+                                                                                "source_eff", "gamma_eff_tot", "gamma_eff_*"
+                                                                                ]
+                                                                    },
+                                                        "source": {
+                                                                    "neutrons": [
+                                                                                "source total intensity", "source g=*"
+                                                                                ],
+                                                                    "photons": [
+                                                                                "source total intensity", "source g=*"
+                                                                                ]
+                                                                    },
+                                                        "power": ["total", "fission", "neutron_KERMA", "photon_KERMA"],
+                                                        "static": ["reactivity (GPT)", "k-eigenvalue", "k-eigenvalue_adjoint"],
+                                                        "time": {}
+                                                          },
+                                    "restart": {"TODO": []}
+                                     },
+                            "metadata" : {
+                                        "colormap": {
+                                                        "flux": "Spectral_r",
+                                                        "flux_adj": "Spectral_r",
+                                                        "i_current": "Spectral_r",
+                                                        "o_current": "Spectral_r",
+                                                        "i_current_adj": "Spectral_r",
+                                                        "o_current_adj": "Spectral_r",
+                                                        "precursors": "cividis",
+                                                        "power_density/fission": "inferno",
+                                                        "power_density/neutron_kerma": "inferno",
+                                                        "power_density/photon_kerma": "inferno",
+                                                        "power_density/total": "inferno",
+                                                        "power_radial": "inferno",
+                                                        "precursp": "cividis",
+                                                        "temperatures/fuel": "coolwarm",
+                                                        "temperatures/coolant": "coolwarm"
+                                                }
+                                         },
+                            "alias" : {"keff": "k-eigenvalue", "k": "eigenvalue dir.", "fluxdir": "flux", 
+                                       "flux_adjoint": "flux_adj", "fluxadj": "flux_adj", 
+                                       "keffa": "k-eigenvalue_adjoint", "k-eigenvalue adj":"k-eigenvalue_adjoint", "powerdensity": "powertot", 
+                                       "reactivityn": "neutrons/reactivity", "reactivityp": "photons/reactivity", 
+                                       "power tot.": "total", "intpowtot": "total", "intpowneu": "neutron_KERMA", 
+                                       "intpowpho": "photon_KERMA", "intpowfis": "fission"}
+                        }
+             },
+
+"DerivedData" : {
+                "data" : {
+                            "distributions": [
+                                                "global_importance",
+                                                "neutron_density",
+                                                "tot_n_precursors", "tot_p_precursors",
+                                                "radial_power", "radial_n_kerma", "radial_p_kerma", "radial_fission_power",
+                                                "axial_power", "axial_n_kerma", "axial_p_kerma", "axial_fission_power"
+                                             ],
+                           "input_xs": {"chi": "CHIT", "D": "DIFFCOEF", "ESigF": "ESIGF", "nu_xs_f": "NUSF",
+                                        "xs_f": "XS_FISS", "xs_r": "XS_REM", "xs_s": "XS_SCATT", "xs_t": "XS_TOT"}
+                         },
+                "metadata" : {
+                                "description": {
+                                                "global_importance": "node-averaged global importance",
+                                                "neutron_density": "node-averaged neutron density",
+                                                "tot_n_precursors": "node-averaged total precursors density",
+                                                "tot_p_precursors": "node-averaged total precursors density",
+                                                "radial_power": "radial total power density",
+                                                "radial_n_kerma": "radial n-KERMA power density",
+                                                "radial_p_kerma": "radial p-KERMA power density",
+                                                "radial_fission_power": "radial fission power density",
+                                                "axial_power": "axial total power density",
+                                                "axial_n_kerma": "axial n-KERMA power density",
+                                                "axial_p_kerma": "axial p-KERMA power density",
+                                                "axial_fission_power": "axial fission power density",
+                                                "chi": "fission spectrum",
+                                                "D": "diffusion coefficient",
+                                                "ESigF": "energy production XS",
+                                                "nu_xs_f": "fission production XS",
+                                                "xs_f": "fission XS",
+                                                "xs_s": "scattering XS",
+                                                "xs_t": "total XS"
+                                               },
+                                "dim": {
+                                                "global_importance": "[-]",
+                                                "neutron_density": "[cm^{-3}]",
+                                                "tot_n_precursors": "[cm^{-3}]",
+                                                "tot_p_precursors": "[cm^{-3}]",
+                                                "radial_power": "[W]",
+                                                "radial_n_kerma": "[W]",
+                                                "radial_p_kerma": "[W]",
+                                                "radial_fission_power": "[W]",
+                                                "axial_power": "[W/cm]",
+                                                "axial_n_kerma": "[W/cm]",
+                                                "axial_p_kerma": "[W/cm]",
+                                                "axial_fission_power": "[W/cm]",
+                                                "chi": "[-]",
+                                                "D": "[cm]",
+                                                "ESigF": "[1/cm/J]",
+                                                "nu_xs_f": "[1/cm]",
+                                                "xs_f": "[1/cm]",
+                                                "xs_s": "[1/cm]",
+                                                "xs_t": "[1/cm]"
+                                        },
+                                "uom": {
+                                                "global_importance": "[-]",
+                                                "neutron_density": "[cm^{-3}]",
+                                                "tot_n_precursors": "[cm^{-3}]",
+                                                "tot_p_precursors": "[cm^{-3}]",
+                                                "radial_power": "[W]",
+                                                "radial_n_kerma": "[W]",
+                                                "radial_p_kerma": "[W]",
+                                                "radial_fission_power": "[W]",
+                                                "axial_power": "[W/cm]",
+                                                "axial_n_kerma": "[W/cm]",
+                                                "axial_p_kerma": "[W/cm]",
+                                                "axial_fission_power": "[W/cm]",
+                                                "chi": "[-]",
+                                                "D": "[cm]",
+                                                "ESigF": "[1/cm/J]",
+                                                "nu_xs_f": "[1/cm]",
+                                                "xs_f": "[1/cm]",
+                                                "xs_s": "[1/cm]",
+                                                "xs_t": "[1/cm]"
+                                       },
+                                "colormap": {
+                                                "global_importance": "Spectral_r",
+                                                "neutron_density": "Spectral_r",
+                                                "tot_n_precursors": "cividis",
+                                                "tot_p_precursors": "cividis",
+                                                "radial_power": "inferno",
+                                                "radial_n_kerma": "inferno",
+                                                "radial_p_kerma": "inferno",
+                                                "radial_fission_power": "inferno",
+                                                "axial_power": "inferno",
+                                                "axial_n_kerma": "inferno",
+                                                "axial_p_kerma": "inferno",
+                                                "axial_fission_power": "inferno"
+                                        }
+                             }
+               }
+}

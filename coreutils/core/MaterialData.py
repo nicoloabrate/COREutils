@@ -1039,32 +1039,42 @@ class NEMaterial():
                 flx = self.Flx
 
         multigrp = self.energygrid
+        # few_into_multigrp = multigroup_onto_fewgroup(multi_g_grid, few_g_grid[str(case)])
         if isinstance(fewgrp, list):
             fewgrp = np.asarray(fewgrp)
         # ensure descending order
         fewgrp = fewgrp[np.argsort(-fewgrp)]
         H = len(multigrp)-1
         G = len(fewgrp)-1
-        # sanity check
+        # sanity checks
         if G >= H:
-            raise OSError(f'Collapsing failed: few-group structure should',
+            raise MaterialError(f'Collapsing failed: few-group structure should',
                           ' have less than {H} group')
-        if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
-            raise OSError('Collapsing failed: few-group structure'
+        if multigrp[0] != fewgrp[0] or multigrp[-1] != fewgrp[-1]:
+            raise MaterialError('Collapsing failed: few-group structure'
                           'boundaries do not match with multi-group'
                           'one')
+        # map fewgroup onto multigroup
+        few_into_multigrp = np.zeros((G+1,), dtype=int)
+        # multigrp_bin = np.zeros((H+1,), dtype=int)
         for ig, g in enumerate(fewgrp):
-            if g not in multigrp:
-                raise OSError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
+            reldiff = abs(multigrp-g)/g
+            idx = np.argmin(reldiff)
+            if (reldiff[idx] > 1E-5):
+                raise MaterialError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
+            else:
+                few_into_multigrp[ig] = idx
+                # multigrp_bin[idx] = 1
 
-        iS = 0
         collapsed = {}
         collapsed['Flx'] = np.zeros((G, ))
         for g in range(G):
             # select fine groups in g
             G1, G2 = fewgrp[g], fewgrp[g+1]
-            iE = np.argwhere(np.logical_and(multigrp[iS:] < G1,
-                                            multigrp[iS:] >= G2))[-1][0]+iS
+            iS = few_into_multigrp[g]
+            iE = few_into_multigrp[g+1]
+            # iE = np.argwhere(np.logical_and(multigrp[iS:] < G1,
+            #                                 multigrp[iS:] >= G2))[-1][0]+iS
             # compute flux in g
             NC = flx[iS:iE].sum()
             collapsed['Flx'][g] = NC
@@ -1084,13 +1094,14 @@ class NEMaterial():
                         collapsed[key][g] = np.divide(flx[iS:iE].dot(v[iS:iE]), NC, where=NC!=0)
                     else:
                         # --- scattering
-                        iS2 = 0
                         for g2 in range(G):  # arrival group
                             I1, I2 = fewgrp[g2], fewgrp[g2+1]
-                            iE2 = np.argwhere(np.logical_and
-                                              (multigrp[iS2:] < I1,
-                                               multigrp[iS2:] >= I2))
-                            iE2 = iE2[-1][0]+iS2
+                            # iE2 = np.argwhere(np.logical_and
+                            #                   (multigrp[iS2:] < I1,
+                            #                    multigrp[iS2:] >= I2))
+                            # iE2 = iE2[-1][0]+iS2
+                            iS2 = few_into_multigrp[g2]
+                            iE2 = few_into_multigrp[g2+1]
                             s = v[iS:iE, iS2:iE2].sum(axis=0)
                             NCS = flx[iS2:iE2].sum()
                             collapsed[key][g][g2] = np.divide(flx[iS2:iE2].dot(s), NCS, where=NCS!=0)
@@ -1140,56 +1151,7 @@ class NEMaterial():
         return self.Fiss.max() > 0 and self.Nubar.max() > 0
 
 
-class CZdata():
-    """Assign Cooling Zones material data to the reactor core.
-
-    Parameters
-    ----------
-    mflow: list
-        List with mass flow rates, one for each cooling zone.
-    pressures: list
-        List with pressures, one for each cooling zone.
-    temperatures: list
-        List with temperatures, one for each cooling zone.
-    CZassemblynames: list
-        List with cooling zone names, sorted consistently with the
-        physical parameter lists.
-
-    Attributes
-    ----------
-    massflowrates: dict
-        Dict with mass flow rates. The keys are the cooling zone.
-    pressures: dict
-        Dict with pressures. The keys are the cooling zone.
-    temperatures: dict
-        Dict with temperatures. The keys are the cooling zone.
-    """
-
-    def __init__(self, mflow, pressures, temperatures, CZassemblynames):
-        # check length consistency
-        if mflow is not None:
-            if len(mflow) != len(CZassemblynames):
-                raise OSError("The number of mass flow rates must match" +
-                              "with the number of the cooling zones!")
-            else:
-                self.massflowrates = dict(zip(CZassemblynames, mflow))
-
-        if temperatures is not None:
-            if len(temperatures) != len(CZassemblynames):
-                raise OSError("The number of temperatures must match" +
-                              "with the number of the cooling zones!")
-            else:
-                self.temperatures = dict(zip(CZassemblynames, temperatures))
-
-        if pressures is not None:
-            if len(pressures) != len(CZassemblynames):
-                raise OSError("The number of pressures must match" +
-                              "with the number of the cooling zones!")
-            else:
-                self.pressures = dict(zip(CZassemblynames, pressures))
-
-
-class THHexData():
+class HTHexData():
     """Assign TH material data to the reactor core.
 
     Parameters

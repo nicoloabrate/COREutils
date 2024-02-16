@@ -6,7 +6,6 @@ from shutil import rmtree
 import numpy as np
 import pandas as pd
 import h5py as h5
-from . import templates
 from coreutils.tools.utils import fortranformatter as ff
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticNamelistError
 

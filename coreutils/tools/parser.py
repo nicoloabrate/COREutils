@@ -8,7 +8,7 @@ from coreutils.frenetic.frenetic_namelists import FreneticNamelist
 CImandatory = ('Tc', 'Tf')
 GEmandatory = ('dim', 'shape', 'lattice_pitch') # 'lattice_pitch' only if shape!='1D', 'cuts' only in '1D'
 NEmandatory = ('filename', 'assemblynames', 'rotation', 'energygrid', 'cuts')
-THmandatory = ('czfile', 'massflowrates', 'temperatures', 'rotation', 'pressures', 'cznames', 'thdata')
+THmandatory = ('bcfile', 'massflowrate', 'temperature', 'rotation', 'pressure', 'bcnames', 'htdata')
 # TODO add check on data types (e.g., rotation and dim must be integers)
 # set to value in dict if this key is missing
 setToValue = {
@@ -47,10 +47,10 @@ setToValue = {
                         'nelref': None,
                         'zref': None,
                         'zmesh': None,
-                        'THconfig': None,
-                        'CZconfig': None,
-                        'CZlabels': None,
-                        'THlabels' : None,
+                        'HTconfig': None,
+                        'BCconfig': None,
+                        'BClabels': None,
+                        'HTlabels' : None,
                         'BCs': None,
                         'axplot': False,
                         'radplot': False,
@@ -346,10 +346,10 @@ def __parseTH(inp):
             pass
         else:
             # check mandatory args not needed for 1D case
-            if k in ['cznames']:
+            if k in ['bcnames']:
                 # in case of misplelling
-                if 'cznames' in inp.keys():
-                    THargs[k.lower()] = inp['cznames']
+                if 'bcnames' in inp.keys():
+                    THargs[k.lower()] = inp['bcnames']
                 else:
                     raise ParserError(f"Mandatory '{k}' key missing in TH input file!")
             else:
@@ -368,21 +368,21 @@ def __parseTH(inp):
             if "zref" not in THargs:
                 raise ParserError("`zref` list with beginning and end of the mesh refinement zone is missing!")
 
-    thdata = THargs["thdata"]
+    htdata = THargs["htdata"]
     mandatory_args = ["htc_corr", "frict_corr", "chan_coupling_corr"]
 
-    if thdata is not None:
-        if "data" not in thdata.keys():
-            raise ParserError("'data' dict missing in THdata dict in input .json file!")
+    if htdata is not None:
+        if "data" not in htdata.keys():
+            raise ParserError("'data' dict missing in HTdata dict in input .json file!")
         else:
-            if isinstance(thdata["data"], dict):
-                for thtype, v in thdata["data"].items():
+            if isinstance(htdata["data"], dict):
+                for thtype, v in htdata["data"].items():
                     v = lowcasedict(v)
                     for k in mandatory_args:
                         if k.casefold() not in v.keys():
-                            raise ParserError(f"{k} is missing in THdata['data'] dict in input .json!")
+                            raise ParserError(f"{k} is missing in HTdata['data'] dict in input .json!")
             else:
-                raise ParserError("'data' key in THdata dict in input .json should be associated with a dict!")
+                raise ParserError("'data' key in HTdata dict in input .json should be associated with a dict!")
 
     return THargs
 

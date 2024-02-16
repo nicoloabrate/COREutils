@@ -8,12 +8,11 @@ import numpy as np
 from os.path import join
 from datetime import datetime
 from shutil import move, copyfile, SameFileError
-from . import templates
 from coreutils.tools.utils import fortranformatter as ff
 from coreutils.tools.properties import *
 from coreutils.tools.plot import RadialMap, AxialGeomPlot, SlabPlot
 import matplotlib.pyplot as plt
-from .InpTH import writeTHdata, writeCZdata, makeTHinput
+from .InpTH import writeHTdata, writeBCdata, makeTHinput
 from .InpNE import writeConfig, makeNEinput, writemacro, writeNEdata
 import coreutils.tools.h5 as myh5
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticNamelistError
@@ -62,10 +61,11 @@ def fillFreneticNamelist(core):
         isSym = core.FreneticNamelist['isSym']
         N = int(core.nAss/6*isSym+1) if isSym else core.nAss
         try:
-            nDiff = len(core.TH.THdata.keys())
+            nDiff = len(core.TH.HTdata.keys())
         except AttributeError:
             nDiff = len(core.NE.assemblytypes)
-            logging.warn('nDiff variable set equal to the number of NE assemblies')
+            # FIXME FIXME
+            # logging.warn('nDiff variable set equal to the number of NE assemblies')
 
     except AttributeError as err:
         if "object has no attribute 'Map'" in str(err):  # assume 1D core
@@ -96,7 +96,7 @@ def fillFreneticNamelist(core):
     if hasattr(core, "NE"):
         TimeNETHConfig.extend(core.NE.time)
     if hasattr(core, "TH"):
-        TimeNETHConfig.extend(core.TH.CZtime)
+        TimeNETHConfig.extend(core.TH.BCtime)
 
     TimeNETHConfig = list(set(TimeNETHConfig))
 
@@ -119,7 +119,13 @@ def fillFreneticNamelist(core):
             splitz = [1]
             meshz = [0., 0.]
 
-        core.FreneticNamelist['iRun'] = 2 if core.trans else 1
+        if core.trans:
+            core.FreneticNamelist['iRun'] = 2
+        else:
+            if np.isnan(core.FreneticNamelist['iRun']):
+                core.FreneticNamelist['iRun'] = 1
+                
+
         core.FreneticNamelist['nConf'] = len(core.NE.time)
         core.FreneticNamelist['nElez0'] = NZ
         core.FreneticNamelist['Meshz0'] = meshz
@@ -172,10 +178,10 @@ def fillFreneticNamelist(core):
                 # get data in assembly
                 if n > N:
                     break
-                whichtype = core.getassemblytype(n, core.TH.CZconfig[0], isfren=True)
-                whichtype = core.TH.CZassemblytypes[whichtype]
-                Tinl[n-1] = core.TH.CZdata.temperatures[whichtype]
-                mdot[n-1] = core.TH.CZdata.massflowrates[whichtype]
+                whichtype = core.getassemblytype(n, core.TH.BCconfig[0], isfren=True)
+                whichtype = core.TH.BCassemblytypes[whichtype]
+                Tinl[n-1] = core.TH.BCdata.temperatures[whichtype]
+                mdot[n-1] = core.TH.BCdata.massflowrate[whichtype]
 
             # estimate outlet temp. with approx. energy balance
             if core.coolant == 'Pb':
@@ -192,14 +198,14 @@ def fillFreneticNamelist(core):
 
         #  assign THdata in ad hoc keys
         iType = 1
-        for THtype, THdata in core.TH.THdata.items():
+        for HTtype, HTdata in core.TH.HTdata.items():
             core.FreneticNamelist[f'HAType{iType}'] = {}
             HAdict = core.FreneticNamelist[f'HAType{iType}']
-            iHA = [i for i in THdata.iHA if i <= N]
+            iHA = [i for i in HTdata.iHA if i <= N]
             HAdict['iHA'] = iHA
 
             # TODO only one lattice axially, more should be considered
-            GEtype = core.TH.THtoGE[THtype][0]
+            GEtype = core.TH.HTtoGE[HTtype][0]
             latname = core.Geometry.AssemblyType[GEtype].reg[0]
             lattice = core.Geometry.LatticeGeometry[latname]
             # TODO only one pin type per lattice, more should be considered
@@ -250,11 +256,11 @@ def fillFreneticNamelist(core):
             HAdict['iBiBX'] = 0
             HAdict['iCRadX'] = 1 if pin.isAnnular else 0
             # correlations
-            HAdict['FPeakX'] = float(THdata.frictMult)
-            HAdict['QBoxX'] = float(THdata.htcMult)
-            HAdict['iHpbPinX'] = THdata.htcCorr
-            HAdict['iTyFrictX'] = THdata.frictCorr
-            HAdict['iChCouplX'] = THdata.chanCouplCorr
+            HAdict['FPeakX'] = float(HTdata.frictMult)
+            HAdict['QBoxX'] = float(HTdata.htcMult)
+            HAdict['iHpbPinX'] = HTdata.htcCorr
+            HAdict['iTyFrictX'] = HTdata.frictCorr
+            HAdict['iChCouplX'] = HTdata.chanCouplCorr
 
             # TODO TODO material
             HAdict['iFuelX'] = pin.materials[1] if pin.isAnnular else pin.materials[0]
@@ -338,8 +344,8 @@ def fillFreneticNamelist(core):
             for s in lst:
                 frnnml_full[nml][s] = core.FreneticNamelist[s]
         else:
-            for iTHtype, THtype in enumerate(core.TH.THdata.keys()):
-                hatype = f'HAType{iTHtype+1}'
+            for iHTtype, HTtype in enumerate(core.TH.HTdata.keys()):
+                hatype = f'HAType{iHTtype+1}'
                 if hatype not in frnnml_full.keys():
                     frnnml_full[hatype] = {}
                 frnnml_full[hatype][nml] = {}
@@ -499,24 +505,25 @@ def inpgen(core, json):
     if TH:
         THpath = mkdir("TH", casepath)
         THdatapath = mkdir("data", THpath)
-        writeTHdata(core)
+        writeHTdata(core)
         # move TH data files
         pwd = os.getcwd()
         for f in os.listdir(pwd):
             if f.startswith("HA"):
                 move(f, join(THdatapath, f))
 
-        # make CZ input (mdot.txt, temp.txt, pressout.txt, filecool.txt)
+        # make BC input (mdot.txt, temp.txt, pressout.txt, filecool.txt)
         THpath = mkdir("TH", casepath)
-        # write CZ .txt data
-        writeCZdata(core)
+        # write BC .txt data
+        writeBCdata(core)
         # write input.inp
         makeTHinput(core)
         # move TH files
         THfiles = ['mdot.inp', 'pressout.inp', 'tempinl.inp', 'input.inp']
         [move(f, join(THpath, f)) for f in THfiles]
     else:
-        logging.warn('No TH configuration, so HA_xx_xx.inp not written and other data not created!')
+        pass
+        # logging.warn('No TH configuration, so HA_xx_xx.inp not written and other data not created!')
 
     if NE:
         auxNE(core, AUXpathNE)
@@ -706,7 +713,7 @@ def auxTH(core, AUXpathTH):
     if core.TH.plot['radplot']:
         if core.dim != 1:
             for fmt in figfmt:
-                for conftype in ['TH', 'CZ']:
+                for conftype in ['HT', 'BC']:
                     asslabel = core.TH.__dict__[f"{conftype}assemblytypes"]
                     # assembly numbers
                     figname = f'{conftype}-rad-map.{fmt}'

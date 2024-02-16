@@ -157,7 +157,7 @@ class NE:
                     #        if NPp != mat.NPF:
                     #            raise OSError(f'Number of photon precursor families in {k} '
                     #                        'not consistent with the other regions!')
-        
+
             self.nPre = NP
             if isPH:
                 self.nPrp = 0 # FIXME TODO!
@@ -280,11 +280,14 @@ class NE:
                 for k in config.keys():
                     if k not in xs_config.keys():
                         raise OSError(f"t={k} [s] for collapsing not included in collapsing config. times!")
-                transient = True 
+                # transient = True 
                 nConf = len(xs_config.keys())
             else:
-                xs_config = {"0.0": collpath}
-                transient = False
+                if config is None:
+                    xs_config = {"0.0": None}
+                else:
+                    xs_config = dict(zip(config.keys(), [collpath]*len(config.keys())))
+                # transient = False
 
             new_config = {}
             data = {}
@@ -303,6 +306,7 @@ class NE:
                 AxialConfig_regions = MyDict()
 
             nT = 1 # configuration counter
+            nReg = 0
             for t in xs_config.keys():
                 conf = xs_config[t]
                 # add new regions
@@ -313,7 +317,6 @@ class NE:
                 sa_types = sa_types[sa_types != 0]
                 univ_at_t = []
                 # update SA-related objects
-                nReg = 0
                 for sa in sa_types:
                     sa_name = cp(self.assemblytypes[sa])
                     if CI.dim != 2:
@@ -342,6 +345,7 @@ class NE:
                                 for iCell in range(len(AxialConfig_cutsregions[sa_name_new][M])):
                                     if AxialConfig_cutsregions[sa_name_new][M][iCell] != 0:
                                         AxialConfig_cutsregions[sa_name_new][M][iCell] = f"({name})-T{nT}"
+
                         for n in range(1, nR+1):
                             if univ_str_newT[n-1] not in regions.values():
                                 nReg += 1
@@ -354,6 +358,7 @@ class NE:
                                 AxialConfig_config[n_SA][n-1] = list(regions.values()).index(univ_str_newT[n-1])+1
 
                             AxialConfig_regions[n+nU+1] = univ_str_newT[n-1]
+
                         assemblytypes[n_SA] = sa_name_new
                         which = list(self.assemblytypes.values()).index(sa_name)
                         assemblylabel[n_SA] = self.assemblylabel[which+1]
@@ -400,6 +405,8 @@ class NE:
                                 if spectrum.shape[0] != self.nGro:
                                     raise NEError(f"Cannot collapse to {len(fewgrp)} with {spectrum.shape[0]} groups!",
                                                   f"Check {fname} file!")
+                            # FIXME
+                            self.P1consistent = False
                             data[temp][new_u].collapse(fewgrp, spectrum=spectrum, egridname=egridname)
 
                 nT += 1
@@ -427,6 +434,13 @@ class NE:
         self.plot = {}
         self.plot['axplot'] = NEargs["axplot"]
         self.plot['radplot'] = NEargs["radplot"]
+        # FIXME TODO temporary patch
+        for v in self.labels.values():
+            if v not in NEargs["regionsplot"]:
+                NEargs["regionsplot"][v] = v
+        self.plot['regionsplot'] = NEargs["regionsplot"]
+
+
         self.worksheet = NEargs["worksheet"]
 
     def from_dict(self, inpdict):
@@ -751,12 +765,12 @@ class NE:
                             if r in regs[:jReg]:
                                 iMix += 1 
                             # add SAs type
-                            newmixname = f'{atype}n.{iMix}: {r}'
+                            newmixname = f'{atype}:n.{iMix}: {r}'
                             if newmixname not in self.regions.values():
-                                newmix.append(f'{newtype}n.{iMix}: {r}')
-                                self.regions[self.nReg+1] = f'{newtype}n.{iMix}: {r}'
-                                self.labels[f'{newtype}n.{iMix}: {r}'] = f'{lbls[jReg]}'
-                                newaxregions_str[jReg] = f'{newtype}n.{iMix}: {r}'
+                                newmix.append(f'{newtype}:n.{iMix}: {r}')
+                                self.regions[self.nReg+1] = f'{newtype}:n.{iMix}: {r}'
+                                self.labels[f'{newtype}:n.{iMix}: {r}'] = f'{lbls[jReg]}'
+                                newaxregions_str[jReg] = f'{newtype}:n.{iMix}: {r}'
                                 newaxregions[jReg] = self.nReg
                         else:
                             if r not in self.regions.values():
@@ -813,7 +827,7 @@ class NE:
 
         # --- dict sanity check
         if 'keff' not in prt.keys():
-            raise OSError(f'Mandatoy key `keff` missing in ''critical'' card for t={time} s')
+            raise OSError(f'Mandatory key `keff` missing in ''critical'' card for t={time} s')
         else:
             keff = prt['keff']
         # get fissile regions
@@ -831,9 +845,14 @@ class NE:
                 #     self.replaceSA(core, {reg: f"{reg}-crit"}, now)
                 # else:
                 # perturb Nubar
-                pert = {"region": reg, "howmuch": [1/keff-1],
-                        "what": "Nubar", "which": "all"}
-                self.perturb(core, pert, time=time, action="crit")
+                # check that reg is fissile
+                for temp in core.TfTc:
+                    if reg in self.data[temp].keys():
+                        if self.data[temp][reg].isfiss():
+                            pert = {"region": reg, "howmuch": [1/keff-1],
+                                    "what": "Nubar", "which": "all"}
+                            self.perturb(core, pert, time=time, action="crit")
+                    break # just to perform the check
 
     def perturb(self, core, prt, time=0, sanitycheck=True, isfren=True,
                 action='pert'):
@@ -999,7 +1018,7 @@ class NE:
                     if prtreg not in self.assemblytypes.keys():
                         nTypes = len(self.assemblytypes.keys())
                         self.assemblytypes.update({nTypes+1: prtreg})
-                        self.assemblylabel.update({nTypes+1: prtreg})       
+                        self.assemblylabel.update({nTypes+1: prtreg})
                     repl = {prtreg: assbly}
                     self.replaceSA(core, repl, time, isfren=isfren)
                 else:
@@ -1120,17 +1139,17 @@ class NE:
                                 if r in regs[:jReg]:
                                     iMix += 1
                                 # add SAs type
-                                newmixname = f'{newtype}:{iMix}:_{r}'
+                                newmixname = f'{newtype}:n.{iMix}: {r}'
                                 if newmixname not in self.regions.values():
-                                    newmix.append(f'{newtype}:{iMix}:_{r}')
-                                    self.regions[self.nReg+1] = f'{newtype}:{iMix}:_{r}'
-                                    self.labels[f'{newtype}:{iMix}:_{r}'] = f'{lbls[jReg]}'
-                                    newaxregions_str[jReg] = f'{newtype}:{iMix}:_{r}'
+                                    newmix.append(f'{newtype}:n.{iMix}: {r}')
+                                    self.regions[self.nReg+1] = f'{newtype}:n.{iMix}: {r}'
+                                    self.labels[f'{newtype}:n.{iMix}: {r}'] = f'{lbls[jReg]}'
+                                    newaxregions_str[jReg] = f'{newtype}:n.{iMix}: {r}'
                                     newaxregions[jReg] = self.nReg
                                 else:
                                     str2int = self.regions.reverse()
-                                    newaxregions[jReg] = str2int[f'{newtype}:_{r}']
-                                    newaxregions_str[jReg] = f"{newtype}:_{r}"  # or oldtype?
+                                    newaxregions[jReg] = str2int[f'{newtype}: {r}']
+                                    newaxregions_str[jReg] = f"{newtype}: {r}"  # or oldtype?
                             else:
                                 if r not in self.regions.values():
                                     self.regions[self.nReg+1] = r
@@ -1146,8 +1165,8 @@ class NE:
                             tmp = self.data[temp]  
                             for u0 in newmix:
                                 # identify SA type and subregions
-                                strsplt = re.split(r"\d_", u0, maxsplit=1)
-                                NEty = strsplt[0]
+                                strsplt = re.split(r"\d: ", u0, maxsplit=1)
+                                NEty = strsplt[0].split(":n.")[0]
                                 names = re.split(r"\+", strsplt[1])
                                 # parse weights
                                 w = np.zeros((len(names), ))
@@ -1376,6 +1395,39 @@ class NE:
     @property
     def nReg(self):
         return len(self.regions.keys())
+
+    @staticmethod
+    def multigroup_onto_fewgroup(multig, fewg):
+
+        if isinstance(fewg, list):
+            fewg = np.asarray(fewg)
+
+        if isinstance(fewg, list):
+            fewg = np.asarray(fewg)
+
+        # ensure descending order
+        fewg = fewg[np.argsort(-fewg)]
+        H = len(multig)-1
+        G = len(fewg)-1
+        # sanity checks
+        if G >= H:
+            raise NEError(f'Collapsing failed: few-group structure should',
+                          ' have less than {H} group')
+        if multig[0] != fewg[0] or multig[-1] != fewg[-1]:
+            raise NEError('Collapsing failed: few-group structure'
+                          'boundaries do not match with multi-group'
+                          'one')
+        # map fewgroup onto multigroup
+        few_into_multigrp = np.zeros((G+1,), dtype=int)
+        for ig, g in enumerate(fewg):
+            reldiff = abs(multig-g)/g
+            idx = np.argmin(reldiff)
+            if (reldiff[idx] > 1E-5):
+                raise NEError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
+            else:
+                few_into_multigrp[ig] = idx
+
+        return few_into_multigrp
 
 
 class NEError(Exception):

@@ -40,9 +40,6 @@ def inpgen(core, json, casename=None, plotNE=None, whichSA=None,
     casename : str, optional
         File path where the case directory is located, by default ``None``.
         In this case, the name of the FRENETIC case is 'case1'.
-    templates : dict, optional
-        File path where the template files are located, by default ``None``.
-        In this case, the default template is used.
     H5fmt : bool, optional
         Set ``True`` to print NE data also in txt format, by default ``False``.
 

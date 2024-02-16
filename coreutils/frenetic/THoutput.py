@@ -155,22 +155,25 @@ class THoutput:
         self.THpath = os.path.join(path, 'TH')
         # looking for core file
         self.core = Core(os.path.join(path, 'core.h5'))
-        self.mapHAType = {}
-        # map HA type to the number of assemblies
-        for nchan, chan in self.core.TH.THassemblytypes.items():
-            # loop over time
-            whichHex = self.core.getassemblylist(nchan, self.core.TH.THconfig[0], isfren=True)
-            self.mapHAType[nchan] = whichHex
+        if hasattr(self.core, "TH"):
+            self.mapHAType = {}
+            # map HA type to the number of assemblies
+            for nchan, chan in self.core.TH.THassemblytypes.items():
+                # loop over time
+                whichHex = self.core.getassemblylist(nchan, self.core.TH.THconfig[0], isfren=True)
+                self.mapHAType[nchan] = whichHex
 
-        self.inout = THoutput.inout
-        self.distributions = THoutput.distrout
-        self.maximum = THoutput.maximum
-        self.inout_measure = THoutput.inout_uom
-        self.maximum_measure = THoutput.maximum_uom
-        self.distributions_descr = THoutput.distrout_attr
-        self.maximum_descr = THoutput.maximum_attr
-        self.inout_descr = THoutput.inout_attr
-        self.distributions_measure = THoutput.distributions_uom
+            self.inout = THoutput.inout
+            self.distributions = THoutput.distrout
+            self.maximum = THoutput.maximum
+            self.inout_measure = THoutput.inout_uom
+            self.maximum_measure = THoutput.maximum_uom
+            self.distributions_descr = THoutput.distrout_attr
+            self.maximum_descr = THoutput.maximum_attr
+            self.inout_descr = THoutput.inout_attr
+            self.distributions_measure = THoutput.distributions_uom
+        else:
+            raise THoutputError("Object core.h5 does not contain any TH object.")
 
     def get(self, which, hex=None, t=None, z=None):
         """
