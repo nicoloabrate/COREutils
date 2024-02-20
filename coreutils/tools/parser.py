@@ -170,10 +170,7 @@ def __parseCI(inp):
         if k in inp.keys():
             pass
         else:
-            if (k == 'tf_tc') and CIargs['dim'] != 3:
-                CIargs[k.lower()] = [300]
-            else:
-                raise ParserError(f'Mandatory {k} key missing in CI input file!')                            
+            raise ParserError(f'Mandatory {k} key missing in CI input file!')                            
 
     # check non-mandatory arguments
     if 'tEnd'.lower() not in inp.keys():

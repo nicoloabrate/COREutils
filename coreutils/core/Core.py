@@ -161,7 +161,7 @@ class Core:
         # --- ASSIGN COMMON INPUT DATA
         TfTc = []
         CIargs['tf_tc'].sort()
-        self.TfTc = [(Ttup[0], Ttup[1]) for Ttup in CIargs['tf_tc']]
+        self.TfTc = [(float(Ttup[0]), float(Ttup[1])) for Ttup in CIargs['tf_tc']]
         self.Tf = []
         self.Tc = [] 
         for Tf, Tc in self.TfTc:
