@@ -5,7 +5,7 @@ from collections import OrderedDict
 from coreutils.tools.utils import uppcasedict, lowcasedict
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist
 
-CImandatory = ('Tc', 'Tf')
+CImandatory = ('Tf_Tc',)
 GEmandatory = ('dim', 'shape', 'lattice_pitch') # 'lattice_pitch' only if shape!='1D', 'cuts' only in '1D'
 NEmandatory = ('filename', 'assemblynames', 'rotation', 'energygrid', 'cuts')
 THmandatory = ('bcfile', 'massflowrate', 'temperature', 'rotation', 'pressure', 'bcnames', 'htdata')
@@ -170,7 +170,7 @@ def __parseCI(inp):
         if k in inp.keys():
             pass
         else:
-            if (k == 'tf' or k == 'tc') and CIargs['dim'] != 3:
+            if (k == 'tf_tc') and CIargs['dim'] != 3:
                 CIargs[k.lower()] = [300]
             else:
                 raise ParserError(f'Mandatory {k} key missing in CI input file!')                            

@@ -160,20 +160,21 @@ class Core:
 
         # --- ASSIGN COMMON INPUT DATA
         TfTc = []
-        CIargs['tf'].sort()
-        CIargs['tc'].sort()
-        fuel_temp = CIargs['tf']
-        cool_temp = CIargs['tc']
-        fuel_temp = np.asarray(fuel_temp,dtype=np.double)
-        cool_temp = np.asarray(cool_temp,dtype=np.double)
-        # ensure ascending order
-        for Tf in fuel_temp:
-            for Tc in cool_temp:
-                if Tf >= Tc:
-                    TfTc.append((Tf, Tc))
-        self.TfTc = TfTc
-        self.Tf = fuel_temp
-        self.Tc = cool_temp
+        CIargs['tf_tc'].sort()
+        self.TfTc = [(Ttup[0], Ttup[1]) for Ttup in CIargs['tf_tc']]
+        self.Tf = []
+        self.Tc = [] 
+        for Tf, Tc in self.TfTc:
+            if Tf < Tc:
+                raise OSError(f"Tf={Tf} < Tc={Tc}! Check input file.")
+            else:
+                self.Tf.append(Tf)
+                self.Tc.append(Tc)
+        self.Tf = list(set(self.Tf))
+        self.Tc = list(set(self.Tc))
+        self.Tf.sort()
+        self.Tc.sort()
+
         self.TimeEnd = tEnd
         self.trans = trans
         self.dim = dim

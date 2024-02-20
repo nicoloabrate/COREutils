@@ -324,7 +324,8 @@ class NEMaterial():
 
     def __init__(self, uniName=None, energygrid=None, datapath=None,
                  egridname=None, h5file=None, reader='json', serpres=None,
-                 basename=False, temp=False, datacheck=True, init=False, P1consistent=False):
+                 basename=False, temp=False, datacheck=True, init=False, 
+                 P1consistent=False):
         if h5file:
             if isinstance(h5file, dict):
                 for k, v in h5file.items():

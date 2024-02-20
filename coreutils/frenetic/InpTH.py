@@ -24,8 +24,9 @@ def writeBCdata(core):
     for inp in input_files.keys():
         what = input_files[inp]
         # generate input .inp
+        n_time = len(core.TH.BCs[what]["time"])
         f = io.open(inp, 'w', newline='\n')
-        f.write(f"{len(core.TH.BCs[what]["time"])}, \n")
+        f.write(f"{n_time}, \n")
         isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
         N = int(core.nAss/6*isSym+1) if isSym else core.nAss
         values = core.TH.BCs[what]["values"]
