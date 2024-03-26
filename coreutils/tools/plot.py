@@ -471,7 +471,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                     valuesapp(tallies[idx])
                 # plot geometry filled with colour
                 asspatch = RegularPolygon(xy, core.Geometry.AssemblyGeometry.numedges,
-                                            L*scale, orientation=orientation,
+                                            radius=L*scale, orientation=orientation,
                                             **kwargs)
                 coordapp(xy)
                 x, y = xy
@@ -492,7 +492,7 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                     SAslabels = core.TH.THassemblylabels
 
                 atype = core.getassemblytype(k, config)
-                asspatch = RegularPolygon(xy, core.Geometry.AssemblyGeometry.numedges, L*scale,
+                asspatch = RegularPolygon(xy, core.Geometry.AssemblyGeometry.numedges, radius=L*scale,
                                         orientation=orientation, color=col, ec='k', lw=0.5,
                                         fill=fill, label=SAslabels[atype], **kwargs)
                 ax.add_patch(asspatch)

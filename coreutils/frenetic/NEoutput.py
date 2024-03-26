@@ -96,7 +96,8 @@ class NEoutput:
             NEoutput._fill_deprec_vers_metadata(self.MapVersion, self.npre, self.ngro, self.nprp, self.ngrp)
         elif vers == 2.0:
             self.MapVersion["data"]["integralParameters"] = NEoutput.fill_intpar_dict(self.MapVersion["data"]["integralParameters"],
-                                                                            self.npre, self.ngro, self.nprp, self.ngrp)
+                                                                                      self.npre, self.ngro, self.nprp, self.ngrp)
+                                                                                    #   self.core.FreneticNamelist["NUMERICS1"]["eig_type"])
             self.HDF5_path = NEoutput.build_HDF5_path(self.MapVersion["data"])
             dupl_dist = NEoutput.get_duplicate_dset_names(self.MapVersion["data"]["distributions"])
             dupl_intp = NEoutput.get_duplicate_dset_names(self.MapVersion["data"]["integralParameters"])
@@ -892,30 +893,6 @@ class NEoutput:
             dz = self.core.NE.AxialConfig.dz
             profile = np.tensordot(profile, dz, axes=([1], [0]))
             profile = profile*self.core.Geometry.AssemblyGeometry.area
-# FIXME TODO 
-        # if tot:
-        #     dims = self.distrout_dim[what]
-        #     for sum_dim in sum_dims:
-        #         sum_ax = dims.index(sum_dim)
-        #         if "power" in what:
-        #             if sum_dim == "nhex":
-        #                 w = self.core.Geometry.AssemblyGeometry.area
-        #                 profile = w*profile.sum(axis=sum_ax)
-        #             elif sum_dim == "nelz":
-        #                 w = self.core.NE.AxialConfig.dz
-        #                 profile = np.tensordot(profile, w, axes=([sum_ax], [0]))
-        #                 profile = profile*self.core.Geometry.AssemblyGeometry.area
-        #             else:
-        #                 raise NEOutputError(f"Cannot get {what} from data!")
-        #         else:
-        #             profile = profile.sum(axis=sum_ax)
-
-        #         dims = list(dims)
-        #         dims.remove(sum_dim)
-        #         dims = tuple(dims)
-
-
-
         elif what == "axial_power":
             what = "power_density/total"
             sum_dims = ["iHexNode"]
@@ -1439,11 +1416,12 @@ class NEoutput:
                 if figname is not None:
                     ax.savefig(figname)
 
-    def zplot1D(self, what, gro=None, pre=None, ax=None,
+    def zplot1D(self, what, gro=None, pre=None, grp=None,
+                prp=None, ax=None, label=None,
                abscissas=None, t=None, hex=None, leglabels=None, 
                figname=None, xlabel=None,
                xlims=None, ylims=None, ylabel=None, geometry=None,
-               style='sty1D.mplstyle', norm=True,
+               style='sty1D.mplstyle', norm=False,
                legend=True, **kwargs):
         """
         Plot integral param. or distribution against axis.
@@ -1475,125 +1453,81 @@ class NEoutput:
             else:
                 sty1D = style
 
-        label = what
+        if label is None:
+            label = what
+
         if what in self.MapVersion["alias"].keys():
             what = self.MapVersion["alias"][what]
 
         # --- parse profile
-        y, descr, uom = self.get(what, gro=gro, hex=hex, t=t, pre=pre, metadata=True)
-        # --- select independent variable
-        for idx, path in enumerate(self.HDF5_path):
-            if what in path:
-                if "/" in what:
-                    dset = what.split("/")[-1]
-                    dset_in_path = path.split("/")[-1]
-                else:
-                    dset = what
-                    dset_in_path = path.split("/")[-1]
-
-                if dset == dset_in_path:
-                    dsetpath = self.HDF5_path[idx]
-                    break
-        root_group = dsetpath.split("/")[0]
-
+        y, descr, uom, color = self.get(what, gro=gro, hex=hex, t=t, pre=pre, metadata=True)
+        n_dims = y.shape
+        dims = []
+        for d in n_dims:
+            if d > 1:
+                dims.append(d)
+        dims = tuple(dims)
+        y = np.reshape(y, dims)
+        # --- parse independent variable
+        z = self.core.NE.AxialConfig.AxNodes
+        zcuts = self.core.NE.AxialConfig.zcuts
         if norm:
             z = z/z.max()
-            if xlabel is None:
+            if xlabel is None and rcParams['text.usetex']:
                 xlabel = " normalised axial coordinate $[-]$"
-
         else:
-            xlabel = f"axial coordinate [cm]"
-
-        # nTimeConfig = len(self.core.NE.time)
-        ax = plt.gca() if ax is None else ax
-
-        if hex is None:
-            hex = [0] # 1st hexagon (this is python index, not hex. number)
-
-        # get python-wise index for slicing
-        igro, ipre, idt, idz = self._shift_index(gro, pre, t, z, times=times)
-        # map indexes from full- to sliced-array
-        igro, ipre, idt, idz = self._to_index(igro, ipre, idt, idz)
-
-        # --- DEFINE SLICES
-        dimdict = {'iTime': idt, 'iAxNode': idz, 'Group': igro,
-                    'ngrp': igrp, 'Family': ipre, 'iHexNode': hex}
-        usrdict = {'iTime': t, 'iAxNode': z, 'Group': gro,
-                    'ngrp': grp, 'Family': pre, 'iHexNode': hex}
-        dimlst = [None]*len(dims)
-        for k in dims:
-            i = dims.index(k)
-            dimlst[i] = dimdict[k]
-        # define multi-index
-        tmp = dimlst.pop(idx)
-        indexes = list(itertools.product(*dimlst))
-        indexes = [list(tup) for tup in indexes]
-        for i in range(len(indexes)):
-            indexes[i].insert(idx, tmp)
+            if xlabel is None:
+                xlabel = f"axial coordinate [cm]"
 
         # --- PLOT
+        ax = plt.gca() if ax is None else ax
         # plot against axial coordinate
         with plt.style.context(sty1D):
-            ax = plt.gca() if ax is None else ax
             handles = []
             handlesapp = handles.append
             ymin, ymax = np.inf, -np.inf
             # loop over dimensions to slice
-            for i, s in enumerate(indexes):
-                y = prof[s[i]]  # .take(indices=d, axis=i)
-                label = self._build_label(s, dims, dim2plot, usrdict)
-                if abscissas is not None:
-                    x = abscissas
-                lin1, = ax.plot(x, y, label=label, **kwargs)
-                handlesapp(lin1)
-                # track minimum and maximum
-                if ylims is None:
-                    ymin = y.min() if y.min() < ymin else ymin
-                    ymax = y.max() if y.max() > ymax else ymax
+            lin1, = ax.step(z, y, where='mid', label=label, **kwargs)
+            handlesapp(lin1)
+            # track minimum and maximum
+            if ylims is None:
+                ymin = y.min() if y.min() < ymin else ymin
+                ymax = y.max() if y.max() > ymax else ymax
 
             if ylims is not None:
                 ymin = min(ylims)
                 ymax = max(ylims)
 
-            plt.xlabel(xlabel)
+            ax.set_xlabel(xlabel)
             if ylabel is None:
-                # select unit of measure corresponding to profile
-                if what in self.distributions:
-                    isintegral = False
-                    idx = self.distributions.index(what)
-                    uom = self.distributions_measure[idx]
-                else:  # integral data
-                    isintegral = True
-                    for k, v in self.MapVersion["data"]["integralParameters"].items():
-                        if what in v:
-                            idx = v.index(what)
-                            uom = self.integralParameters_measure[k][idx]
-
                 if "/" in what:
                     dset = what.split("/")[-1]
                 else:
                     dset = what
 
                 if rcParams['text.usetex']:
-                    plt.ylabel(rf"{dset} ${uom}$")
+                    ylabel = rf"{dset} ${uom}$"
+                    ax.set_ylabel(ylabel)
                 else:
-                    plt.ylabel(f"{dset} {uom}")
+                    ylabel = f"{dset} {uom}"
+                    ax.set_ylabel(ylabel)
             else:
-                plt.ylabel(ylabel)
+                ax.set_ylabel(ylabel)
 
             # ax.set_ylim(ymin, ymax)
-            ax.set_xlim(x.min(), x.max())
+            if xlims is None:
+                ax.set_xlim(zcuts.min(), zcuts.max())
 
-            legend_x = 0.50
-            legend_y = 1.01
-            ncol = 2 if len(indexes) < 4 else 4
-            if leglabels is not None:
-                plt.legend(handles, leglabels, bbox_to_anchor=(legend_x, legend_y),
-                        loc='lower center', ncol=ncol)
-            else:
-                if legend:
-                    plt.legend(bbox_to_anchor=(legend_x, legend_y),
-                            loc='lower center', ncol=ncol)
+            # legend_x = 0.50
+            # legend_y = 1.01
+            # ncol = 2 if len(indexes) < 4 else 4
+            # if leglabels is not None:
+            #     plt.legend(handles, leglabels, bbox_to_anchor=(legend_x, legend_y),
+            #             loc='lower center', ncol=ncol)
+            # else:
+            #     if legend:
+            #         plt.legend(bbox_to_anchor=(legend_x, legend_y),
+            #                 loc='lower center', ncol=ncol)
 
             plt.tight_layout()
             # plt.show()
@@ -1603,7 +1537,8 @@ class NEoutput:
     def RadialMap(self, what, z=0, t=0, pre=0, gro=1, grp=0,
                   label=False, figname=None, hex=None,
                   usetex=False, fill=True, axes=None, cmap=None,
-                  thresh=None, cbarLabel=True, xlabel=None, ylabel=None,
+                  thresh=None, cbarLabel=True, uom=None, descr=None,
+                  xlabel=None, ylabel=None,
                   log=None, title=True, scale=1, fmt="%.2f", **kwargs):
         """
         Plot FRENETIC output on the x-y plane.
@@ -1663,8 +1598,6 @@ class NEoutput:
         None.
 
         """
-        uom = ""
-        descr = ""
         if hasattr(self.core, "FreneticNamelist"):
             isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
         else:
@@ -1694,9 +1627,14 @@ class NEoutput:
         elif isinstance(what, str):  # single output
             tallies, descr, uom, color = self.get(what, t=t, z=z, pre=pre, gro=gro, metadata=True)
             tallies = np.squeeze(tallies)
-        # elif isinstance(what, (np.ndarray)):
-        #     tallies = what+0
-        #     what = None
+        elif isinstance(what, (np.ndarray)):
+            tallies = what+0
+            what = None
+            if uom is None:
+                raise OSError("unit of measure should be provided!")
+            if descr is None:
+                raise OSError("data legend should be provided!")
+            color = "inferno"
         else:
             raise TypeError('Input must be str, dict or list!')
 
@@ -2029,7 +1967,22 @@ class NEoutput:
                 pass
 
     @staticmethod
-    def fill_intpar_dict(MapVersion, npre, ngro, nprp, ngrp):
+    def fill_intpar_dict(MapVersion, npre, ngro, nprp, ngrp): #, eig_type):
+            # --- static
+            # fill eigenvalue with its type
+            # if eig_type == 0:
+            #     eig = "k"
+            # elif eig_type == 1:
+            #     eig = "gamma"
+            # else:
+            #     eig = "*"
+
+            # lst = MapVersion['static']
+            # idx =  lst.index("*-eigenvalue")
+            # lst[idx] = f"{eig}-eigenvalue"
+            # idx =  lst.index("*-eigenvalue_adjoint")
+            # lst[idx] = f"{eig}-eigenvalue_adjoint"
+
             # fill group and precursors entries
             # --- amplitude
             lst = MapVersion['amplitude']

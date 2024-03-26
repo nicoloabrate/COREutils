@@ -222,7 +222,7 @@
                                                                                 ]
                                                                     },
                                                         "power": ["total", "fission", "neutron_KERMA", "photon_KERMA"],
-                                                        "static": ["reactivity (GPT)", "k-eigenvalue", "k-eigenvalue_adjoint"],
+                                                        "static": ["reactivity (GPT)", "*-eigenvalue", "*-eigenvalue_adjoint"],
                                                         "time": {}
                                                           },
                                     "restart": {"TODO": []}
@@ -246,9 +246,15 @@
                                                         "temperatures/coolant": "coolwarm"
                                                 }
                                          },
-                            "alias" : {"keff": "k-eigenvalue", "k": "eigenvalue dir.", "fluxdir": "flux", 
+                            "alias" : {"keff": "k-eigenvalue", "k": "k-eigenvalue", 
+                                       "gammaeff": "gamma-eigenvalue",
+                                       "fluxdir": "flux", 
                                        "flux_adjoint": "flux_adj", "fluxadj": "flux_adj", 
-                                       "keffa": "k-eigenvalue_adjoint", "k-eigenvalue adj":"k-eigenvalue_adjoint", "powerdensity": "powertot", 
+                                       "keffa": "k-eigenvalue_adjoint", "k-eigenvalue adj":"k-eigenvalue_adjoint", 
+                                       "k adj":"k-eigenvalue_adjoint", 
+                                       "gammaeffa": "gamma-eigenvalue_adjoint",
+                                       "gamma_a": "gamma-eigenvalue_adjoint",
+                                       "powerdensity": "powertot", 
                                        "reactivityn": "neutrons/reactivity", "reactivityp": "photons/reactivity", 
                                        "power tot.": "total", "intpowtot": "total", "intpowneu": "neutron_KERMA", 
                                        "intpowpho": "photon_KERMA", "intpowfis": "fission"}
