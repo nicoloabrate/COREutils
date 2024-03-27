@@ -654,18 +654,18 @@ def auxNE(core, AUXpathNE):
                     AxialGeomPlot(core, x0, time=t, fren=True, zcuts=True,
                                 figname=figname, legend=True)
                     plt.close()
-                    # plot x=0 SAs
-                    figname = f'NE-ax-y0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-                    AUX_NE_plot.append(figname)
-                    AxialGeomPlot(core, y0, time=t, fren=True, zcuts=True,
-                                figname=figname, legend=True, floating=True)
-                    plt.close()
-                    # plot along 1st sextant
-                    figname = f'NE-ax-sextI-conf{itime}-t{1E3*t:g}_ms.{fmt}'
-                    AUX_NE_plot.append(figname)
-                    AxialGeomPlot(core, sextI, time=t, fren=True, zcuts=True,
-                                figname=figname, legend=True, floating=True)
-                    plt.close()
+                    # # plot x=0 SAs
+                    # figname = f'NE-ax-y0-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    # AUX_NE_plot.append(figname)
+                    # AxialGeomPlot(core, y0, time=t, fren=True, zcuts=True,
+                    #             figname=figname, legend=True, floating=True)
+                    # plt.close()
+                    # # plot along 1st sextant
+                    # figname = f'NE-ax-sextI-conf{itime}-t{1E3*t:g}_ms.{fmt}'
+                    # AUX_NE_plot.append(figname)
+                    # AxialGeomPlot(core, sextI, time=t, fren=True, zcuts=True,
+                    #             figname=figname, legend=True, floating=True)
+                    # plt.close()
                     # custom plot
                     if whichSA is not None:
                         figname = f'NE-ax-conf{itime}-t{1E3*t:g}_ms.{fmt}'

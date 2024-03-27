@@ -65,7 +65,7 @@ class FreneticNamelist():
                                        "RhoInp", "GeoInp", "NumInp", "OutInp", "iHDF5Inp", "echo"],
                            "MESHNE": ["nDim", "AlbedoXY", "AlbedoZN", "AlbedoZP", "nElez0", "Meshz0", 
                                       "SplitZ"],
-                           "NUMERICS1": ["TolFlx", "iOutAcc", "nOutMax", "NEinitFile"] # , "eig_type"],
+                           "NUMERICS1": ["TolFlx", "iOutAcc", "nOutMax", "NEinitFile"], # , "eig_type"],
                            "NUMERICS2": ["iMethod", "iAlgVar", "iAdapt", "iCtrlQty", "dtShpMax", "dtRMax", 
                                          "TolNorm", "TolShp", "TolIntp", "FacSaf", "iAdjoint", "nNormMax", 
                                          "Teta", "TolShpOut"],

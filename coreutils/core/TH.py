@@ -251,15 +251,21 @@ class TH:
         for what in pert.model_fields_set:
             p = pert.__dict__[what]
             newcore = None
-            if float(time) in self.BCconfig.keys():
-                now = float(time)
-            else:
-                nt = self.BCtime.index(float(time))
-                now = self.BCtime[nt-1]
-
-            n_tim, n_ass = self.BCs[what]["values"].shape
+            # if float(time) in self.BCconfig.keys():
+            #     now = float(time)
+            # else:
+            #     nt = self.BCtime.index(float(time))
+            #     now = self.BCtime[nt-1]
 
             if hasattr(p, "func"):
+                # add initial time
+                t0 = float(time)
+                t = t0
+                BC = self.BCs[what]
+                BC["time"].append(t)
+                n_tstart = BC["time"].index(t0)
+                n_t = n_tstart
+                n_ass = self.BCs[what]["values"].shape[1]
                 for f in p.func:
                     for func in f.keys():
                         dt = f[func].dt
@@ -269,20 +275,18 @@ class TH:
                             if func == "step":
                                 if dt == 0 or dt > 1E-3:
                                     dt = 1E-12
+                            if n_t == n_tstart:
+                                BC["values"] = np.concatenate((BC["values"], 
+                                                               BC["values"][n_t - 1, :][np.newaxis, :]), axis=0)
+                                n_t += 1
+                            # perturb at time
+                            BC["values"] = np.concatenate((BC["values"], BC["values"][n_t - 1, :][np.newaxis, :]), axis=0)
+                            BC["time"].append(t0+dt)
+                            for w_lst in p.which:
+                                for w in w_lst:
+                                    BC["values"][n_t, w - 1] = BC["values"][n_tstart, w - 1]*(1+var/100)
 
-                            self.BCs[what]["time"].append(float(time))
-                            self.BCs[what]["time"].append(float(time)+dt)
-                            tmp = np.zeros((n_tim + 2, n_ass))
-                            # copy previous array
-                            tmp[0:n_tim, :] = self.BCs[what]["values"][:]
-                            # same configuration at t=time
-                            tmp[n_tim, :] = tmp[n_tim-1, :][:]
-                            # perturb at time+dt
-                            tmp[n_tim+1, :] = tmp[n_tim-1, :][:]
-                            for w in p.which[i_pert]:
-                                tmp[n_tim+1, w - 1] = tmp[n_tim+1, w - 1]*(1+var/100)
-
-                            self.BCs[what]["values"] = tmp
+                            n_t += 1
 
                         else:
                             raise THError(f"{func} type not implemented!")
