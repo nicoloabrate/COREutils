@@ -8,7 +8,7 @@ from coreutils.input.input_model import *
 class func_BCs(BaseModel):
 
     dt: NonNegativeFloat
-    variation: float
+    variation: NonNegativeFloat
 
 class pertBCs(BaseModel):
     which: List[List[PositiveInt]]
@@ -22,8 +22,9 @@ class pertBCs(BaseModel):
 
             for shape in self.func:
                 for s in shape.keys():
-                    if s not in ["step", "linear", "exponential", "custom"]:
+                    if s not in ["step", "linear"]:
                         raise ValueError(f'Unknown {s} entry in func!')
+                    
 
         elif hasattr(self, "filepath"):
             shape = self.filepath

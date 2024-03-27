@@ -279,14 +279,18 @@ class TH:
                                 BC["values"] = np.concatenate((BC["values"], 
                                                                BC["values"][n_t - 1, :][np.newaxis, :]), axis=0)
                                 n_t += 1
+                            else:
+                                if dt <= dt_old:
+                                    raise THError("dt in perturbBCs should be increasing!")
                             # perturb at time
                             BC["values"] = np.concatenate((BC["values"], BC["values"][n_t - 1, :][np.newaxis, :]), axis=0)
                             BC["time"].append(t0+dt)
                             for w_lst in p.which:
                                 for w in w_lst:
-                                    BC["values"][n_t, w - 1] = BC["values"][n_tstart, w - 1]*(1+var/100)
+                                    BC["values"][n_t, w - 1] = BC["values"][n_tstart, w - 1]*var
 
                             n_t += 1
+                            dt_old = dt
 
                         else:
                             raise THError(f"{func} type not implemented!")
