@@ -743,25 +743,36 @@ class NE:
                     for ax in axpos:
                         newaxregions[ax] = newreg_int
                         newaxregions_str[ax] = newreg_str
+
                     # add new type in xscuts (mainly for plot)
                     for irplZ, rplZ in enumerate(where):
+
                         # check new atype exists (if len(where) > 1)
                         if irplZ == 0:
                             cuts = cp(self.AxialConfig.cuts[atype])
                         else:
                             cuts = cp(self.AxialConfig.cuts[newtype])
+
                         upz, loz, reg, lab = cuts.upz, cuts.loz, cuts.reg, cuts.labels
+                        # add possible new axial planes
                         if rplZ[0] not in loz:
                             loz.append(rplZ[0])
                             loz.sort()
                             upz.insert(loz.index(rplZ[0])-1, rplZ[0])
+                            reg.insert(loz.index(rplZ[0]), reg[loz.index(rplZ[0])])
+                            lab.insert(loz.index(rplZ[0]), lab[loz.index(rplZ[0])])
                         if rplZ[1] not in upz:
                             upz.append(rplZ[1])
                             upz.sort()
                             loz.insert(upz.index(rplZ[1])+1, rplZ[1])
+                            reg.insert(upz.index(rplZ[1]), reg[upz.index(rplZ[1])])
+                            lab.insert(upz.index(rplZ[1]), lab[upz.index(rplZ[1])])
+
+                        # select axial bin location
                         for iz, zc in enumerate(list(zip(loz, upz))):
                             if tuple(rplZ) == zc:
                                 break
+
                         if action != 'crit':
                             reg.insert(iz, newreg_str)
                             lab.insert(iz, newlab_str)
