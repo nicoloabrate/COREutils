@@ -1486,7 +1486,8 @@ class NEMaterial():
         for s in kinetics:
             if s not in datavail:
                 kincons = False
-                self.__dict__[s] = [0]
+                self.__dict__[s] = np.zeros((self.NPF,))
+                self.__dict__[f"{s}_tot"] = np.zeros((self.NPF,))
 
         if kincons:
             if not hasattr(self, "beta"):
