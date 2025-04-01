@@ -13,7 +13,7 @@ import logging
 from collections import OrderedDict
 from shutil import rmtree
 from coreutils.tools.utils import MyDict
-from numpy import string_, ndarray, array, asarray
+from numpy import ndarray, array, asarray
 from numpy import int8, int16, int32, int64, float16, float32, float64, \
                   complex128, zeros, asarray, bytes_, dtype
 
@@ -376,7 +376,7 @@ class write():
             if dic is not None:
                 dic = dic.__dict__
             else:
-                fh5[grp] = string_('None')
+                fh5[grp] = str('None')
                 dic = {}
 
         if dic:

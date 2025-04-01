@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from collections import OrderedDict, UserDict
-from numpy import string_, ndarray, array, asarray
+from numpy import ndarray, array, asarray
 from numpy import int8, int16, int32, int64, float16, float32, float64, \
                   complex128, zeros, asarray, bytes_
 
@@ -199,3 +199,7 @@ def uppcasedict(inpdict):
         raise OSError("Cannot use uppcasedict, keys cannot become case insensitive!")
     else:
         return dict(zip(uppcasekeys, inpdict.values())) 
+
+
+class InputGeneratorError(Exception):
+    pass
