@@ -12,6 +12,7 @@ import shutil as sh
 from numbers import Real
 from collections import OrderedDict
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 from pathlib import Path
 from matplotlib.patches import RegularPolygon, Rectangle
 from matplotlib.collections import PatchCollection
@@ -333,6 +334,7 @@ def AxialGeomPlot(core, which, time=0, label=False, assembly_name=False,
 def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
               label=False, figname=None, which=None, fren=False,
               whichconf='NE', asstype=False, dictname=None, colors_dict=None,
+              vmin=None, vmax=None,
               legend=False, fill=True, style='radgeom.mplstyle',
               axes=None, cmap='Spectral_r', thresh=None, fontsize=6,
               cbarfontsize=15, cbarLabel=None, xlabel=None, ylabel=None,
@@ -531,9 +533,16 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
             coord = np.asarray(coord)
             values = np.asarray(values)
             patches = np.asarray(patches, dtype=object)
-            normalizer = normalizerFactory(values, None, False,
+            # color normalisation
+            if vmin is not None or vmax is not None:
+                mynorm = colors.Normalize(vmin=vmin, vmax=vmax)
+            else:
+                mynorm = None
+
+            normalizer = normalizerFactory(values, mynorm, False,
                                            coord[:, 0]*scale,
                                            coord[:, 1]*scale)
+
             pc = PatchCollection(patches, cmap=cmap, ec='k', lw=0.5, **kwargs)
 
             if title is None:

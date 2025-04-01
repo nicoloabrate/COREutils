@@ -1535,6 +1535,7 @@ class NEoutput:
 
     def RadialMap(self, what, z=0, t=0, pre=0, gro=1, grp=0,
                   hex=None, label=False, figname=None, 
+                  vmin=None, vmax=None,
                   usetex=False, fill=True, axes=None, cmap=None,
                   thresh=None, cbarLabel=True, uom=None, descr=None,
                   xlabel=None, ylabel=None,
@@ -1670,6 +1671,8 @@ class NEoutput:
                   which=hex,
                   fren=True,
                   whichconf='NE',
+                  vmin=vmin,
+                  vmax=vmax,
                   asstype=False,
                   dictname=None,
                   legend=False,

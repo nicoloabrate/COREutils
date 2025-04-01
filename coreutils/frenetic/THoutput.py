@@ -766,6 +766,7 @@ class THoutput:
 
     def RadialMap(self, what, z=0, t=0,
                   label=False, figname=None, hex=None,
+                  vmin=None, vmax=None,
                   usetex=False, fill=True, axes=None, cmap=None,
                   thresh=None, cbarLabel=True, xlabel=None, ylabel=None,
                   log=None, title=True, scale=1, fmt="%.2f", **kwargs):
@@ -882,6 +883,8 @@ class THoutput:
                   which=hex,
                   fren=True,
                   whichconf='TH',
+                  vmin=vmin,
+                  vmax=vmax,
                   asstype=False,
                   dictname=None,
                   legend=False,
