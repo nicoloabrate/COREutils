@@ -108,17 +108,22 @@ class NE:
         NEfren = NEargs['fren']
         NEassemblylabel = NEargs['assemblylabel']
         NEdata = NEargs['nedata']
-        if "fixdata" in NEdata.keys():
-            self.fixdata = NEdata["fixdata"]
-        else:
-            self.fixdata = 1
+        isPH = False
+        if NEdata is not False:
+            if "fixdata" in NEdata.keys():
+                self.fixdata = NEdata["fixdata"]
+            else:
+                self.fixdata = 1
 
-        if "nxn" in NEdata.keys():
-            self.use_nxn = NEdata["nxn"]
-        else:
-            self.use_nxn = False
+            if "nxn" in NEdata.keys():
+                self.use_nxn = NEdata["nxn"]
+            else:
+                self.use_nxn = False
 
-        isPH = True if 'PH' in NEdata.keys() else False
+            if 'PH' in NEdata.keys():
+                isPH = True
+        else:
+            NEdata = None
 
         self.time = [0.]
         # --- AXIAL GEOMETRY, IF ANY
@@ -139,10 +144,10 @@ class NE:
             self.assemblytypes = MyDict(dict(zip(np.arange(1, nReg+1),
                                                         NEargs['assemblynames'])))
         else:
-            self.regions = self.AxialConfig.regions
+            self.regions = copy(self.AxialConfig.regions)
             self.labels = self.AxialConfig.labels
             self.assemblytypes = MyDict()
-            NZ = len(self.AxialConfig.zcuts)-1
+            # NZ = len(self.AxialConfig.zcuts)-1
             NEtypes = assemblynames
             nAssTypes = len(NEtypes)
             # loop over SAs types (one cycle for 1D)
@@ -166,9 +171,10 @@ class NE:
         # save coordinates for each layer (it can be updated later!)
         if cuts is not None and dim != 2:
             self.zcoord = MyDict()
-            zc = self.AxialConfig.zcuts
-            for iR, z1z2 in enumerate(zip(zc[:-1], zc[1:])):
-                self.zcoord[iR] = z1z2
+            if self.AxialConfig.shared_z_planes:
+                zc = self.AxialConfig.zcuts
+                for iR, z1z2 in enumerate(zip(zc[:-1], zc[1:])):
+                    self.zcoord[iR] = z1z2
 
         if NEassemblylabel is not None:
             self.assemblylabel = MyDict(dict(zip(np.arange(1, nAssTypes+1),
@@ -1202,115 +1208,111 @@ class NE:
                         cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]
                         self.AxialConfig.cuts[newtype] = AxialCuts(cuts.upz, cuts.loz, cuts.reg, cuts.labels)
                         cuts = list(zip(cuts.reg, cuts.labels, cuts.loz, cuts.upz))
-                        zr, zl, zw, zc = self.AxialConfig.mapFine2Coarse(cuts, self.AxialConfig.zcuts, self.plot['AXcolors'])
-                        # --- update info for homogenisation
-                        self.AxialConfig.cutsregions[newtype] = zr
-                        self.AxialConfig.cutslabels[newtype] = zl
-                        self.AxialConfig.cutsweights[newtype] = zw
-                        self.AxialConfig.cutscolors[newtype] = zc
+                        if self.AxialConfig.shared_z_planes:
+                            zr, zl, zw, zc = self.AxialConfig.mapFine2Coarse(cuts, self.AxialConfig.zcuts, self.plot['AXcolors'])
+                            # --- update info for homogenisation
+                            self.AxialConfig.cutsregions[newtype] = zr
+                            self.AxialConfig.cutslabels[newtype] = zl
+                            self.AxialConfig.cutsweights[newtype] = zw
+                            self.AxialConfig.cutscolors[newtype] = zc
 
-                        regs = []
-                        lbls = []
-                        regsapp = regs.append
-                        lblsapp = lbls.append
-                        for k, val in zr.items():
-                            # loop over each axial region
-                            for iz in range(self.AxialConfig.nZ):
-                                if k == 'M1':
-                                    regsapp(val[iz])
-                                    lblsapp(zl[k][iz])
+                            regs = []
+                            lbls = []
+                            regsapp = regs.append
+                            lblsapp = lbls.append
+                            for k, val in zr.items():
+                                # loop over each axial region
+                                for iz in range(self.AxialConfig.nZ):
+                                    if k == 'M1':
+                                        regsapp(val[iz])
+                                        lblsapp(zl[k][iz])
+                                    else:
+                                        mystr = val[iz]
+                                        mylab = zl[k][iz]
+                                        if mystr != 0: # mix name
+                                            regs[iz] = f'{regs[iz]}+{mystr}'
+                                            lbls[iz] = f'{lbls[iz]}+{mylab}'
+                            # --- update region dict
+                            newaxregions = [None]*len(regs)
+                            newaxregions_str = [None]*len(regs)
+                            # make mixture name unique wrt itype and axial coordinates
+                            iMix = 1
+                            newmix = []  # new mix of different materials
+                            newonlymat = []  # material used in mix but not present alone
+                            for jReg, r in enumerate(regs): # axial loop
+                                # nMIX = self.nReg
+                                if '+' in r:
+                                    # update counter if mix already exists
+                                    if r in regs[:jReg]:
+                                        iMix += 1
+                                    # add SAs type
+                                    newmixname = f'{newtype}:n.{iMix}: {r}'
+                                    if newmixname not in self.regions.values():
+                                        newmix.append(f'{newtype}:n.{iMix}: {r}')
+                                        self.regions[self.nReg+1] = f'{newtype}:n.{iMix}: {r}'
+                                        self.labels[f'{newtype}:n.{iMix}: {r}'] = f'{lbls[jReg]}'
+                                        newaxregions_str[jReg] = f'{newtype}:n.{iMix}: {r}'
+                                        newaxregions[jReg] = self.nReg
+                                    else:
+                                        str2int = self.regions.reverse()
+                                        newaxregions[jReg] = str2int[f'{newtype}: {r}']
+                                        newaxregions_str[jReg] = f"{newtype}: {r}"  # or oldtype?
                                 else:
-                                    mystr = val[iz]
-                                    mylab = zl[k][iz]
-                                    if mystr != 0: # mix name
-                                        regs[iz] = f'{regs[iz]}+{mystr}'
-                                        lbls[iz] = f'{lbls[iz]}+{mylab}'
-                        # --- update region dict
-                        newaxregions = [None]*len(regs)
-                        newaxregions_str = [None]*len(regs)
-                        # make mixture name unique wrt itype and axial coordinates
-                        iMix = 1
-                        newmix = []  # new mix of different materials
-                        newonlymat = []  # material used in mix but not present alone
-                        for jReg, r in enumerate(regs): # axial loop
-                            # nMIX = self.nReg
-                            if '+' in r:
-                                # update counter if mix already exists
-                                if r in regs[:jReg]:
-                                    iMix += 1
-                                # add SAs type
-                                newmixname = f'{newtype}:n.{iMix}: {r}'
-                                if newmixname not in self.regions.values():
-                                    newmix.append(f'{newtype}:n.{iMix}: {r}')
-                                    self.regions[self.nReg+1] = f'{newtype}:n.{iMix}: {r}'
-                                    self.labels[f'{newtype}:n.{iMix}: {r}'] = f'{lbls[jReg]}'
-                                    newaxregions_str[jReg] = f'{newtype}:n.{iMix}: {r}'
-                                    newaxregions[jReg] = self.nReg
-                                else:
-                                    str2int = self.regions.reverse()
-                                    newaxregions[jReg] = str2int[f'{newtype}: {r}']
-                                    newaxregions_str[jReg] = f"{newtype}: {r}"  # or oldtype?
-                            else:
-                                if r not in self.regions.values():
-                                    self.regions[self.nReg+1] = r
-                                    self.labels[r] = f'{lbls[jReg]}'
-                                    nMIX = self.nReg
-                                else:
-                                    str2int = self.regions.reverse()
-                                    nMIX = str2int[r]
-                                newaxregions[jReg] = nMIX
-                                newaxregions_str[jReg] = r
+                                    if r not in self.regions.values():
+                                        self.regions[self.nReg+1] = r
+                                        self.labels[r] = f'{lbls[jReg]}'
+                                        nMIX = self.nReg
+                                    else:
+                                        str2int = self.regions.reverse()
+                                        nMIX = str2int[r]
+                                    newaxregions[jReg] = nMIX
+                                    newaxregions_str[jReg] = r
 
                         # --- update info in object
                         self.assemblytypes.update({nTypes+1: newtype})
                         self.assemblylabel.update({nTypes+1: newtype})
-                        self.AxialConfig.config.update({nTypes+1: newaxregions})
-                        self.AxialConfig.config_str.update({newtype: newaxregions_str})
 
-                        # --- homogenise
-                        for temp in core.TfTc:
-                            tmp = self.data[temp]  
-                            for u0 in newmix:
-                                # identify SA type and subregions
-                                strsplt = re.split(r"\d: ", u0, maxsplit=1)
-                                NEty = strsplt[0].split(":n.")[0]
-                                names = re.split(r"\+", strsplt[1])
-                                # identify axial planes for homogenisation
-                                idx_coarse = self.AxialConfig.config_str[NEty].index(u0)
-                                z_coarse_lo = self.AxialConfig.zcuts[idx_coarse]
-                                z_coarse_up = self.AxialConfig.zcuts[idx_coarse + 1]
-                                # compute volumes
-                                V_heter = np.zeros((len(names), ))
-                                V_homog = np.zeros((len(names), ))
-                                for iM, mixname in enumerate(names):
-                                    # fine region
-                                    idx_fine = self.AxialConfig.cuts[NEty].reg.index(mixname)
-                                    z_lo = self.AxialConfig.cuts[NEty].loz[idx_fine]
-                                    z_up = self.AxialConfig.cuts[NEty].upz[idx_fine]
-                                    V_heter[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_lo)
-                                    if z_lo >= z_coarse_lo and z_up <= z_coarse_up:
-                                        V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_lo)
-                                    elif z_lo >= z_coarse_lo and z_up > z_coarse_up:
-                                        V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_coarse_up-z_lo)
-                                    elif z_lo <= z_coarse_lo and z_up <= z_coarse_up:
-                                        V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_coarse_lo)
-                                    else:
-                                        raise NEError(f"Error in homogenisation!")
+                        if self.AxialConfig.shared_z_planes:
+                            self.AxialConfig.config.update({nTypes+1: newaxregions})
+                            self.AxialConfig.config_str.update({newtype: newaxregions_str})
+                            # --- homogenise
+                            for temp in core.TfTc:
+                                tmp = self.data[temp]  
+                                for u0 in newmix:
+                                    # identify SA type and subregions
+                                    strsplt = re.split(r"\d: ", u0, maxsplit=1)
+                                    NEty = strsplt[0].split(":n.")[0]
+                                    names = re.split(r"\+", strsplt[1])
+                                    # identify axial planes for homogenisation
+                                    idx_coarse = self.AxialConfig.config_str[NEty].index(u0)
+                                    z_coarse_lo = self.AxialConfig.zcuts[idx_coarse]
+                                    z_coarse_up = self.AxialConfig.zcuts[idx_coarse + 1]
+                                    # compute volumes
+                                    V_heter = np.zeros((len(names), ))
+                                    V_homog = np.zeros((len(names), ))
+                                    for iM, mixname in enumerate(names):
+                                        # fine region
+                                        idx_fine = self.AxialConfig.cuts[NEty].reg.index(mixname)
+                                        z_lo = self.AxialConfig.cuts[NEty].loz[idx_fine]
+                                        z_up = self.AxialConfig.cuts[NEty].upz[idx_fine]
+                                        V_heter[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_lo)
+                                        if z_lo >= z_coarse_lo and z_up <= z_coarse_up:
+                                            V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_lo)
+                                        elif z_lo >= z_coarse_lo and z_up > z_coarse_up:
+                                            V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_coarse_up-z_lo)
+                                        elif z_lo <= z_coarse_lo and z_up <= z_coarse_up:
+                                            V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_coarse_lo)
+                                        else:
+                                            raise NEError(f"Error in homogenisation!")
 
-                                # perform homogenisation
-                                mat4hom = {}
-                                for name in names:
-                                    mat4hom[name] = self.data[temp][name]
-                                vol4hom = {"homog": dict(zip(names, V_homog)), 
-                                        "heter": dict(zip(names, V_heter))}
-                                tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata)
+                                    # perform homogenisation
+                                    mat4hom = {}
+                                    for name in names:
+                                        mat4hom[name] = self.data[temp][name]
+                                    vol4hom = {"homog": dict(zip(names, V_homog)), 
+                                            "heter": dict(zip(names, V_heter))}
+                                    tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata)
 
-                    # # --- update info in object
-                    # if newtype not in self.assemblytypes.keys():
-                    #     self.assemblytypes.update({nTypes+1: newtype})
-                    #     self.assemblylabel.update({nTypes+1: newtype})
-                    #     self.AxialConfig.config.update({nTypes+1: newaxregions})
-                    #     self.AxialConfig.config_str.update({newtype: newaxregions_str})
                     # --- replace assembly
                     if not isinstance(assbly, list):
                         assbly = [assbly]

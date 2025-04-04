@@ -646,19 +646,25 @@ class AxialConfig:
 
         # cuts defining different material regions
         xscuts = cuts['xscuts']
-        # homogenisation cuts
-        self.zcuts = [float(z) for z in cuts['zcuts']]
-        if len(self.zcuts) != len(set(self.zcuts)):
-            raise GeometryError(f"Axial cuts are repeated and/or not sorted --> {cuts['zcuts']}")
-        self.zcuts.sort()
+        if cuts['zcuts'] is not None:
+            # homogenisation cuts
+            self.zcuts = [float(z) for z in cuts['zcuts']]
+            if len(self.zcuts) != len(set(self.zcuts)):
+                raise GeometryError(f"Axial cuts are repeated and/or not sorted --> {cuts['zcuts']}")
+            self.zcuts.sort()
 
-        self.nZ = len(self.zcuts)-1
-        if len(splitz) != self.nZ:
-            raise OSError(f"Number of splitz ({len(splitz)}) does not match with number of cuts ({self.nZ})!")
+            self.nZ = len(self.zcuts)-1
+            if len(splitz) != self.nZ:
+                raise OSError(f"Number of splitz ({len(splitz)}) does not match with number of cuts ({self.nZ})!")
+            self.self.shared_z_planes = True
+            attributes = ['regions', 'labels', 'cuts', 'config', 'config_str',
+                        'cutsregions', 'cutslabels', 'cutsweights', 'cutscolors']
+        else:
+            attributes = ['cuts', 'regions', 'labels']
+            self.shared_z_planes = False
+            self.zcuts = None
 
         # initialise dict
-        attributes = ['regions', 'labels', 'cuts', 'config', 'config_str',
-                      'cutsregions', 'cutslabels', 'cutsweights', 'cutscolors']
         for at in attributes:
             self.__dict__[at] = MyDict()
         if labels is None:
@@ -694,63 +700,72 @@ class AxialConfig:
             for ir in r:
                 if ir in labels.keys():
                     lbl.append(labels[ir])
+
             self.cuts[asstype] = AxialCuts(up, lo, r, lbl)
             cuts = tuple(zip(r, lbl, lo, up))
-            zr, zl, zw, col = self.mapFine2Coarse(cuts, self.zcuts, colors)
-            self.cutsregions[asstype] = zr
-            self.cutslabels[asstype] = zl
-            self.cutsweights[asstype] = zw
-            self.cutscolors[asstype] = col
-            if not homog:
-                # check if homogenisation is needed
-                if any(y < 1 for y in zw['M1']):
-                    homog = True
 
-            regs = []
-            regsapp = regs.append
-            lbls = []
-            lblsapp = lbls.append
+            if self.shared_z_planes:
+                zr, zl, zw, col = self.mapFine2Coarse(cuts, self.zcuts, colors)
+                self.cutsregions[asstype] = zr
+                self.cutslabels[asstype] = zl
+                self.cutsweights[asstype] = zw
+                self.cutscolors[asstype] = col
+                if not homog:
+                    # check if homogenisation is needed
+                    if any(y < 1 for y in zw['M1']):
+                        homog = True
 
-            for k, val in zr.items():
-                # loop over each axial region
+                regs = []
+                regsapp = regs.append
+                lbls = []
+                lblsapp = lbls.append
+
+                for k, val in zr.items():
+                    # loop over each axial region
+                    for iz in range(self.nZ):
+                        if k == 'M1':
+                            regsapp(val[iz])
+                            lblsapp(labels[val[iz]])
+                        else:
+                            mystr = val[iz]
+                            if mystr != 0: # mix name
+                                regs[iz] = f'{regs[iz]} + {mystr}'
+                                lbls[iz] = f'{lbls[iz]} + {labels[mystr]}'
+                # make mixture name unique wrt iType and axial coordinates
+                iMix = 1
+                for jReg, r in enumerate(regs): # axial loop
+                    if '+' in r:
+                        # update counter if mix already exists
+                        if r in regs[:jReg]:
+                            iMix += 1 
+                        # add SAs type
+                        regs[jReg] = f'{asstype}_n.{iMix}: {r}'
+                        l = lbls[jReg]
+                        lbls[jReg] = f'{l}'
+                # get unique regions without changing list order
+                ureg = set()
+                ureg_add = ureg.add
+                tmp_dict = {}
                 for iz in range(self.nZ):
-                    if k == 'M1':
-                        regsapp(val[iz])
-                        lblsapp(labels[val[iz]])
-                    else:
-                        mystr = val[iz]
-                        if mystr != 0: # mix name
-                            regs[iz] = f'{regs[iz]} + {mystr}'
-                            lbls[iz] = f'{lbls[iz]} + {labels[mystr]}'
-            # make mixture name unique wrt iType and axial coordinates
-            iMix = 1
-            for jReg, r in enumerate(regs): # axial loop
-                if '+' in r:
-                    # update counter if mix already exists
-                    if r in regs[:jReg]:
-                        iMix += 1 
-                    # add SAs type
-                    regs[jReg] = f'{asstype}_n.{iMix}: {r}'
-                    l = lbls[jReg]
-                    lbls[jReg] = f'{l}'
-            # get unique regions without changing list order
-            ureg = set()
-            ureg_add = ureg.add
-            tmp_dict = {}
-            for iz in range(self.nZ):
-                if not (regs[iz] in ureg or ureg_add(regs[iz])):
-                    if regs[iz] not in self.regions.values():
-                        self.regions[self.nReg+1] = regs[iz]
-                        self.labels[regs[iz]] = lbls[iz]
-                        tmp_dict[regs[iz]] = self.nReg
-                    else:
-                        tmp_dict[regs[iz]] = list(self.regions.values()).index(regs[iz])+1
-            # --- assign axial configuration of iType SA 
-            self.config_str.update({asstype: regs})
-            self.config.update({iType: [tmp_dict[r] for r in regs]})
+                    if not (regs[iz] in ureg or ureg_add(regs[iz])):
+                        if regs[iz] not in self.regions.values():
+                            self.regions[self.nReg+1] = regs[iz]
+                            self.labels[regs[iz]] = lbls[iz]
+                            tmp_dict[regs[iz]] = self.nReg
+                        else:
+                            tmp_dict[regs[iz]] = list(self.regions.values()).index(regs[iz])+1
+                # --- assign axial configuration of iType SA 
+                self.config_str.update({asstype: regs})
+                self.config.update({iType: [tmp_dict[r] for r in regs]})
+
+            else:
+                for iReg, reg_name in enumerate(self.cuts[asstype].reg):
+                    if reg_name not in self.regions.values():
+                        self.regions[self.nReg + 1] = reg_name
+
         # --- assign homog. flag
         self.homogenised = homog
-        if splitz is not None:
+        if self.shared_z_planes:
             self.splitz = splitz
             mesh, centers = AxialCuts.mesh1d(splitz, self.zcuts)
             self.AxNodes = centers
