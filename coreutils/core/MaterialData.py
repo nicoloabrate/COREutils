@@ -101,8 +101,8 @@ def readSerpentRes(datapath, energygrid, T, beginswith,
 
     """
     # -- serpentTools settings
-    st.settings.rc['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod',
-                                           'gc-meta']
+    # st.settings.rc['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod',
+    #                                        'gc-meta']
 
     missinT = False
     if T is not None:
