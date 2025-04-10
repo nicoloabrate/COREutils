@@ -1204,8 +1204,27 @@ class NE:
                     if newtype not in self.AxialConfig.cuts.keys():
                         # --- operate translation
                         cuts = cp(self.AxialConfig.cuts[atype])
-                        cuts.upz[0:-1] = [z+dz for z in cuts.upz[0:-1]]
-                        cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]
+                        fixed_pos = transconfig.get("fixed",[0])[0]
+                        if fixed_pos == 0:
+                            cuts.upz[0:-1] = [z+dz for z in cuts.upz[0:-1]]
+                            cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]
+                        else:
+                            for i in range(len(cuts.upz)-1):
+                                if cuts.upz[i]<=fixed_pos:
+                                    cuts.upz[i] += 0
+                                    cuts.loz[i] += 0
+                                else:
+                                    if cuts.loz[i]+dz <= fixed_pos and cuts.upz[i]+dz > fixed_pos:
+                                        cuts.loz[i] = fixed_pos
+                                        cuts.upz[i] += dz
+                                    elif cuts.loz[i]+dz <= fixed_pos and cuts.upz[i]+dz <= fixed_pos:
+                                        cuts.upz[i] = fixed_pos
+                                        cuts.loz[i] = fixed_pos
+                                    else:
+                                        cuts.upz[i] += dz
+                                        cuts.loz[i] += dz
+                            cuts.loz[-1] += dz
+                        
                         self.AxialConfig.cuts[newtype] = AxialCuts(cuts.upz, cuts.loz, cuts.reg, cuts.labels)
                         cuts = list(zip(cuts.reg, cuts.labels, cuts.loz, cuts.upz))
                         if self.AxialConfig.shared_z_planes:

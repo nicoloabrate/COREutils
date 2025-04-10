@@ -11,7 +11,15 @@ from shutil import move, copyfile, SameFileError, rmtree
 from coreutils.tools.utils import fortranformatter as ff
 from coreutils.tools.properties import *
 from coreutils.tools.utils import fortranformatter # InputGeneratorError, 
-from coreutils.frenetic.FreneticInput import FreneticInput
+
+
+
+
+#from coreutils.frenetic.FreneticInput import FreneticInput
+
+
+
+
 
 from coreutils.tools.plot import RadialMap, AxialGeomPlot, SlabPlot
 from .InpTH import writeHTdata, writeBCdata, makeTHinput
