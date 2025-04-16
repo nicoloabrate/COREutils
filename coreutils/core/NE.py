@@ -1152,6 +1152,10 @@ class NE:
             raise OSError('dz missing in translate input!')
         if 'which' not in transconfig.keys():
             raise OSError('which missing in translate input!')
+        if 'fixed' not in transconfig.keys():
+            fixed_pos = 0
+        else:
+            fixed_pos = transconfig.get("fixed",[0])[0]
 
         if isinstance(transconfig['which'], str):
             str2int = self.assemblytypes.reverse()
@@ -1169,7 +1173,8 @@ class NE:
         
         # account for repetitions for updating replacement counter
         repetitions = []
-        for v in list(self.regions.values()):
+        #for v in list(self.regions.values()):
+        for v in list(self.assemblylabel.values()):  # the repetisions must be searched in the assembly names
             if action in v:
                 repetitions.append(v.split(action)[0])
 
@@ -1204,7 +1209,10 @@ class NE:
                     if newtype not in self.AxialConfig.cuts.keys():
                         # --- operate translation
                         cuts = cp(self.AxialConfig.cuts[atype])
-                        fixed_pos = transconfig.get("fixed",[0])[0]
+                        # FIXME FIXME FIXME
+                        # we should stock the initial thickness of the regions
+                        # because if they go under the fixed position and then the CR is inserted again,
+                        # we must know the maximum thickness of the region 
                         if fixed_pos == 0:
                             cuts.upz[0:-1] = [z+dz for z in cuts.upz[0:-1]]
                             cuts.loz[1:] = [z+dz for z in cuts.loz[1:]]

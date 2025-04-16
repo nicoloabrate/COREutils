@@ -19,7 +19,7 @@ for ass in trans_ass:
     loz = ax_cuts.loz
     upz = ax_cuts.upz
     my_dict[ass] = {'reg':reg,'loz':loz,'upz':upz}
-
+"""
 ass = 'CR-1trans'
 cuts = alfred_nea.NE.AxialConfig.cuts[ass]
 transconfig = {"which": [[6, 37]],"dz": [-10],"fixed": [72]}
@@ -45,4 +45,8 @@ else:
                 cuts.upz[i] += dz
                 cuts.loz[i] += dz
     cuts.loz[-1] += dz
+"""
 
+
+for i in range(len(my_dict['CR']['loz'])):
+    print(my_dict['CR']['loz'][i], my_dict['CR']['upz'][i],"","","",my_dict['CR-1trans']['loz'][i],my_dict['CR-1trans']['upz'][i],"","","",my_dict['CR-2trans']['loz'][i], my_dict['CR-2trans']['upz'][i],"","","",my_dict['CR-3trans']['loz'][i],my_dict['CR-3trans']['upz'][i],"","","",my_dict['CR-4trans']['loz'][i],my_dict['CR-4trans']['upz'][i],"","","",my_dict['CR-5trans']['loz'][i],my_dict['CR-5trans']['upz'][i],"","","",my_dict['CR-6trans']['loz'][i],my_dict['CR-6trans']['upz'][i],"","","",my_dict['CR-7trans']['loz'][i],my_dict['CR-7trans']['upz'][i],"","","",my_dict['CR']['reg'][i])
