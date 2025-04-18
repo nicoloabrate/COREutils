@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from coreutils.eranos.InpKIN3D import *
 from collections import defaultdict
+import os
 
 
 def genMaterialList(core):
@@ -52,3 +53,30 @@ def defineSubAssemblies(core):
         for ii in range(len(times)):
             if times[ii] == 0:
                 print(f"            {regions[ii]}        ({start}*(DILAX))             ({end}*(DILAX))")
+
+
+def axialMeshCore(core):
+    """
+    Generate the axial mesh of the core, considering all the configurations.
+    """
+    assemblies = core.NE.AxialConfig.cuts.keys()
+    DesiredHeight = core.NE.desiredAxialMesh
+    #sanity check
+    if DesiredHeight is not None and DesiredHeight <= 0:
+        raise OSError(f"Desired Axial Mesh must be > 0! It is equal to {DesiredHeight}")
+    
+    SetOfCuts = set()
+    for assembly in assemblies:
+        AssemblyCuts = core.NE.AxialConfig.cuts[assembly]
+        for loz in AssemblyCuts.loz:
+            SetOfCuts.add(loz)
+        for upz in AssemblyCuts.upz:
+            SetOfCuts.add(upz)
+    
+    SetOfCuts = sorted(list(SetOfCuts))
+    for ii in range(len(SetOfCuts)-1):
+        if DesiredHeight == None:
+            nz = 1
+        else:
+            nz = max(1,int(round((SetOfCuts[ii+1]-SetOfCuts[ii])/DesiredHeight)))
+        print(f"        {nz}   ({SetOfCuts[ii+1]}*(DILAX))  ! {(SetOfCuts[ii+1]-SetOfCuts[ii])/nz}")

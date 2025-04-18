@@ -508,6 +508,8 @@ class NE:
 
         self.worksheet = NEargs["worksheet"]
 
+        self.desiredAxialMesh = NEargs['desiredaxialmesh']
+
     def from_dict(self, inpdict):
         mydicts = ["assemblytypes", "regions", "zcoord", "assemblylabel"]
         for k, v in inpdict.items():

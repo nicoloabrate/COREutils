@@ -48,6 +48,7 @@ setToValue = {
                         'SAcolors': None,
                         'AXcolors': None,
                         'worksheet': False,
+                        'desiredaxialmesh': None,
                       },
                 'TH': {
                         'fren': True,
