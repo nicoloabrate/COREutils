@@ -52,7 +52,7 @@ def genDictAxialCutsTrans(core):
                 print(f"No region in {interval} at time {time}")
     return inverted_dict
 
-def changeRegionLabels(core):
+def newRegionLabels(core):
     """
     Change the region labels in order to distinguish them from the 
     rest of the regions in the core
@@ -118,7 +118,7 @@ def plotTableCompsWithLabels(core):
     """
     Generates a table with the compositions as a function of time
     """
-    axialCutsDf = changeRegionLabels(core)
+    axialCutsDf = newRegionLabels(core)
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
@@ -167,6 +167,32 @@ def genKIN3DcompChanges(core):
             if r1 != r2:
                 r1_label = f"{r1}_{ii:03}"
                 r2_label = f"{r2}_{ii:03}"
-                output_lines.append(f"COMPOSITION_CHANGE '{r1_label}' '{r2_label}' {t1} {t2}")
+                output_lines.append(f"COMPOSITION_CHANGE '{r1_label}' '{r2}' {t1} {t2}")
 
     return "\n".join(output_lines)
+
+
+def genKIN3DhexagonalDetector(detector_position=(30,30), filename="detector_specs.txt"):
+    """
+    Generates the detector specifications for KIN3D, given the position of the hexagonal detectors
+    """
+    with open(filename, "a") as f:
+        f.write("      DETECTOR_LOCATION_AND_CROSS_SECTIONS\n")
+        f.write(f"        'VIDE_VOID' {detector_position[0]} {detector_position[1]}\n")
+        f.write("          1  1  1  1  1  1  1  1  1  1  1\n")
+        f.write("          1  1  1  1  1  1  1  1  1  1  1\n")
+        f.write("          1  1  1  1  1  1  1  1  1  1  1\n")
+    return
+
+
+def genKIN3DfullDetectors(core, filename="detector_specs.txt"):
+    """
+    Generates the detector specifications for KIN3D, one for each subassembly
+    """
+    ass_positions = core.Map._Map__draweranosmap()
+    with open(filename, "w") as f:
+        pass
+    for pos in ass_positions:
+        genKIN3DhexagonalDetector(pos, filename)
+    return
+

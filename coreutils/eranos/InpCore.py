@@ -9,7 +9,7 @@ def genMaterialList(core):
     """
     Generate the material list to be included in the ECCO_Interface 
     """
-    axialCutsDf = changeRegionLabels(core)
+    axialCutsDf = newRegionLabels(core)
     regLabels = set()
     for (start, end), row in axialCutsDf.iterrows():
         regions = list(row.values)
@@ -44,7 +44,7 @@ def defineSubAssemblies(core):
     Define the sub-assemblies in the core, cosidering the initial axial configuration
     of the translated CRs.
     """
-    axialCutsDf = changeRegionLabels(core)
+    axialCutsDf = newRegionLabels(core)
     print("    SUB_ASSEMBLY 'CROD_EXTR'     ABSORBER    1  0.00")
     print("        MEDIUM")
     for (start, end), row in axialCutsDf.iterrows():
@@ -52,7 +52,7 @@ def defineSubAssemblies(core):
         regions = list(row.values)
         for ii in range(len(times)):
             if times[ii] == 0:
-                print(f"            {regions[ii]}        ({start}*(DILAX))             ({end}*(DILAX))")
+                print(f"            '{regions[ii]}'        ({start}*(DILAX))             ({end}*(DILAX))")
 
 
 def axialMeshCore(core):

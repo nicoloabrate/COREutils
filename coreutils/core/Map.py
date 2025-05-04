@@ -49,6 +49,9 @@ class Map:
     serp2fren: dict
         Dictionary mapping the assemblies according to the Serpent 2 numeration 
         to the one employed by FRENETIC.
+    fren2eranos: dict
+        Dictionary mapping the assemblies according to the FRENETIC numeration 
+        to the one employed by ERANOS.
     serpcentermap: dict
         Dictionary mapping assembly number to its center coordinates.
 
@@ -120,12 +123,14 @@ class Map:
         serpmap = Map.__drawserpmap(self, Geom)  # Serpent numeration
         # define assembly centers coordinate
         coord = Map.__findcenters(self, Geom)
+        eranosmap = Map.__draweranosmap(self)  # ERANOS numeration
 
         if Geom.type == "H":
             # define assembly numeration according to FRENETIC
             frenmap = Map.__drawfrenmap(self)
             # Serpent to FRENETIC dict
             self.serp2fren = OrderedDict(zip(serpmap[:], frenmap[:]))
+            self.fren2eranos = dict(zip(frenmap, eranosmap))
             # sort FRENETIC map in ascending way
             sortind = np.argsort(frenmap)
             frenmap = frenmap[sortind]
@@ -133,6 +138,7 @@ class Map:
             # serpmap = serpmap[sortind]
             # FRENETIC to Serpent dict
             self.fren2serp = dict(zip(frenmap, serpmap[sortind]))
+            
 
         # Serpent centers map
         self.serpcentermap = dict(zip(serpmap[sortind], coord))
@@ -434,6 +440,48 @@ class Map:
         frenmap = frenmap[frenmap != 0]
 
         return frenmap
+
+
+    def __draweranosmap(self, center = (30,30)):
+        """
+        Define the core map according to ERANOS code ordering.
+
+        Returns
+        -------
+        eranosmap : np.array
+            Array with assembly tuples
+        """
+        # FIXME only hex geom considered, generalize to all geometries
+        # check on geometry
+        if self.rotation_angle != 60 and self.rotation_angle != 0:
+            logger.critical("EranosMap method (now) works only for hexagonal core geometry!")
+            raise OSError("rotation angle should be 60 or 0 degrees")
+
+
+        nL = np.count_nonzero(self.sector, axis=1)
+        self.nonZeroCols = nL[nL != 0]
+        map = self.sector.astype(object)  # copy input matrix
+
+        # number of assemblies
+        # unpack non-zero coordinates of the matrix
+        x, y = np.where(map != 0)  # rows, columns
+        # define core central assembly
+        xc, yc = [np.max(x), np.min(y)]
+        # copy input matrix
+        eranosmap = self.type.astype(object)
+        for i in range(eranosmap.shape[0]):
+            for k in range(len(eranosmap[i])):
+                if eranosmap[i][k] != 0:
+                    eranosmap[i][k] = (center[0] + (k-(xc - (i-yc))), center[1] - (i-yc))
+        # flatten 2D array along 1 axis
+        eranosmap = eranosmap.flatten('C')
+        # squeeze out 0 assemblies
+        eranosmap = eranosmap[eranosmap != 0]
+
+        return eranosmap
+
+
+
 
 
 class MapError(Exception):
