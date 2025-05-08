@@ -7,6 +7,7 @@ Description: Class to plot data from Serpent calculations.
 """
 import numpy as np
 import math
+import re
 import logging
 import shutil as sh
 from numbers import Real
@@ -18,6 +19,8 @@ from matplotlib.patches import RegularPolygon, Rectangle
 from matplotlib.collections import PatchCollection
 from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 from matplotlib import rc, rcParams, colors, cm
+from scipy.interpolate import griddata
+
 
 rcParams['text.usetex']= True if sh.which('latex') else False
 
@@ -734,3 +737,94 @@ def isDark(color):
         return False
     else:
         return True
+
+
+def TransientRadialMap(time_vector, power_matrix, detector_locations, lattice_pitch=16.7):
+    """
+    Creates a 3D transient plot of detector power over time as a surface,
+    interpolating the data to a grid for display.
+
+    Parameters
+    ----------
+    time_vector : numpy.ndarray
+        A 1D numpy array containing time values.
+    power_matrix : numpy.ndarray
+        A 2D numpy array where each row represents the power values for a detector over time.
+    detector_locations : dict
+        A dictionary mapping detector numbers to their (x, y) coordinates.
+    lattice_pitch : float, optional
+        The lattice pitch of the hexagonal grid. Defaults to 16.7.
+
+    Returns
+    -------
+    None
+        Displays the 3D surface plot.
+    """
+
+    #time_vector, power_matrix, detector_locations = RetrieveDetectorPowerMatrix(core, filename)
+
+    if power_matrix is None or not power_matrix.size:
+        print("Error: No detector power data to display.")
+        return
+    if time_vector is None or not time_vector.size:
+        print("Error: No time data to display.")
+        return
+    if not detector_locations:
+        print("Error: No detector location data to display.")
+        return
+
+    num_detectors = power_matrix.shape[0]
+    num_time_points = power_matrix.shape[1]
+
+    x_vals_hex = []
+    y_vals_hex = []
+
+    # Convert hexagonal coordinates to Cartesian coordinates
+    for detector_number, (xx, yy) in detector_locations.items():
+        i = xx
+        j = yy
+        x_cart = lattice_pitch * ((i - 30) * math.cos(-math.pi / 6) + (j - 30) * math.cos(math.pi / 6))
+        y_cart = lattice_pitch * ((j - 30) * math.cos(-math.pi / 3) + (i - 30) * math.cos(-math.pi * 2 / 3))
+        x_vals_hex.append(x_cart)
+        y_vals_hex.append(y_cart)
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Create the meshgrid only once
+    X, Y = np.meshgrid(x_vals_hex, y_vals_hex)
+    
+    # Calculate global Z limits
+    z_min = np.nanmin(power_matrix)
+    z_max = np.nanmax(power_matrix)
+
+    # Iterate through time points and plot detector power as a surface
+    for t_index in range(num_time_points):
+        ax.cla()  # Clear the previous plot
+
+        # Get power values for this time point
+        power_values = power_matrix[:, t_index]
+
+        # Interpolate the data to a grid
+        xi = np.linspace(min(x_vals_hex), max(x_vals_hex), 100)
+        yi = np.linspace(min(y_vals_hex), max(y_vals_hex), 100)
+        Xi, Yi = np.meshgrid(xi, yi)
+        Z = griddata((x_vals_hex, y_vals_hex), power_values, (Xi, Yi), method='cubic')
+
+        # Create the surface plot
+        surf = ax.plot_surface(Xi, Yi, Z, cmap='viridis', edgecolor='none')
+
+        # Set axis labels and title
+        ax.set_xlabel('X [cm]')
+        ax.set_ylabel('Y [cm]')
+        ax.set_zlabel('Power [-]')
+        ax.set_title(f'Detector power at time t = {time_vector[t_index]:.2f} s')
+        ax.set_box_aspect([1, 1, 1])  # Set aspect ratio for better visualization
+
+        # Set Z axis limits
+        ax.set_zlim(z_min, z_max)
+
+        plt.pause(0.5)
+
+    plt.show()
+

@@ -481,7 +481,80 @@ class Map:
         return eranosmap
 
 
+    def __drawvariantmap(self,num_rings, center=(30, 30)):
+        """
+        Generates an array that maps the enumeration of hexagons to their coordinates
+        in a concentric hexagonal lattice, with the correct starting point for each ring.
 
+        Args:
+            num_rings (int): The number of rings surrounding the central hexagon.
+            center (tuple): The coordinates of the central hexagon.
+
+        Returns:
+            list of tuples: a list containing the tuples (x,y) coordinates of the hexagons ordered following VARIANT enumeration.
+        """
+        variantmap = []
+        xx, yy = center
+        variantmap.append((xx, yy))
+
+        for ring in range(1, num_rings + 1):
+            #starting point for each ring
+            xx += 1
+            yy -= 1
+            variantmap.append((xx, yy))
+            n_hex = 1
+            # first side
+            n_side = 1
+            while n_side < ring:
+                xx += 1
+                yy += 0
+                variantmap.append((xx, yy))
+                n_hex += 1
+                n_side +=1
+            # second side
+            n_side = 1
+            while n_side < ring+1:
+                xx += 0
+                yy += 1
+                variantmap.append((xx, yy))
+                n_hex += 1
+                n_side +=1
+            # third side
+            n_side = 1
+            while n_side < ring+1:
+                xx -= 1
+                yy += 1
+                variantmap.append((xx, yy))
+                n_hex += 1
+                n_side +=1
+            # fourth side
+            n_side = 1
+            while n_side < ring+1:
+                xx -= 1
+                yy += 0
+                variantmap.append((xx, yy))
+                n_hex += 1
+                n_side +=1
+            # fifth side
+            n_side = 1
+            while n_side < ring+1:
+                xx += 0
+                yy -= 1
+                variantmap.append((xx, yy))
+                n_hex += 1
+                n_side +=1
+            # sixth side
+            n_side = 1
+            while n_side < ring+1:
+                xx += 1
+                yy -= 1
+                variantmap.append((xx, yy))
+                n_hex += 1
+                n_side +=1
+            if n_hex != 6*ring:
+                raise MapError("Error in variant map generation: number of hexagons in the ring is not correct")
+            
+        return variantmap
 
 
 class MapError(Exception):
