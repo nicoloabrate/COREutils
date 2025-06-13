@@ -163,22 +163,6 @@ class Core:
         # --- ASSIGN COMMON INPUT DATA
         write_coreutils_msg(f"Assign general core data")
 
-        TfTc = []
-        CIargs['tf_tc'].sort()
-        self.TfTc = [(float(Ttup[0]), float(Ttup[1])) for Ttup in CIargs['tf_tc']]
-        self.Tf = []
-        self.Tc = [] 
-        for Tf, Tc in self.TfTc:
-            if Tf < Tc:
-                raise OSError(f"Tf={Tf} < Tc={Tc}! Check input file.")
-            else:
-                self.Tf.append(Tf)
-                self.Tc.append(Tc)
-        self.Tf = list(set(self.Tf))
-        self.Tc = list(set(self.Tc))
-        self.Tf.sort()
-        self.Tc.sort()
-
         self.TimeEnd = tEnd
         self.trans = trans
         self.dim = dim

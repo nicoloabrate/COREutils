@@ -12,7 +12,7 @@ from pathlib import Path
 from collections import OrderedDict
 from coreutils.tools.utils import MyDict, write_coreutils_msg
 from coreutils.core.UnfoldCore import UnfoldCore
-from coreutils.core.MaterialData import *
+from coreutils.core.MaterialData import MGC_reader, NEMaterial, Homogenise
 from coreutils.core.Geometry import Geometry, AxialConfig, AxialCuts
 from matplotlib import colors
 
@@ -32,25 +32,13 @@ mycols1 = ["#19647e", "#28afb0", "#ee964b", # generated with Coloor
 xkcd = list(colors.XKCD_COLORS.keys())  
 mycols1.extend(xkcd)
 
-# # --- pick more colors
-# if len(mycols1) < nReg:
-#     if seed is None:
-#         np.random.seed(1)
-#     N = nReg-len(mycols1)
-#     # assign random colours
-#     for icol in range(N):
-#         mycols1.append(np.random.randint(3,))
+reader_ext = {
+            "serpent": "_res.m",
+            "json": ".json",
+            "txt": ".txt",
+            "nemtab": ".XS",
+             }
 
-# # color dict
-# if isinstance(core.NE.plot["regionslabel"], dict):
-#     # get labels
-#     reg_lbl = []
-#     for v in core.NE.plot["regionslabel"].values():
-#         if v not in reg_lbl:
-#             reg_lbl.append(v)
-#     asscol = dict(zip(reg_lbl, mycols1))
-# else:
-#     asscol = dict(zip(reg, mycols1))
 
 class NE:
     """
@@ -107,20 +95,9 @@ class NE:
         config = NEargs['config']
         NEfren = NEargs['fren']
         NEassemblylabel = NEargs['assemblylabel']
-        NEdata = NEargs['nedata']
-        if "fixdata" in NEdata.keys():
-            self.fixdata = NEdata["fixdata"]
-        else:
-            self.fixdata = 1
-
-        if "nxn" in NEdata.keys():
-            self.use_nxn = NEdata["nxn"]
-        else:
-            self.use_nxn = False
-
-        isPH = True if 'PH' in NEdata.keys() else False
-
+        MMGCdata = NEargs['mgcdata']
         self.time = [0.]
+        # ------ GEOMETRY ------
         # --- AXIAL GEOMETRY, IF ANY
         if cuts is not None and dim != 2:
             write_coreutils_msg(f"Build core axial geometry for NE object")
@@ -178,46 +155,17 @@ class NE:
 
         # --- parse names of NE universes (==region mix)
         if dim != 2:
-            univ = []  # consider axial regions in "cuts"
+            NE_regions = []  # consider axial regions in "cuts"
             for k in self.AxialConfig.cuts.keys():
-                univ.extend(self.AxialConfig.cuts[k].reg)
+                NE_regions.extend(self.AxialConfig.cuts[k].reg)
         else:
             univ = cp(assemblynames)  # regions are assembly names
         # squeeze repetitions
-        univ = list(set(univ))
+        NE_regions = list(set(NE_regions))
 
-        # ------ NE MATERIAL DATA AND ENERGY GRID
-        if NEdata is not None:
-            self.NEdata = NEdata
-            self.get_energy_grid(NEargs)
-            if isPH:
-                self.get_PH_energy_grid(NEdata["PH"])
-            
-            write_coreutils_msg(f"Read and assign multi-group constants to NE object")
-            self.get_material_data(univ, CI, fixdata=self.fixdata, isPH=isPH, use_nxn=self.use_nxn)
-
-            # --- check precursors family consistency
-            NP = -1
-            NPp = -1
-            for temp in CI.TfTc:
-                for k, mat in self.data[temp].items():
-                    if NP == -1:
-                        NP = mat.NPF
-                    else:
-                        if NP != mat.NPF:
-                            raise OSError(f'Number of neutron precursor families in {k} '
-                                        'not consistent with the other regions!')
-
-            self.nPre = NP
-            if isPH:
-                self.nPrp = 0 # FIXME TODO!
-                self.nGrp = len(self.energygridPH)-1
-                self.nDhp = 1 # FIXME TODO!
-                logger.info("DHP set to 1!")
-            else:
-                self.nPrp = 0
-                self.nGrp = 0
-                self.nDhp = 0
+        # ------ NE MATERIAL DATA AND ENERGY GRID ------
+        if MMGCdata is not None:
+            self.MGClibrary = MGClibrary(MMGCdata, NE_regions, CI, self)
 
         # ------ BUILD NE TIME_DEP. CONFIGURATIONS
         write_coreutils_msg(f"Define NE time-dependent configurations")
@@ -265,223 +213,233 @@ class NE:
                                  isfren=NEfren)
         # --- CLEAN DATASET 
         # remove unused regions
-        if NEdata is not None:
+        if MMGCdata is not None:
             # remove Material objects if not needed anymore
-            for temp in CI.TfTc:
-                tmp = self.data[temp]
+            for iPar in self.MGClibrary.data.keys():
+                tmp = self.MGClibrary.data[iPar]
                 universes = list(tmp.keys())
                 for u in universes:
                     if u not in self.regions.values():
                         tmp.pop(u)
 
         # ------ PERFORM COLLAPSING, IF ANY
-        write_coreutils_msg(f"Carry out multi-group collapsing")
-        if NEdata is not None and 'collapse' in NEargs:
-            # check path to data
-            if 'path' in NEargs['collapse']:
-                collpath = Path(NEargs['collapse']['path'])
-            else:
-                collpath = None
-                spectrum = None # use default flux in data
-
-            # get few groups and grid name (# TODO merge this with method get_energy_grid)
-            if 'egridname' in NEargs['collapse'].keys():
-                ename = NEargs['collapse']['egridname']
-            else:
-                ename = None
-
-            if 'energygrid' in NEargs['collapse'].keys():
-                fewgrp = NEargs['collapse']['energygrid']
-            else:
-                fewgrp = ename
-
-            if isinstance(fewgrp, (list, np.ndarray, tuple)):
-                nGro = len(fewgrp)-1
-                egridname = f'{self.nGro}G' if ename is None else ename
-                fewgrp = fewgrp
-            elif isinstance(fewgrp, (str, float, int)):
-                pwd = Path(__file__).parent.parent.parent
-                if 'COREutils'.lower() not in str(pwd).lower():
-                    raise OSError(f'Check coreutils tree for NEdata: {pwd}')
+        if MMGCdata is not None:
+            if 'collapse' in MMGCdata:
+                write_coreutils_msg(f"Carry out multi-group collapsing")
+                # check path to data
+                if 'path' in MMGCdata['collapse']:
+                    collpath = Path(MMGCdata['collapse']['path'])
                 else:
-                    pwd = pwd.joinpath('NEdata')
-                    if isinstance(fewgrp, str):
-                        fgname = f'{fewgrp}.txt'
-                        egridname = str(fewgrp)
+                    collpath = None
+                    spectrum = None # use default flux in data
+
+                # get few groups and grid name
+                if 'energy_grid_name' in MMGCdata['collapse'].keys():
+                    ename = MMGCdata['collapse']['energy_grid_name']
+                else:
+                    ename = None
+
+                if 'energy_grid' in MMGCdata['collapse'].keys():
+                    fewgrp = MMGCdata['collapse']['energy_grid']
+                else:
+                    fewgrp = ename
+
+                if ename is None and fewgrp is None:
+                    raise NEError("'collapse' dict needs 'energy_grid' or 'energy_grid_name' keys!")
+
+                if isinstance(fewgrp, (list, np.ndarray, tuple)):
+                    n_groups = len(fewgrp)-1
+                    energy_grid_name = f'{self.MGClibrary.n_groups}G' if ename is None else ename
+                    fewgrp = fewgrp
+                elif isinstance(fewgrp, (str, float, int)):
+                    pwd = Path(__file__).parent.parent.parent
+                    if 'COREutils'.lower() not in str(pwd).lower():
+                        raise OSError(f'Check coreutils tree for NEdata: {pwd}')
                     else:
-                        fgname = f'{fewgrp}G.txt'
-                        egridname = str(fewgrp)
-
-                    egridpath = pwd.joinpath('group_structures', fgname)
-                    fewgrp = np.loadtxt(egridpath)
-                    nGro = len(fewgrp)-1
-            else:
-                raise OSError(f'Unknown fewgrp grid for collapsing {type(fewgrp)}')
-
-            if fewgrp[0] < fewgrp[0]:
-                fewgrp[np.argsort(-fewgrp)]
-
-            # check existence of multiple collapsing spectra
-            if 'config' in NEargs['collapse'].keys():
-                xs_config = NEargs['collapse']['config']
-                # sanity check on xs collapsing times
-                for k in xs_config.keys():
-                    if k not in config.keys():
-                        raise OSError(f"t={k} [s] for collapsing not included in NE config. times!")
-                # sanity check on config times
-                for k in config.keys():
-                    if k not in xs_config.keys():
-                        raise OSError(f"t={k} [s] for collapsing not included in collapsing config. times!")
-                # transient = True 
-                nConf = len(xs_config.keys())
-            else:
-                if config is None:
-                    xs_config = {"0.0": None}
-                else:
-                    xs_config = dict(zip(config.keys(), [collpath]*len(config.keys())))
-                # transient = False
-
-            new_config = {}
-            data = {}
-            labels = {}
-            regions = MyDict()
-            assemblytypes = MyDict()
-            assemblylabel = MyDict()
-            if CI.dim != 2:
-                AxialConfig_config = MyDict()
-                AxialConfig_config_str = MyDict() # orderedict
-                AxialConfig_cuts = MyDict()
-                AxialConfig_cutslabels = MyDict()
-                AxialConfig_cutsregions = MyDict()
-                AxialConfig_cutsweights = MyDict()
-                AxialConfig_labels = MyDict()
-                AxialConfig_regions = MyDict()
-
-            nT = 1 # configuration counter
-            nReg = 0
-            for t in xs_config.keys():
-                conf = xs_config[t]
-                # add new regions
-                tf = float(t)
-                new_config[tf] = self.config[tf]+0
-                # get SAs @ t=tf and corresponding universes
-                sa_types = np.unique(self.config[tf])
-                sa_types = sa_types[sa_types != 0]
-                univ_at_t = []
-                # update SA-related objects
-                for sa in sa_types:
-                    sa_name = cp(self.assemblytypes[sa])
-                    if CI.dim != 2:
-                        univ = self.AxialConfig.config_str[sa_name]
-                        univ_str_newT = [f"({u})-T{nT}" for u in univ]
-                        sa_name_new = f"({sa_name})-T{nT}"
-                        AxialConfig_config_str[sa_name_new] = univ_str_newT
-                        n_SA = len(AxialConfig_config_str.keys())
-                        # FIXME nR
-                        if n_SA == 1:
-                            nU = 0
-                            nR = len(AxialConfig_config_str[sa_name_new]) # len()  # 1
+                        pwd = pwd.joinpath('NEdata')
+                        if isinstance(fewgrp, str):
+                            fgname = f'{fewgrp}.txt'
+                            energy_grid_name = str(fewgrp)
                         else:
-                            nU = AxialConfig_config[n_SA-1][-1]
-                            nR = len(AxialConfig_config_str[sa_name_new])
-                        AxialConfig_config[n_SA] = [-1]*nR
-                        # copy starting objects (only strings change, coordinates are fixed)
-                        AxialConfig_cuts[sa_name_new] = cp(self.AxialConfig.cuts[sa_name])
-                        AxialConfig_cutsregions[sa_name_new] = cp(self.AxialConfig.cutsregions[sa_name])
-                        AxialConfig_cutslabels[sa_name_new] = cp(self.AxialConfig.cutslabels[sa_name])
-                        AxialConfig_cutsweights[sa_name_new] = cp(self.AxialConfig.cutsweights[sa_name])
-                        # update names of the axial regions (assuming that different spectra are used at different times)
-                        for i, name in enumerate(AxialConfig_cuts[sa_name_new].reg):
-                            AxialConfig_cuts[sa_name_new].reg[i] = f"({name})-T{nT}"
-                            for M in AxialConfig_cutsregions[sa_name_new].keys():
-                                for iCell in range(len(AxialConfig_cutsregions[sa_name_new][M])):
-                                    if AxialConfig_cutsregions[sa_name_new][M][iCell] != 0:
-                                        AxialConfig_cutsregions[sa_name_new][M][iCell] = f"({name})-T{nT}"
+                            fgname = f'{fewgrp}G.txt'
+                            energy_grid_name = str(fewgrp)
 
-                        for n in range(1, nR+1):
-                            if univ_str_newT[n-1] not in regions.values():
-                                nReg += 1
-                                AxialConfig_config[n_SA][n-1] = nReg
-                                # univ_int_newT = np.arange(nU+1, nU+len(univ_str_newT)+1).tolist()
-                                regions[nReg] = univ_str_newT[n-1]
-                                lbl_key = univ_str_newT[n-1].split(f"-T{nT}")[0][1:-1]
-                                labels[univ_str_newT[n-1]] = self.labels[lbl_key]
-                            else:
-                                AxialConfig_config[n_SA][n-1] = list(regions.values()).index(univ_str_newT[n-1])+1
+                        egridpath = pwd.joinpath('group_structures', fgname)
+                        fewgrp = np.loadtxt(egridpath)
+                        n_groups = len(fewgrp)-1
+                else:
+                    raise OSError(f'Unknown fewgrp grid for collapsing {type(fewgrp)}')
 
-                            AxialConfig_regions[n+nU+1] = univ_str_newT[n-1]
+                if fewgrp[0] < fewgrp[0]:
+                    fewgrp[np.argsort(-fewgrp)]
 
-                        assemblytypes[n_SA] = sa_name_new
-                        which = list(self.assemblytypes.values()).index(sa_name)
-                        assemblylabel[n_SA] = self.assemblylabel[which+1]
-                        AxialConfig_labels[sa_name_new] = self.AxialConfig.cuts[sa_name].labels
-                        univ_at_t.extend(univ)
-
-                        # update config
-                        lst = CI.getassemblylist(sa, self.config[tf])
-                        lst = [i-1 for i in lst]
-                        lst = (list(set(lst)))
-                        rows, cols = np.unravel_index(lst, CI.Map.type.shape)
-                        new_config[tf][rows, cols] = n_SA
+                # check existence of multiple collapsing spectra
+                if 'config' in MMGCdata['collapse'].keys():
+                    xs_config = MMGCdata['collapse']['config']
+                    # sanity check on xs collapsing times
+                    for k in xs_config.keys():
+                        if k not in config.keys():
+                            raise OSError(f"t={k} [s] for collapsing not included in NE config. times!")
+                    # sanity check on config times
+                    for k in config.keys():
+                        if k not in xs_config.keys():
+                            raise OSError(f"t={k} [s] for collapsing not included in collapsing config. times!")
+                    # transient = True 
+                    nConf = len(xs_config.keys())
+                else:
+                    if config is None:
+                        xs_config = {"0.0": None}
                     else:
-                        sa_name_new = f"({sa_name})-T{nT}"
-                        nR = len(assemblytypes.keys())
-                        regions[nR+1] = sa_name_new
-                        assemblytypes[nR+1] = sa_name_new
-                        which = list(self.assemblytypes.values()).index(sa_name)
-                        assemblylabel[nR+1] = cp(self.assemblylabel[which+1])
-                        labels[sa_name_new] = cp(self.labels[sa_name])
-                        univ_at_t.append(sa_name)
-                        # update config
-                        lst = CI.getassemblylist(sa, self.config[tf])
-                        lst = [i-1 for i in lst]
-                        lst = (list(set(lst)))
-                        rows, cols = np.unravel_index(lst, CI.Map.type.shape)
-                        new_config[tf][rows, cols] = nR+1
+                        xs_config = dict(zip(config.keys(), [collpath]*len(config.keys())))
+                    # transient = False
 
-                for temp in CI.TfTc:
-                    Tf, Tc = temp
-                    if temp not in data.keys():
-                        data[temp] = {}
-                    for u in self.data[temp].keys():
-                        if u in univ_at_t:
-                            new_u = f"({u})-T{nT}"
-                            data[temp][new_u] = cp(self.data[temp][u])
+                new_config = {}
+                data = {}
+                labels = {}
+                regions = MyDict()
+                assemblytypes = MyDict()
+                assemblylabel = MyDict()
+                if CI.dim != 2:
+                    AxialConfig_config = MyDict()
+                    AxialConfig_config_str = MyDict() # orderedict
+                    AxialConfig_cuts = MyDict()
+                    AxialConfig_cutslabels = MyDict()
+                    AxialConfig_cutsregions = MyDict()
+                    AxialConfig_cutsweights = MyDict()
+                    AxialConfig_labels = MyDict()
+                    AxialConfig_regions = MyDict()
 
-                            if collpath is not None:
-                                fname = str(collpath.joinpath(conf, f"Tf_{Tf:g}_Tc_{Tc:g}", self.egridname, f"{u}.txt"))
-                                if not Path(fname).exists():
-                                    fname = str(collpath.joinpath(conf, f"Tc_{Tc:g}_Tf_{Tf:g}", self.egridname, f"{u}.txt"))
-                                spectrum = np.loadtxt(fname)
+                nT = 1 # configuration counter
+                nReg = 0
+                for t in xs_config.keys():
+                    conf = xs_config[t]
+                    # add new regions
+                    tf = float(t)
+                    new_config[tf] = self.config[tf]+0
+                    # get SAs @ t=tf and corresponding universes
+                    sa_types = np.unique(self.config[tf])
+                    sa_types = sa_types[sa_types != 0]
+                    univ_at_t = []
+                    # update SA-related objects
+                    for sa in sa_types:
+                        sa_name = cp(self.assemblytypes[sa])
+                        if CI.dim != 2:
+                            univ = self.AxialConfig.config_str[sa_name]
+                            univ_str_newT = [f"({u})-T{nT}" for u in univ]
+                            sa_name_new = f"({sa_name})-T{nT}"
+                            AxialConfig_config_str[sa_name_new] = univ_str_newT
+                            n_SA = len(AxialConfig_config_str.keys())
+                            # FIXME nR
+                            if n_SA == 1:
+                                nU = 0
+                                nR = len(AxialConfig_config_str[sa_name_new]) # len()  # 1
+                            else:
+                                nU = AxialConfig_config[n_SA-1][-1]
+                                nR = len(AxialConfig_config_str[sa_name_new])
+                            AxialConfig_config[n_SA] = [-1]*nR
+                            # copy starting objects (only strings change, coordinates are fixed)
+                            AxialConfig_cuts[sa_name_new] = cp(self.AxialConfig.cuts[sa_name])
+                            AxialConfig_cutsregions[sa_name_new] = cp(self.AxialConfig.cutsregions[sa_name])
+                            AxialConfig_cutslabels[sa_name_new] = cp(self.AxialConfig.cutslabels[sa_name])
+                            AxialConfig_cutsweights[sa_name_new] = cp(self.AxialConfig.cutsweights[sa_name])
+                            # update names of the axial regions (assuming that different spectra are used at different times)
+                            for i, name in enumerate(AxialConfig_cuts[sa_name_new].reg):
+                                AxialConfig_cuts[sa_name_new].reg[i] = f"({name})-T{nT}"
+                                for M in AxialConfig_cutsregions[sa_name_new].keys():
+                                    for iCell in range(len(AxialConfig_cutsregions[sa_name_new][M])):
+                                        if AxialConfig_cutsregions[sa_name_new][M][iCell] != 0:
+                                            AxialConfig_cutsregions[sa_name_new][M][iCell] = f"({name})-T{nT}"
 
-                                if spectrum.shape[0] != self.nGro:
-                                    raise NEError(f"Cannot collapse to {len(fewgrp)} with {spectrum.shape[0]} groups!",
-                                                  f"Check {fname} file!")
-                            # FIXME
-                            self.P1consistent = False
-                            # TODO add photon collapsing
-                            data[temp][new_u].collapse(fewgrp, spectrum=spectrum, egridname=egridname, fixdata=self.fixdata)
+                            for n in range(1, nR+1):
+                                if univ_str_newT[n-1] not in regions.values():
+                                    nReg += 1
+                                    AxialConfig_config[n_SA][n-1] = nReg
+                                    # univ_int_newT = np.arange(nU+1, nU+len(univ_str_newT)+1).tolist()
+                                    regions[nReg] = univ_str_newT[n-1]
+                                    lbl_key = univ_str_newT[n-1].split(f"-T{nT}")[0][1:-1]
+                                    labels[univ_str_newT[n-1]] = self.labels[lbl_key]
+                                else:
+                                    AxialConfig_config[n_SA][n-1] = list(regions.values()).index(univ_str_newT[n-1])+1
 
-                nT += 1
-            # update regions
-            self.config = new_config
-            self.regions = regions
-            if CI.dim != 2:
-                self.AxialConfig.config = AxialConfig_config
-                self.AxialConfig.config_str = AxialConfig_config_str
-                self.AxialConfig.cuts = AxialConfig_cuts
-                self.AxialConfig.cutslabels = AxialConfig_cutslabels
-                self.AxialConfig.cutsweights = AxialConfig_cutsweights
-                self.AxialConfig.cutsregions = AxialConfig_cutsregions
+                                AxialConfig_regions[n+nU+1] = univ_str_newT[n-1]
 
-            self.assemblytypes = assemblytypes
-            self.assemblylabel = assemblylabel
-            self.labels = labels
-            self.data = data
-            # update attributes in self
-            self.nGro = len(fewgrp)-1
-            self.energygrid = fewgrp
-            self.egridname = egridname
+                            assemblytypes[n_SA] = sa_name_new
+                            which = list(self.assemblytypes.values()).index(sa_name)
+                            assemblylabel[n_SA] = self.assemblylabel[which+1]
+                            AxialConfig_labels[sa_name_new] = self.AxialConfig.cuts[sa_name].labels
+                            univ_at_t.extend(univ)
+
+                            # update config
+                            lst = CI.getassemblylist(sa, self.config[tf])
+                            lst = [i-1 for i in lst]
+                            lst = (list(set(lst)))
+                            rows, cols = np.unravel_index(lst, CI.Map.type.shape)
+                            new_config[tf][rows, cols] = n_SA
+                        else:
+                            sa_name_new = f"({sa_name})-T{nT}"
+                            nR = len(assemblytypes.keys())
+                            regions[nR+1] = sa_name_new
+                            assemblytypes[nR+1] = sa_name_new
+                            which = list(self.assemblytypes.values()).index(sa_name)
+                            assemblylabel[nR+1] = cp(self.assemblylabel[which+1])
+                            labels[sa_name_new] = cp(self.labels[sa_name])
+                            univ_at_t.append(sa_name)
+                            # update config
+                            lst = CI.getassemblylist(sa, self.config[tf])
+                            lst = [i-1 for i in lst]
+                            lst = (list(set(lst)))
+                            rows, cols = np.unravel_index(lst, CI.Map.type.shape)
+                            new_config[tf][rows, cols] = nR+1
+
+                    for iPar in self.MGClibrary.data.keys():
+                        if iPar not in data.keys():
+                            data[iPar] = {}
+                        for u in self.MGClibrary.data[iPar].keys():
+                            if u in univ_at_t:
+                                new_u = f"({u})-T{nT}"
+                                data[iPar][new_u] = cp(self.MGClibrary.data[iPar][u])
+
+                                if collpath is not None:
+                                    # FIXME FIXME
+                                    fname = str(collpath.joinpath(conf, f"par{iPar:g}", self.energy_grid_name, f"{u}.txt"))
+                                    if not Path(fname).exists():
+                                        fname = str(collpath.joinpath(conf, f"par{iPar:g}", self.energy_grid_name, f"{u}.txt"))
+                                    spectrum = np.loadtxt(fname)
+
+                                    if spectrum.shape[0] != self.MGClibrary.n_groups:
+                                        raise NEError(f"Cannot collapse to {len(fewgrp)} with {spectrum.shape[0]} groups!",
+                                                    f"Check {fname} file!")
+                                # FIXME
+                                self.P1consistent = False
+                                # TODO add photon collapsing
+                                data[iPar][new_u].collapse(fewgrp, self.MGClibrary.energy_grid, spectrum=spectrum, fixdata=self.MGClibrary.fixdata)
+
+                    nT += 1
+
+                # update energy grid
+                self.MGClibrary.fine_energy_grid = self.MGClibrary.energy_grid + 0
+                self.MGClibrary._energy_grid = fewgrp
+                self.MGClibrary._n_groups = len(fewgrp) - 1
+                self.MGClibrary.energy_grid_name = energy_grid_name if energy_grid_name else f'{G}G'
+                # update regions
+                self.config = new_config
+                self.regions = regions
+                if CI.dim != 2:
+                    self.AxialConfig.config = AxialConfig_config
+                    self.AxialConfig.config_str = AxialConfig_config_str
+                    self.AxialConfig.cuts = AxialConfig_cuts
+                    self.AxialConfig.cutslabels = AxialConfig_cutslabels
+                    self.AxialConfig.cutsweights = AxialConfig_cutsweights
+                    self.AxialConfig.cutsregions = AxialConfig_cutsregions
+
+                self.assemblytypes = assemblytypes
+                self.assemblylabel = assemblylabel
+                self.labels = labels
+                self.MGClibrary.data = data
+                # update attributes in self
+                self.n_groups = len(fewgrp)-1
+                self.energy_grid = fewgrp
+                self.energy_grid_name = energy_grid_name
 
         if NEargs["regionslabel"] is None:
             if CI.dim != 2:
@@ -850,8 +808,8 @@ class NE:
                                 self.labels[r] = f'{lbls[jReg]}'
                     # --- homogenise
                     if self.AxialConfig.homogenised:
-                        for temp in core.TfTc:
-                            tmp = self.data[temp]  
+                        for temp in core.NE.MGClibrary.values.keys():
+                            tmp = self.MGClibrary.data[temp]  
                             for u0 in newmix:
                                 # identify SA type and subregions
                                 strsplt = re.split(r"\d_", u0, maxsplit=1)
@@ -882,10 +840,10 @@ class NE:
                                 # perform homogenisation
                                 mat4hom = {}
                                 for name in names:
-                                    mat4hom[name] = self.data[temp][name]
+                                    mat4hom[name] = self.MGClibrary.data[temp][name]
                                 vol4hom = {"homog": dict(zip(names, V_homog)), 
                                         "heter": dict(zip(names, V_heter))}
-                                tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata)
+                                tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata, self.add_missing_MGC)
 
                 # --- update info in object
                 if newtype not in self.assemblytypes.keys():
@@ -934,10 +892,10 @@ class NE:
             for ireg in SA_reg:
                 reg = self.regions[ireg]
                 # check that reg is fissile
-                for temp in core.TfTc:
+                for iPar in self.MGClibrary.parameters.values.keys():
                     perturb_list = []
-                    if reg in self.data[temp].keys():
-                        if self.data[temp][reg].isfiss():
+                    if reg in self.MGClibrary.data[iPar].keys():
+                        if self.MGClibrary.data[iPar][reg].isfiss():
                             fiss_reg.append(reg)
                     break # just to perform the check
 
@@ -945,7 +903,7 @@ class NE:
             lst_app = perturb_list.append
             for reg in fiss_reg:
                 lst_app({"region": reg, "howmuch": [1/keff-1],
-                        "what": "Nubar", "which": "all"})
+                        "what": "nu_fiss", "which": "all"})
 
             self.perturb(core, perturb_list, time=time, action="crit")
 
@@ -1035,12 +993,12 @@ class NE:
             depgro = prtdict['depgro']
             perturbation = prtdict['what']
             if perturbation != 'density':
-                if len(howmuch) != self.nGro:
+                if len(howmuch) != self.MGClibrary.n_groups:
                     if len(howmuch) == 1:
-                        howmuch = howmuch*self.nGro
+                        howmuch = howmuch*self.MGClibrary.n_groups
                     else:
                         raise OSError('The perturbation intensities' 
-                                      f' required should be list of 1 or {self.nGro} elements')
+                                      f' required should be list of 1 or {self.MGClibrary.n_groups} elements')
 
             notfound = True  # to check consistency of "where" arg
             for itype, assbly in whichlst.items(): # loop over each assembly
@@ -1098,9 +1056,9 @@ class NE:
                 else:
                     prtreg = f"{oldreg}-{action}"
                 # --- perturb data and assign it
-                for temp in core.TfTc:
-                    self.data[temp][prtreg] = cp(self.data[temp][oldreg])
-                    self.data[temp][prtreg].perturb(perturbation, howmuch, depgro, fixdata=fixdata)
+                for iPar in self.MGClibrary.data.keys():
+                    self.MGClibrary.data[iPar][prtreg] = cp(self.MGClibrary.data[iPar][oldreg])
+                    self.MGClibrary.data[iPar][prtreg].perturb(perturbation, howmuch, depgro, fixdata=fixdata)
                 # --- add new assemblies
                 self.regions[self.nReg+1] = prtreg
                 if action != "crit":
@@ -1268,8 +1226,8 @@ class NE:
                         self.AxialConfig.config_str.update({newtype: newaxregions_str})
 
                         # --- homogenise
-                        for temp in core.TfTc:
-                            tmp = self.data[temp]  
+                        for iPar in self.MGClibrary.data.keys():
+                            tmp = self.MGClibrary.data[iPar]  
                             for u0 in newmix:
                                 # identify SA type and subregions
                                 strsplt = re.split(r"\d: ", u0, maxsplit=1)
@@ -1300,7 +1258,7 @@ class NE:
                                 # perform homogenisation
                                 mat4hom = {}
                                 for name in names:
-                                    mat4hom[name] = self.data[temp][name]
+                                    mat4hom[name] = self.MGClibrary.data[iPar][name]
                                 vol4hom = {"homog": dict(zip(names, V_homog)), 
                                         "heter": dict(zip(names, V_heter))}
                                 tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata)
@@ -1317,193 +1275,6 @@ class NE:
                     dim = 3
                     self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
 
-    def get_material_data(self, univ, core, fixdata=True, isPH=False, use_nxn=False):
-
-        try:
-            path = self.NEdata['path']
-        except KeyError:
-            pwd = Path(__file__).parent.parent.parent
-            if 'coreutils' not in str(pwd):
-                raise OSError(f'Check coreutils tree for NEdata: {pwd}')
-
-            # look into default NEdata dir
-            path = str(pwd.joinpath('NEdata', self.egridname))
-
-        if "checktempdep" not in self.NEdata.keys():
-            self.NEdata["checktempdep"] = 0
-        if "P1consistent" not in self.NEdata.keys():
-            self.NEdata["P1consistent"] = 0
-        if "nPrec" not in self.NEdata.keys():
-            self.NEdata["nPrec"] = None
-
-        try:
-            files = self.NEdata['beginwith']
-        except KeyError:
-            # look for Serpent files in path/serpent
-            pwd = Path(__file__).parent.parent.parent
-            serpath = str(pwd.joinpath('NEdata', f'{self.egridname}',
-                                        'serpent'))
-            try:
-                files = [f for f in os.listdir(serpath)]
-            except FileNotFoundError as err:
-                logger.warning(str(err))
-                files = []
-
-        if not hasattr(self, 'data'):
-            self.data = {}
-        for temp in core.TfTc:
-            if temp not in self.data.keys():
-                self.data[temp] = {}
-            tmp = self.data[temp]
-            # get temperature for OS operation on filenames or do nothing
-            T = temp if self.NEdata["checktempdep"] else None
-            # look for all data in Serpent format
-            serpres = {}
-            serpdet = {}
-            serpuniv = []
-            for f in files:
-                sdata, sdet = readSerpentRes(path, self.energygrid, T, 
-                                            beginswith=f, egridname=self.egridname)
-                if sdata is not None:
-                    serpres[f] = sdata
-                    for univtup in sdata.universes.values():
-                        # access to HomogUniv attribute name
-                        serpuniv.append(univtup.name)
-
-                if sdet is not None:
-                    serpdet[f] = sdet
-
-            if isPH:
-                energygridPH = self.energygridPH
-            else:
-                energygridPH = None
-
-            for u in univ:
-                if u in serpuniv:
-                    tmp[u] = NEMaterial(u, self.energygrid, egridname=self.egridname, 
-                                        serpres=serpres, serpdet=serpdet, temp=T, fixdata=fixdata, 
-                                        P1consistent=self.NEdata["P1consistent"], use_nxn=use_nxn,
-                                        energygridPH=energygridPH)
-                else: # look for data in json and txt format
-                    tmp[u] = NEMaterial(u, self.energygrid, egridname=self.egridname,
-                                        datapath=path, basename=u, temp=T, fixdata=fixdata, 
-                                        P1consistent=self.NEdata["P1consistent"], use_nxn=use_nxn,
-                                        energygridPH=energygridPH)
-            # --- HOMOGENISATION (if any)
-            if core.dim != 2:
-                if self.AxialConfig.homogenised:
-                    for u0 in self.regions.values():
-                        if "+" in u0: # homogenisation is needed
-                            # identify SA type and subregions
-                            strsplt = re.split(r"\d: ", u0, maxsplit=1)
-                            NEty = strsplt[0].split("_n.")[0]
-                            names = re.split(r" \+ ", strsplt[1])
-                            # identify axial planes
-                            idx_coarse = self.AxialConfig.config_str[NEty].index(u0)
-                            z_coarse_lo = self.AxialConfig.zcuts[idx_coarse]
-                            z_coarse_up = self.AxialConfig.zcuts[idx_coarse + 1]
-                            # compute volumes
-                            V_heter = np.zeros((len(names), ))
-                            V_homog = np.zeros((len(names), ))
-                            for iM, mixname in enumerate(names):
-                                # fine region
-                                idx_fine = self.AxialConfig.cuts[NEty].reg.index(mixname)
-                                z_lo = self.AxialConfig.cuts[NEty].loz[idx_fine]
-                                z_up = self.AxialConfig.cuts[NEty].upz[idx_fine]
-                                V_heter[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_lo)
-                                if z_lo >= z_coarse_lo and z_up <= z_coarse_up:
-                                    V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_lo)
-                                elif z_lo >= z_coarse_lo and z_up > z_coarse_up:
-                                    V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_coarse_up-z_lo)
-                                elif z_lo <= z_coarse_lo and z_up <= z_coarse_up:
-                                    V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_coarse_lo)
-                                else:
-                                    raise NEError(f"Error in homogenisation!")
-
-                            # perform homogenisation
-                            mat4hom = {}
-                            for name in names:
-                                mat4hom[name] = self.data[temp][name]
-                            vol4hom = {"homog": dict(zip(names, V_homog)), 
-                                      "heter": dict(zip(names, V_heter))}
-                            tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata)
-
-    def get_energy_grid(self, NEargs):
-        if 'egridname' in NEargs.keys():
-            ename = NEargs['egridname']
-        else:
-            ename = None
-
-        if 'energygrid' in NEargs.keys():
-            energygrid = NEargs['energygrid']
-        else:
-            energygrid = ename
-
-        if isinstance(energygrid, (list, np.ndarray, tuple)):
-            self.nGro = len(energygrid)-1
-            self.egridname = f'{self.nGro}G' if ename is None else ename
-            self.energygrid = np.asarray(energygrid)
-        elif isinstance(energygrid, (str, float, int)):
-            pwd = Path(__file__).parent.parent.parent
-            if 'COREutils'.lower() not in str(pwd).lower():
-                raise OSError(f'Check coreutils tree for NEdata: {pwd}')
-            else:
-                pwd = pwd.joinpath('NEdata')
-                if isinstance(energygrid, str):
-                    fgname = f'{energygrid}.txt'
-                    self.egridname = str(energygrid)
-                else:
-                    fgname = f'{energygrid}G.txt'
-                    self.egridname = str(energygrid)
-
-                egridpath = pwd.joinpath('group_structures', fgname)
-                self.energygrid = np.loadtxt(egridpath)
-                self.nGro = len(self.energygrid)-1
-        else:
-            raise OSError(f'Unknown energygrid \
-                            {type(energygrid)}')
-
-        if self.energygrid[0] < self.energygrid[0]:
-            self.energygrid[np.argsort(-self.energygrid)]
-
-    def get_PH_energy_grid(self, PHargs):
-        if 'egridname' in PHargs.keys():
-            ename = PHargs['egridname']
-        else:
-            ename = None
-
-        if 'energygrid' in PHargs.keys():
-            energygrid = PHargs['energygrid']
-        else:
-            energygrid = ename
-
-        if isinstance(energygrid, (list, np.ndarray, tuple)):
-            self.nGrp = len(energygrid)-1
-            self.egridnamePH = f'{self.nGrp}G' if ename is None else ename
-            self.energygridPH = energygrid
-        elif isinstance(energygrid, (str, float, int)):
-            pwd = Path(__file__).parent.parent.parent
-            if 'COREutils'.lower() not in str(pwd).lower():
-                raise OSError(f'Check coreutils tree for PHdata: {pwd}')
-            else:
-                pwd = pwd.joinpath('PHdata')
-                if isinstance(energygrid, str):
-                    fgname = f'{energygrid}.txt'
-                    self.egridnamePH = str(energygrid)
-                else:
-                    fgname = f'{energygrid}G.txt'
-                    self.egridnamePH = str(energygrid)
-
-                egridpath = pwd.joinpath('group_structures', fgname)
-                self.energygridPH = np.loadtxt(egridpath)
-                self.nGrp = len(self.energygridPH)-1
-        else:
-            raise OSError(f'Unknown energygrid \
-                            {type(energygrid)}')
-
-        if self.energygridPH[0] < self.energygridPH[0]:
-            self.energygridPH[np.argsort(-self.energygridPH)]
-
     def get_fissile_types(self, t=0):
         """Return fissile assembly types.
 
@@ -1513,7 +1284,7 @@ class NE:
             Return fissile assembly types.
         """
         fissile_types = []
-        temp = list(self.data.keys())[0]
+        param = list(self.MGClibrary.parameters.values.keys())[0]
         for iType, aType in self.assemblytypes.items():
             # TODO check in numpy array
             if iType in self.config[t]:
@@ -1523,7 +1294,7 @@ class NE:
                     regs = [aType]
 
                 for r in regs:
-                    if self.data[temp][r].isfiss():
+                    if self.MGClibrary.data[param][r].isfiss():
                         fissile_types.append(iType)
                         break
 
@@ -1585,6 +1356,368 @@ class NE:
 
         return few_into_multigrp
 
+class MGClibrary():
+
+    def __init__(self, MMGCdata, NE_regions, core, NE_geom):
+
+        if "add_missing_MGC" in MMGCdata.keys():
+            self.add_missing_MGC = MMGCdata["add_missing_MGC"]
+        else:
+            self.add_missing_MGC = 1
+
+        if "fixdata" in MMGCdata.keys():
+            self.fixdata = MMGCdata["fixdata"]
+        else:
+            self.fixdata = 1
+
+        if "nxn" in MMGCdata.keys():
+            self.use_nxn = MMGCdata["nxn"]
+        else:
+            self.use_nxn = False
+
+        if "n_precursor" in MMGCdata.keys():
+            self.n_prec = MMGCdata["n_precursor"]
+        else:
+            self.n_prec = 1
+
+        isPH = True if 'PH' in MMGCdata.keys() else False
+
+        self.energy_grid = MMGCdata
+        # FIXME
+        self.n_groups = self.energy_grid
+        if "energy_grid_name" not in MMGCdata.keys():
+            self.energy_grid_name = f'{self.MGClibrary.n_groups}G' 
+        else:
+            self.energy_grid_name = MMGCdata["energy_grid_name"]
+
+        if isPH:
+            self.get_PH_energy_grid(MMGCdata["PH"])
+
+        write_coreutils_msg(f"Read and assign multi-group constants to NE object")
+        self.get_material_data(MMGCdata, core, NE_geom, NE_regions)
+
+
+    def get_MGC_path(self, lib_path):
+
+        pattern = r"<par([0-9][0-9]*)>"
+        path_dict_param = {}
+        path_dict_no_param = {}
+
+        for reader in lib_path.keys():
+            for path in lib_path[reader]:
+
+                param_match = re.search(pattern, path)
+                if param_match:
+                    number = param_match.group(1)
+                    path = re.sub(r"<par([0-9][0-9]*)>", r"par\1", path)
+                    N = int(number)
+                    if N not in path_dict_param.keys():
+                        path_dict_param[N] = {}
+
+                if Path(path).exists():
+                    file_list = os.listdir(path)
+                else:
+                    raise NEError(f"Path to group constant {path} in 'NEdata' does not exist.")
+
+                if param_match:
+                    path_dict_param[N][reader] = []
+                else:
+                    path_dict_no_param[reader] = []
+
+                if len(file_list) >= 1:
+                    for file in file_list:
+                        if file.endswith(reader_ext[reader]):
+                            if param_match:
+                                path_dict_param[N][reader].append(Path(path).joinpath(file))
+                            else:
+                                path_dict_no_param[reader].append(Path(path).joinpath(file))
+                else:
+                    raise NEError(f"Path to group constant {path} in 'NEdata' is empty.")
+
+        return path_dict_param, path_dict_no_param
+
+    def get_material_data(self, NEdata, core, NE_geom, NE_regions):
+
+        if "parameters" in NEdata.keys():
+            par = NEdata["parameters"]
+            self.parameters = Parameters(par["names"], par["units"], par["values"])
+        else:
+            self.MGC_parameters = None
+
+        if "library_path" in NEdata.keys():
+            gc_path_param, gc_path_all_param = self.get_MGC_path(NEdata["library_path"])
+        else:
+            raise NEError("Mandatory dictionary 'library_path' is missing from 'NEdata': cannot read group constants.")
+
+        # sanity check on library_path
+        if len(self.parameters.values.keys()) != len(gc_path_param.keys()):
+            raise NEError("Mismatch between number of parameters and number of paths in 'library_path'.")
+
+        if "P1consistent" not in NEdata.keys():
+            self.P1consistent = 0
+        else:
+            self.P1consistent = NEdata["P1consistent"]
+        
+        if "nPrec" not in NEdata.keys():
+            NEdata["nPrec"] = None
+
+        if not hasattr(self, 'data'):
+            self.data = {}
+
+        # --- parse full data library
+        if 'nemtab' in gc_path_all_param.keys():
+            reader = 'nemtab'
+            BU = 0.0 # FIXME take into account BU if in self.parameters
+            for f in gc_path_all_param[reader]:
+                param_values, param_combos, gc_in_dict_all_param = MGC_reader(reader, f)
+                if hasattr(self, "parameters"):
+                    # --- check parameters consistency
+                    for par in self.parameters.names:
+                        if par not in param_values.keys():
+                            raise NEError(f"Missing parameter {par} in {reader} file {f}")
+                    # --- ensure same values sorting
+                    par_names_nemtab = list(param_values.keys())
+                    idx_sort_combos = [i for i in range(len(self.parameters.values))]
+                    idx_sort_nemtab = [-1]*len(self.parameters.names)
+                    idx_sort = [i for i in range(len(par_names_nemtab))]
+
+                    for idx, par in enumerate(self.parameters.names):
+                        idx_sort_nemtab[idx] = par_names_nemtab.index(par)
+
+                    if idx_sort != idx_sort_nemtab:
+                        # sort parameters in each combos
+                        param_combos_sorted = []
+                        for combo in param_combos:
+                            param_combos_sorted.append([combo[i] for i in idx_sort_nemtab])
+                        # sort combos
+                        idx_sort_combos = [0]*len(param_combos_sorted)
+                        for k, lst in self.parameters.values.items():
+                            matched = False
+                            for idx, combo in enumerate(param_combos_sorted):
+                                if combo == lst:
+                                    idx_sort_combos[k] = idx
+                                    matched = True
+                            if not matched:
+                                raise OSError(f"Parameter combination {lst} not found in {reader} file {f}")
+
+                else:
+                    # --- create parameters object
+                    self.parameters = Parameters(param_values.keys(), [None]*len(param_values), param_combos)
+                    idx_sort_combos = [i for i in range(len(self.parameters.values))]
+
+                for iPar in idx_sort_combos:
+
+                    if iPar not in self.data.keys():
+                        self.data[iPar] = {}
+
+                    data_name = gc_in_dict_all_param[BU][iPar]["data_name"]
+                    self.data[iPar][data_name] = NEMaterial(data_in_dict=gc_in_dict_all_param[BU][iPar], energy_grid=self.energy_grid,
+                                                            fixdata=self.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
+                                                            add_missing_MGC=self.add_missing_MGC)
+
+        # --- parse parameter-wise data
+        for iPar in self.parameters.values:
+            if iPar not in self.data.keys():
+                self.data[iPar] = {}
+
+            for reader in gc_path_param[iPar].keys():
+                if reader != "serpent":
+                    for f in gc_path_param[iPar][reader]:
+                        gc_in_dict = MGC_reader(reader, f)
+                        self.data[iPar][gc_in_dict['data_name']] = NEMaterial(data_in_dict=gc_in_dict, energy_grid=self.energy_grid,
+                                                                            fixdata=self.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
+                                                                            add_missing_MGC=self.add_missing_MGC)
+                else:
+                    for f in gc_path_param[iPar][reader]:
+                        gc_in_serpdict = MGC_reader(reader, f)
+                        for data_in_dict in gc_in_serpdict:
+                            if self.n_groups != len(data_in_dict["energy_grid"])-1:
+                                raise NEError(f"Mismatch between the number of groups of the grid {self.energy_grid_name} and the energy grid in the Serpent _res files.")
+                            elif not np.allclose(data_in_dict["energy_grid"], self.energy_grid):
+                                raise NEError(f"Group boundaries mismatch between {self.energy_grid_name} and the energy grid in the Serpent _res files.")
+                            else:
+                                data_in_dict.pop("energy_grid")
+                                self.data[iPar][data_in_dict['data_name']] = NEMaterial(data_in_dict=data_in_dict, energy_grid=self.energy_grid,
+                                                                                        fixdata=self.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
+                                                                                        add_missing_MGC=self.add_missing_MGC)
+
+        # --- check if data is present for each region in NE_regions
+        for iPar in self.data.keys():
+            for reg in NE_regions:
+                if reg not in self.data[iPar].keys():
+                    raise NEError(f"Missing region {reg} in data library for the parameter combo n. {iPar} .")
+
+        # --- HOMOGENISATION (if any)
+        if core.dim != 2:
+            if NE_geom.AxialConfig.homogenised:
+                for iPar in self.data.keys():
+                    for u0 in NE_geom.regions.values():
+                        if "+" in u0: # homogenisation is needed
+                            # identify SA type and subregions
+                            strsplt = re.split(r"\d: ", u0, maxsplit=1)
+                            NEty = strsplt[0].split("_n.")[0]
+                            names = re.split(r" \+ ", strsplt[1])
+                            # identify axial planes
+                            idx_coarse = NE_geom.AxialConfig.config_str[NEty].index(u0)
+                            z_coarse_lo = NE_geom.AxialConfig.zcuts[idx_coarse]
+                            z_coarse_up = NE_geom.AxialConfig.zcuts[idx_coarse + 1]
+                            # compute volumes
+                            V_heter = np.zeros((len(names), ))
+                            V_homog = np.zeros((len(names), ))
+                            for iM, mixname in enumerate(names):
+                                # fine region
+                                idx_fine = NE_geom.AxialConfig.cuts[NEty].reg.index(mixname)
+                                z_lo = NE_geom.AxialConfig.cuts[NEty].loz[idx_fine]
+                                z_up = NE_geom.AxialConfig.cuts[NEty].upz[idx_fine]
+                                V_heter[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_lo)
+                                if z_lo >= z_coarse_lo and z_up <= z_coarse_up:
+                                    V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_lo)
+                                elif z_lo >= z_coarse_lo and z_up > z_coarse_up:
+                                    V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_coarse_up-z_lo)
+                                elif z_lo <= z_coarse_lo and z_up <= z_coarse_up:
+                                    V_homog[iM] = core.Geometry.AssemblyGeometry.compute_volume(z_up-z_coarse_lo)
+                                else:
+                                    raise NEError("Error in homogenisation!")
+
+                            # perform homogenisation
+                            mat4hom = {}
+                            for name in names:
+                                mat4hom[name] = self.data[iPar][name]
+                            vol4hom = {"homog": dict(zip(names, V_homog)), 
+                                        "heter": dict(zip(names, V_heter))}
+                            self.data[iPar][u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata, self.energy_grid, add_missing_MGC=self.add_missing_MGC)
+
+    @property
+    def energy_grid(self):
+        return self._energy_grid
+
+    @energy_grid.setter
+    def energy_grid(self, NEargs):
+
+        if 'energy_grid_name' in NEargs.keys():
+            ename = NEargs['energy_grid_name']
+        else:
+            ename = None
+
+        if 'energy_grid' in NEargs.keys():
+            energy_grid = NEargs['energy_grid']
+        else:
+            energy_grid = ename
+
+        # --- load user-defined energy grid
+        if isinstance(energy_grid, (list, np.ndarray, tuple)):
+            self._energy_grid = np.asarray(energy_grid)
+        # --- load pre-defined energy group structure
+        elif isinstance(energy_grid, (str, float, int)):
+            pwd = Path(__file__).parent.parent.parent
+            if 'COREutils'.lower() not in str(pwd).lower():
+                raise NEError(f'Check COREutils tree for NEdata: {pwd}')
+            else:
+                pwd = pwd.joinpath('NEdata')
+                if isinstance(energy_grid, str):
+                    fgname = f'{energy_grid}.txt'
+                    self._energy_grid_name = str(energy_grid)
+                else:
+                    fgname = f'{energy_grid}G.txt'
+                    self.energy_grid_name = str(energy_grid)
+
+                egridpath = pwd.joinpath('group_structures', fgname)
+                self._energy_grid = np.loadtxt(egridpath)
+
+        else:
+            raise OSError(f'Unknown energy_grid \
+                            {type(energy_grid)}')
+        # --- ensure sorting
+        if self._energy_grid[0] < self._energy_grid[0]:
+            self._energy_grid[np.argsort(-self._energy_grid)]
+
+    @property
+    def n_groups(self):
+        return self._n_groups
+
+    @n_groups.setter
+    def n_groups(self, energy_grid):
+        self._n_groups = len(energy_grid) - 1
+
+    def get_PH_energy_grid(self, PHargs):
+        if 'energy_grid_name' in PHargs.keys():
+            ename = PHargs['energy_grid_name']
+        else:
+            ename = None
+
+        if 'energy_grid' in PHargs.keys():
+            energy_grid = PHargs['energy_grid']
+        else:
+            energy_grid = ename
+
+        if isinstance(energy_grid, (list, np.ndarray, tuple)):
+            self.nGrp = len(energy_grid)-1
+            self.energy_grid_namePH = f'{self.nGrp}G' if ename is None else ename
+            self.energygridPH = energy_grid
+        elif isinstance(energy_grid, (str, float, int)):
+            pwd = Path(__file__).parent.parent.parent
+            if 'COREutils'.lower() not in str(pwd).lower():
+                raise OSError(f'Check coreutils tree for PHdata: {pwd}')
+            else:
+                pwd = pwd.joinpath('PHdata')
+                if isinstance(energy_grid, str):
+                    fgname = f'{energy_grid}.txt'
+                    self.energy_grid_namePH = str(energy_grid)
+                else:
+                    fgname = f'{energy_grid}G.txt'
+                    self.energy_grid_namePH = str(energy_grid)
+
+                egridpath = pwd.joinpath('group_structures', fgname)
+                self.energygridPH = np.loadtxt(egridpath)
+                self.nGrp = len(self.energygridPH)-1
+        else:
+            raise OSError(f'Unknown energy_grid \
+                            {type(energy_grid)}')
+
+        if self.energygridPH[0] < self.energygridPH[0]:
+            self.energygridPH[np.argsort(-self.energygridPH)]
+
+
+class Parameters():
+    """Define "Parameters" object.
+    """
+    def __init__(self, names, units, values):
+        self.names = names
+        self.units = units
+        self.values = values
+
+    @property
+    def names(self):
+        return self._names
+
+    @names.setter
+    def names(self, values):
+        self._names = values
+
+    @property
+    def units(self):
+        return self._units
+
+    @units.setter
+    def units(self, values):
+        self._units = values
+
+    @property
+    def values(self):
+        return self._values
+
+    @values.setter
+    def values(self, inpdict):
+        self._values = {}
+        for k in inpdict.keys():
+            if k.startswith("par"):
+                i = int(k.split("par")[1])
+            elif isinstance(k, int):
+                i = k
+            else:
+                raise OSError(f"Unknown parameter {k} in 'parameters' dict in the json input!")
+
+            self._values[i] = inpdict[k]
 
 class NEError(Exception):
     pass

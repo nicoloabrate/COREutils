@@ -6,9 +6,9 @@ from coreutils.tools.utils import uppcasedict, lowcasedict
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist
 from pathlib import Path
 
-CImandatory = ('Tf_Tc',)
+CImandatory = ()
 GEmandatory = ('dim', 'shape', 'lattice_pitch', 'assembly') # 'lattice_pitch' only if shape!='1D', 'cuts' only in '1D'
-NEmandatory = ('filename', 'assemblynames', 'rotation', 'energygrid', 'cuts')
+NEmandatory = ('filename', 'assemblynames', 'rotation', 'cuts')
 THmandatory = ('bcfile', 'massflowrate', 'temperature', 'rotation', 'pressure', 'bcnames', 'htdata')
 # TODO add check on data types (e.g., rotation and dim must be integers)
 # set to value in dict if this key is missing
@@ -31,10 +31,10 @@ setToValue = {
                         'SAcolors': None,
                       },
                 'NE': {
-                        'NEdata': None,
+                        'MMGCdata': None,
                         'labels': None,
                         'splitz': None,
-                        'egridname': None,
+                        'energy_grid_name': None,
                         'xscuts': None,
                         'zcuts': None,
                         'fren': True,
@@ -314,7 +314,7 @@ def __parseNE(inp, dim):
             elif k == 'cuts':
                 if dim != 2:
                     raise ParserError(f"Mandatory '{k}' key missing in NE input file!")
-            elif k in ['energygrid', 'egridname']:
+            elif k in ['energy_grid', 'energy_grid_name']:
                 pass
             else:
                 raise ParserError(f"Mandatory '{k}' key missing in NE input file!")
