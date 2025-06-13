@@ -463,10 +463,12 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
     amap = core.Map
     if which is None:  # consider all assemblies
         which = list(amap.serpcentermap.keys())
-
     else:
         if fren:  # FRENETIC numeration to Serpent
             which = [amap.fren2serp[k] for k in which]
+
+    if which == []:
+        raise ValueError("'which' kwargs is empty! Check the input arguments.")
 
     if thresh is None:
         thresh = -np.inf
