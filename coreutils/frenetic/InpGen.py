@@ -139,7 +139,8 @@ def fillFreneticNamelist(core):
             core.FreneticNamelist['nTimeProfNE'] = len(core.FreneticNamelist['TimeProfNE'])
         # set power
         core.FreneticNamelist['power'] = core.power
-        if core.NE.nGrp == 0:
+        nGrp = 0 # TODO FIXME BUG
+        if nGrp == 0:
             core.FreneticNamelist['ioPowerp'] = 0
     else:
         core.FreneticNamelist['iRun'] = -1
@@ -445,39 +446,43 @@ def inpgen(core, jsonpath):
         logger.warn('No NE object: input.inp and config.inp not written!')
 
     # write NE data
-    if hasattr(core.NE, 'data') or isNE1D:
+    if hasattr(core.NE.MGClibrary, 'data') or isNE1D:
         # -- prepare data
+        par_names = core.NE.MGClibrary.parameters.names
         # get temperatures couples
-        temp = core.TfTc
-        # get NGRO
+        if par_names != ['Tc', 'Tf'] and par_names != ['Tf', 'Tc']:
+            raise OSError("Cannot build the FRENETIC input for more than 2 parameters!")
+
+        temp = core.NE.MGClibrary.parameters.values
+        # get n_groups
         unifuel = None
 
         # reference temperatures defined as minima
-        mincouple = min(temp, key=lambda t: (t[1]+t[0]))
+        # FIXME TODO
+        mincouple = temp[0]
         Tf, Tc = mincouple
-        NGRO = core.NE.nGro
-        NPRE = core.NE.nPre
+        n_groups = core.NE.MGClibrary.n_groups
+        NPRE = core.NE.MGClibrary.n_prec
         # --- get kinetic parameters (equal for each material)
         for iReg in core.NE.regions.keys():
-            mat0 = core.NE.data[temp[0]][core.NE.regions[iReg]]
+            mat0 = core.NE.MGClibrary.data[0][core.NE.regions[iReg]]
             if mat0.isfiss():
                 break
 
         if not mat0.isfiss():
             raise OSError("U should not be here!")
 
-        vel = 1/mat0.Invv
-        if core.NE.NEdata["nPrec"] is None:
+        vel = 1/mat0.inv_vel
+        if core.NE.MGClibrary.n_prec is None:
             beta0 = mat0.beta
             lambda0 = mat0.__dict__['lambda']
-        elif core.NE.NEdata["nPrec"] == 1:
+        elif core.NE.MGClibrary.n_prec == 1:
             beta0 = [mat0.beta_tot]
             lambda0 = [mat0.__dict__['lambda_tot']]
         else:
             raise OSError("Cannot deal with 'nPrec'!=1!")
         # --- write macro.nml
-        writemacro(core, NEpath, nmix, vel, lambda0, beta0,
-                   (Tf, Tc), core.NE.regions, H5fmt=2)
+        writemacro(core, NEpath, nmix, vel, lambda0, beta0, core.NE.regions, H5fmt=2)
 
         # -- write NE_data.h5
         writeNEdata(core, NEpath, verbose=False, H5fmt=2, txt=0)

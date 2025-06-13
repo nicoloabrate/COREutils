@@ -49,17 +49,18 @@ class NEoutput:
         self.NEpath = os.path.join(path, 'NE')
         # looking for core.h5 file with core object
         self.core = Core(os.path.join(path, 'core.h5'))
-        self.ngro = self.core.NE.nGro
-        self.ngrp = self.core.NE.nGrp
-        if "nPrec" in self.core.NE.NEdata.keys():
-            if self.core.NE.NEdata["nPrec"] is None:
-                self.npre = self.core.NE.nPre
+        self.n_groups = self.core.NE.MGClibrary['_n_groups']
+        # FIXME TODO
+        self.ngrp = 0
+        if "n_prec" in self.core.NE.MGClibrary.keys():
+            if self.core.NE.MGClibrary["n_prec"] is None:
+                self.npre = self.core.NE.MGClibrary["n_prec"]
             else:
-                self.npre = self.core.NE.NEdata["nPrec"]
-            self.nprp = self.core.NE.nPrp
+                self.npre = self.core.NE.MGClibrary["n_prec"]
+            self.nprp = 0 # self.core.NE.nPrp
         else:
-            self.npre = self.core.NE.nPre
-            self.nprp = self.core.NE.nPrp
+            self.npre = 0 # self.core.NE.nPre
+            self.nprp = 0 # self.core.NE.nPrp
 
         if hasattr(self.core, "FreneticNamelist"):
             isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
@@ -99,10 +100,10 @@ class NEoutput:
 
         vers = float(self.version)
         if vers <= 1.0:
-            NEoutput._fill_deprec_vers_metadata(self.MapVersion, self.npre, self.ngro, self.nprp, self.ngrp)
+            NEoutput._fill_deprec_vers_metadata(self.MapVersion, self.npre, self.n_groups, self.nprp, self.ngrp)
         elif vers == 2.0:
             self.MapVersion["data"]["integralParameters"] = NEoutput.fill_intpar_dict(self.MapVersion["data"]["integralParameters"],
-                                                                                      self.npre, self.ngro, self.nprp, self.ngrp)
+                                                                                      self.npre, self.n_groups, self.nprp, self.ngrp)
                                                                                     #   self.core.FreneticNamelist["NUMERICS1"]["eig_type"])
             self.HDF5_path = NEoutput.build_HDF5_path(self.MapVersion["data"])
             dupl_dist = NEoutput.get_duplicate_dset_names(self.MapVersion["data"]["distributions"])
@@ -921,7 +922,8 @@ class NEoutput:
                         nvel = [float(v.replace("d", "e")) for v in nvel[:-1]]
 
             if gro is None:
-                for g in range(self.ngro):
+                # FIXME
+                for g in range(self.core.NE.MGClibrary["_n_groups"]):
                     profile[:, g, :, :] = flux[:, g, :, :]/nvel[g]
             else:
                 profile[:, :, :, :] = flux/nvel[gro]
@@ -961,7 +963,7 @@ class NEoutput:
         else:
             loglog = False
 
-        E = self.core.NE.energygrid
+        E = self.core.NE.energy_grid
         if eflx is None:
             raise OSError("TODO: implement automatic space integration")
 
@@ -1743,9 +1745,10 @@ class NEoutput:
             gro = [g-1 for g in gro]
         else:
             if particles == "neutrons":
-                ngmax = self.core.NE.nGro
+                # FIXME
+                ngmax = self.core.NE.MGClibrary['_n_groups']
             elif particles == "photons":
-                ngmax = self.core.NE.nGrp
+                ngmax = self.ngrp # FIXME
             gro = np.arange(0, ngmax).tolist()
 
         if pre is not None:
@@ -1754,9 +1757,9 @@ class NEoutput:
             pre = [p-1 for p in pre]
         else:
             if particles == "neutrons":
-                npmax = self.core.NE.nPre
+                npmax = self.core.NE.MGClibrary['n_prec']
             elif particles == "photons":
-                npmax = self.core.NE.nPrp
+                npmax = self.nprp # FIXME
             pre = np.arange(0, npmax).tolist()
 
         nodes = self.core.NE.AxialConfig.AxNodes if self.core.dim != 2 else np.array([0])
@@ -1877,7 +1880,7 @@ class NEoutput:
         return str(", ".join(label))
 
     @staticmethod
-    def _fill_deprec_vers_metadata(MapVersion, npre, ngro, nprp, ngrp):
+    def _fill_deprec_vers_metadata(MapVersion, npre, n_groups, nprp, ngrp):
             # fill group and precursors entries
             try:
                 # --- family-wise beta_eff
@@ -1898,7 +1901,7 @@ class NEoutput:
                 lst = MapVersion['data']['integralParameters']['intsrc']
                 lst_uom = MapVersion['metadata']['integralParameters']['uom']['intsrc']
                 idy = lst.index('gro=')
-                for i in range(1,ngro+1):
+                for i in range(1,n_groups+1):
                     lst.insert(idy, f'gro={i}')
                     uom = lst_uom['intsrc'][idy]
                     lst_uom.insert(idy, uom)
@@ -1970,7 +1973,7 @@ class NEoutput:
                 pass
 
     @staticmethod
-    def fill_intpar_dict(MapVersion, npre, ngro, nprp, ngrp): #, eig_type):
+    def fill_intpar_dict(MapVersion, npre, n_groups, nprp, ngrp): #, eig_type):
             # --- static
             # fill eigenvalue with its type
             # if eig_type == 0:

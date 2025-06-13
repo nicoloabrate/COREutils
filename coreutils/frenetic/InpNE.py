@@ -14,7 +14,7 @@ from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticName
 logger = logging.getLogger(__name__)
 
 
-def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
+def writemacro(core, path, nmix, vel, lambda0, beta0,
                unimap, H5fmt=2):
     """
     Write the input file "macro.nml" for the NE module of FRENETIC.
@@ -37,12 +37,17 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
         List of tuples with T fuel and T coolant used to evaluate NE data
     unimap : dict
         Dictionary mapping in which list each universe is located in
-        core.NE.data.data dict
+        core.NE.MMGClibrary.data.data dict
 
     Returns
     -------
     ``None``
     """
+    # BUG FIXME TODO
+    nGrp = 0
+    nDhp = 0
+    nPrp = 0
+
     macronames = ["DIFFCOEF", "XS_TOT", "XS_SCATT", "XS_FISS", "NUSF", "ESIGF", "KERMA"]
     # FIXME kerma should be separated from photon data and set to zero if not present in the input data
     macronamesp = ["MUSIGP", "DIFFP", "XS_TOT_P", "XS_SCATT_P", "KERMAP"]
@@ -51,12 +56,16 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
     inpnamesp = ["filemusigp", "filediffp", "filesigtp", "filesigsp", "filekermap"]
 
     nFrenCuts = len(core.NE.AxialConfig.zcuts)-1 if core.dim != 2 else 1
-    (Tf, Tc) = temps
+    
+    # PATCH FIXME TODO
+    iPar = 0
+    temp = core.NE.MGClibrary.parameters.values
+    (Tf, Tc) = temp[iPar]
 
-    if core.NE.NEdata["nPrec"] is None:
+    if core.NE.MGClibrary.n_prec is None:
         nPre = core.NE.nPre
     else:
-        nPre = core.NE.NEdata["nPrec"]
+        nPre = core.NE.MGClibrary.n_prec
     # -- write macro.nml file
     asstypeN = 0
     inpname = "macro.nml"
@@ -68,20 +77,20 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
     f = io.open(filepath, 'w', newline='\n')
     f.write('&MACROXS0\n')
     f.write(f'nMat = {nmix} \n')
-    f.write(f'nGro = {core.NE.nGro} \n')
+    f.write(f'nGro = {core.NE.MGClibrary.n_groups} \n')
     f.write(f'nPre = {nPre} \n')
-    f.write(f'nDhp = {core.NE.nDhp} \n')
-    f.write(f'nGrp = {core.NE.nGrp } \n')
-    f.write(f'nPrp = {core.NE.nPrp } \n')
+    f.write(f'nDhp = {nDhp} \n')
+    f.write(f'nGrp = {nGrp} \n')
+    f.write(f'nPrp = {nPrp } \n')
     f.write('/\n\n')
     f.write('&MACROXS\n')
     f.write('iRHO = 0,\n')
-    f.write(f'veloc0(1:{core.NE.nGro}) = ')
+    f.write(f'veloc0(1:{core.NE.MGClibrary.n_groups}) = ')
 
-    for igro in range(core.NE.nGro):
+    for igro in range(core.NE.MGClibrary.n_groups):
         f.write('%s,' % ff(vel[igro]))
 
-    if core.NE.nGrp > 0:
+    if nGrp> 0:
         f.write(f'\nvelocP0(1:{core.NE.nGrp}) = 1.0E7')
         # FIXME FIXME FIXME at the moment the photon velocity is not computed
         # therefore hardcode value
@@ -95,7 +104,7 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
         else:
             f.write(f'{ff(lambda0[iprec])},')
 
-    if core.NE.nDhp > 0:
+    if nDhp > 0:
         f.write(' \n lambdaDHP0(1:1) = 1.000000d+99,\n') # FIXME FIXME FIXME large value for steady state
         f.write('betaDHP0(1:1) = 0.000000d+00,\n')
     f.write(f'iDiff(1:{nmix}) = {nmix}*2,\n')
@@ -103,7 +112,7 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
     f.write(f'iSigF(1:{nmix}) = {nmix}*2,\n')
     f.write(f'iSigS(1:{nmix}) = {nmix}*2,\n')
 
-    if core.NE.nGrp > 0:
+    if nGrp> 0:
         # FIXME KERMA should be placed in another if.. statement
         f.write(f'iKERMA(1:{nmix}) = {nmix}*2,\n')
         f.write(f'iSigP(1:{nmix}) = {nmix}*2,\n')
@@ -120,8 +129,8 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
         # perform operations only when the assembly is changed
     
         whichmix = core.NE.regions[imix+1]
-        chit = core.NE.data[(Tf, Tc)][whichmix].getxs('Chit')[np.newaxis, :]
-        chid = core.NE.data[(Tf, Tc)][whichmix].getxs('Chid')[np.newaxis, :]
+        chit = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('chi_tot')[np.newaxis, :]
+        chid = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('chi_del')[np.newaxis, :]
         
         imixF = 0
         # look for root universe
@@ -142,15 +151,15 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
             f.write(f'\n!Mix n.{imix+1} is {whichmix} and belongs to {u}\n')
 
         # write kinetic and spectrum parameters
-        f.write(f'chiT0({imix+1},1:{core.NE.nGro}) = ')
-        for igro in range(core.NE.nGro):
+        f.write(f'chiT0({imix+1},1:{core.NE.MGClibrary.n_groups}) = ')
+        for igro in range(core.NE.MGClibrary.n_groups):
             f.write(f'{ff(chit[imixF, igro])},')
         
         # single photon group --> all emitted in this group
-        if core.NE.nGrp > 0:
+        if nGrp> 0:
             f.write(f'\nzetaT0({imix+1:d},1:{core.NE.nGrp:d}) = 1.0E+0,')
             
-        for igro in range(core.NE.nGro):
+        for igro in range(core.NE.MGClibrary.n_groups):
             if len(chid.shape) > 2:
                 v = chid[imixF, 0, igro]
             else:
@@ -170,31 +179,31 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
             if macro == "XS_SCATT":
 
                 if H5fmt == 1:
-                    for igrostart in range(core.NE.nGro):
-                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.nGro}) =')
-                        for igroend in range(core.NE.nGro):
+                    for igrostart in range(core.NE.MGClibrary.n_groups):
+                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.MGClibrary.n_groups}) =')
+                        for igroend in range(core.NE.MGClibrary.n_groups):
                             f.write(f" '{macro}_{imix+1}_{igrostart+1}_{igroend+1}', ")
                         f.write('\n')
                 elif H5fmt == 2:
-                    for igrostart in range(core.NE.nGro):
-                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.nGro}) =')
-                        for igroend in range(core.NE.nGro):
+                    for igrostart in range(core.NE.MGClibrary.n_groups):
+                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.MGClibrary.n_groups}) =')
+                        for igroend in range(core.NE.MGClibrary.n_groups):
                             f.write(f" '{imix+1}/{macro}', ")
                         f.write('\n')
 
             else:
                 if H5fmt == 1:
-                    f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
-                    for igro in range(core.NE.nGro):
+                    f.write(f'{inp}({imix+1},1:{core.NE.MGClibrary.n_groups}) =')
+                    for igro in range(core.NE.MGClibrary.n_groups):
                         f.write(f" '{macro}_{imix+1:d}_{igro+1:d}', ")
                     f.write('\n')
                 elif H5fmt == 2:
-                    f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
-                    for igro in range(core.NE.nGro):
+                    f.write(f'{inp}({imix+1},1:{core.NE.MGClibrary.n_groups}) =')
+                    for igro in range(core.NE.MGClibrary.n_groups):
                         f.write(f" '{imix+1}/{macro}', ")
                     f.write('\n')
 
-        if core.NE.nGrp > 0:
+        if nGrp> 0:
             for inp, macro in zip(inpnamesp, macronamesp):
 
                 if macro == "XS_SCATT_P":
@@ -204,8 +213,8 @@ def writemacro(core, path, nmix, vel, lambda0, beta0, temps,
                             f.write(f" 'input/{macro}_{imix+1}_{igrostart+1}_{igroend+1}.txt', ")
                         f.write('\n')
                 elif macro == "KERMA" or macro == "MUSIGP":
-                    f.write(f'{inp}({imix+1},1:{core.NE.nGro}) =')
-                    for igro in range(core.NE.nGro):
+                    f.write(f'{inp}({imix+1},1:{core.NE.MGClibrary.n_groups}) =')
+                    for igro in range(core.NE.MGClibrary.n_groups):
                         f.write(f" 'input/{macro}_{imix+1:d}_{igro+1:d}.txt', ")
                     f.write('\n')
                 else:
@@ -229,7 +238,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
     path : pathlib object
         Path to file
     verbose : bool, optional
-        Set to ``True`` in order to print also capture, nubar and scattering
+        Set to ``True`` in order to print also capture, nu_fiss and scattering
         production data, by default ``False``
     inf : bool, optional
         Set to ``False`` to get B1 Serpent calculation mode for the
@@ -241,18 +250,20 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
     -------
     ``None``
     """
+    # TODO FIXME
+    # the code assumes that Tf=673 and Tc=673
     # --- define list of output filenames
-    if core.NE.use_nxn:
+    if core.NE.MGClibrary.use_nxn:
         scat_key = 'Sp0'
     else:
         scat_key = 'S0'
 
     outnames = ["DIFFCOEF", "ESIGF", "NUSF", "XS_FISS", "XS_SCATT", "XS_TOT",
                 "CHIT", "KERMA"]
-    matkeys = ['Diffcoef', 'Esigf', 'Nsf', 'Fiss', scat_key, 'Tot', 'Chit',
-               'Kerma']
+    matkeys = ['Diffcoef', 'fiss_energy', 'nuSigma_fiss', 'Sigma_fiss', scat_key, 'Sigma_tot', 'chi_tot',
+               'kerma']
     if verbose:
-        xsverb = ['Rabs']
+        xsverb = ['Sigma_rabs']
         verb_out = ["XS_ABS"]
         # append to default list of names
         outnames.extend(verb_out)
@@ -273,21 +284,23 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
     fh5 = h5.File(h5filepath, "a")
 
     # --- write general info (Tf, Tc, energy grid)
-    fh5.create_dataset('TfTc', data=core.TfTc)
-    fh5.create_dataset('Tf', data=core.Tf)
-    fh5.create_dataset('Tc', data=core.Tc)
-    fh5.create_dataset('energygrid', data=core.NE.energygrid)
-    fh5.create_dataset('egridname', data=core.NE.egridname)
+    # PATCH FIXME TODO
+    TfTc = [(float(Ttup[0]), float(Ttup[1])) for Ttup in [[673, 673]]]
+    fh5.create_dataset('TfTc', data=TfTc)
+    fh5.create_dataset('Tf', data=[673.0])
+    fh5.create_dataset('Tc', data=[673.0])
+    fh5.create_dataset('energy_grid', data=core.NE.MGClibrary.energy_grid)
+    fh5.create_dataset('energy_grid_name', data=core.NE.MGClibrary.energy_grid_name)
 
-    temps = core.TfTc
+    temps = [(673.0, 673.0)]
     Tf, Tc = zip(*temps)
 
     # --- define temperature matrix to be filled with data
     n, m = len(set(Tf))+2, len(set(Tc))+1  # temp matrix dimensions
     frendata = np.zeros((n, m))
     frendata[0, 0], frendata[0, 1] = n-2, m-1  # write matrix size
-    frendata[2:, 0] = core.Tf
-    frendata[1, 1:] = core.Tc
+    frendata[2:, 0] = [673.0]
+    frendata[1, 1:] = [673.0]
 
     if txt:
         # create directory
@@ -306,27 +319,29 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
     # define tuple of couples of temperatures
     temps.sort(key=lambda t: t[0])
     regmap = core.NE.regions.reverse()
-    NEdata = core.NE.data
+    NEdata = core.NE.MGClibrary.data
     if H5fmt == 1:
-        for reg in core.NE.data[temps[0]].keys():
+        # FIXME TODO remove [0] and make it more robust
+        for reg in core.NE.MGClibrary.data[0].keys():
             ireg = regmap[reg]
             # update region (hexagon) type counter
             for data, dataname in datakeys.items():  # loop over data
                 where = {}
                 # temperature couples loop
+                # FIXME TODO make it consistent with core.NE.MGClibrary.parameters
                 for itup, tup in enumerate(temps):
                     # store value in proper position in temp matrix
                     row = np.where(frendata[:, 0] == tup[0])
                     col = np.where(frendata[1, :] == tup[1])
                     where[tup] = (row, col)
                 # -- split homogdata in regions and groups
-                for g in range(core.NE.nGro):  # loop over energy groups
+                for g in range(core.NE.MGClibrary.n_groups):  # loop over energy groups
                     # check if matrix
                     if 'S' in data or 'Sp' in data:
-                        for gdep in range(core.NE.nGro):  # loop over departure g
+                        for gdep in range(core.NE.MGClibrary.n_groups):  # loop over departure g
                             # edit name to include info on dep group
                             txtname = f"{dataname}_{ireg}_{gdep+1}_{g+1}"
-                            gc = gdep+core.NE.nGro*g
+                            gc = gdep+core.NE.MGClibrary.n_groups*g
                             for itup, tup in enumerate(temps):
                                 # select matrix entry
                                 r, c = where[tup]
@@ -347,7 +362,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                             # select matrix entry
                             r, c = where[tup]
                             if 'Esigf' in data:
-                                frendata[r, c] = NEdata[tup][reg].__dict__['Fiss'][g]*NEdata[tup][reg].__dict__['FissEn'][g]*1.60217653e-13                  
+                                frendata[r, c] = NEdata[tup][reg].__dict__['Sigma_fiss'][g]*NEdata[tup][reg].__dict__['fiss_energy'][g]*1.60217653e-13                  
                             else:
                                 frendata[r, c] = NEdata[tup][reg].__dict__[data][g]
                             # write data if all T tuples have been spanned
@@ -365,7 +380,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
         # temperature couples loop
         for itup, tup in enumerate(temps):
             for data, dataname in datakeys.items():  # loop over data
-                for regtype, reg in core.NE.data[tup].items():
+                for regtype, reg in core.NE.MGClibrary.data[itup].items():
                     ireg = regmap[regtype]
                     # create temperatures group
                     # temporary patch
@@ -374,20 +389,20 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                         fh5.create_group(tmpgrp)
                     fh5_TfTc = fh5[tmpgrp]
 
-                    if data not in ['Nsf', 'Esigf']:
+                    if data not in ['nuSigma_fiss', 'Esigf']:
                         xsdata = reg.__dict__[data]
                     else:
-                        if data == 'Nsf':
-                            nubar = reg.Nubar
-                            fiss = reg.Fiss
-                            xsdata = nubar*fiss
+                        if data == 'nuSigma_fiss':
+                            nu_fiss = reg.nu_fiss
+                            Sigma_fiss = reg.Sigma_fiss
+                            xsdata = nu_fiss*Sigma_fiss
                         elif data == 'Esigf':
-                            FissEn = reg.FissEn
-                            fiss = reg.Fiss
-                            xsdata = FissEn*fiss*1.60217653e-13
+                            fiss_energy = reg.fiss_energy
+                            Sigma_fiss = reg.Sigma_fiss
+                            xsdata = fiss_energy*Sigma_fiss*1.60217653e-13
                     # save in h5 file
                     if 'S0' in data or 'Sp0' in data:
-                        tmp = np.array(xsdata.reshape(core.NE.nGro, core.NE.nGro), dtype=float)
+                        tmp = np.array(xsdata.reshape(core.NE.MGClibrary.n_groups, core.NE.MGClibrary.n_groups), dtype=float)
                     else:
                         tmp = np.array(xsdata, dtype=float)
 
@@ -401,59 +416,67 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                     fh5_ih.create_dataset(dataname, data=tmp)
 
     fh5.close()
-    
-    # get MFP and diff. length for sanity check wrt splitz
-    DFLmin = {}
-    MFPmin = {}
-    DFLmax = {}
-    MFPmax = {}
-    for itup, tup in enumerate(temps):
-        for regtype, reg in core.NE.data[tup].items():
-            if itup == 0:
-                DFLmin[regtype] = reg.DiffLength.min()
-                DFLmax[regtype] = reg.DiffLength.max()
-                MFPmin[regtype] = reg.MeanFreePath
-            else:
-                if DFLmin[regtype] > reg.DiffLength.min():
-                    DFLmin[regtype] = reg.DiffLength.min()
-                if DFLmax[regtype] < reg.DiffLength.max():
-                    DFLmax[regtype] = reg.DiffLength.max()
-                if MFPmin[regtype] > reg.MeanFreePath:
-                    MFPmin[regtype] = reg.MeanFreePath
+    # FIXME TODO 
+    # # get MFP and diff. length for sanity check wrt splitz
+    # DFLmin = {}
+    # MFPmin = {}
+    # DFLmax = {}
+    # MFPmax = {}
+    # for itup, tup in enumerate(temps):
+    #     for regtype, reg in core.NE.MGClibrary.data[itup].items():
+    #         if not hasattr(reg, 'DiffLength'):
+    #             if not hasattr(reg, 'Sigma_rem'):
+    #                 DiffLength = np.sqrt(reg.Diffcoef / reg.Sigma_abs)
+    #             else:
+    #                 DiffLength = np.sqrt(reg.Diffcoef / reg.Sigma_rem)
+    #         else:
+    #             DiffLength = reg.DiffLength
 
-    if core.dim != 2:
-        zNodes = core.NE.AxialConfig.AxNodes
-        nNodes = len(zNodes)
+    #         if itup == 0:
+    #             DFLmin[regtype] = DiffLength.min()
+    #             DFLmax[regtype] = DiffLength.max()
+    #             MFPmin[regtype] = reg.MeanFreePath
+    #         else:
+    #             if DFLmin[regtype] > DiffLength.min():
+    #                 DFLmin[regtype] = DiffLength.min()
+    #             if DFLmax[regtype] < DiffLength.max():
+    #                 DFLmax[regtype] = DiffLength.max()
+    #             if MFPmin[regtype] > reg.MeanFreePath:
+    #                 MFPmin[regtype] = reg.MeanFreePath
 
-        # preallocation
-        DFLtoZ = {}
-        for asstype in core.NE.AxialConfig.config_str.keys():
-            DFLtoZ[asstype] = [] # np.zeros((nNodes, 3))
+    # if core.dim != 2:
+    #     zNodes = core.NE.AxialConfig.AxNodes
+    #     nNodes = len(zNodes)
 
-        nS = 0
-        iNode = 0
-        for iCut, z1z2 in core.NE.zcoord.items(): # span het. cuts
-            z1, z2 = z1z2
-            nE = nS+core.NE.AxialConfig.splitz[iCut]
-            for node in core.NE.AxialConfig.AxNodes[nS:nE]: # 
-                if node < z1 or node > z2:
-                    raise OSError("Something is wrong with the nodes!")
-                zn1 = z1 if iNode == 0 else zn2
-                zn2 = zn1+core.NE.AxialConfig.dz[iNode]
-                for asstype in core.NE.AxialConfig.config_str.keys():
-                    reg = core.NE.AxialConfig.config_str[asstype][iCut]
-                    DFLtoZ[asstype].append([zn1, zn2, DFLmax[reg]/core.NE.AxialConfig.dz[iNode]])
-                iNode += 1
-            nS = nE
-    else:
-        # preallocation
-        DFLtoZ = {}
-        for asstype in core.NE.regions.values():
-            DFLtoZ[asstype] = DFLmax[asstype]/np.sqrt(core.Geometry.AssemblyGeometry.area)
+    #     # preallocation
+    #     DFLtoZ = {}
+    #     for asstype in core.NE.AxialConfig.config_str.keys():
+    #         DFLtoZ[asstype] = [] # np.zeros((nNodes, 3))
 
-    L_to_dz_file = path.parent.joinpath('auxiliary', 'NE', 'DiffLength_to_NodeSize.json')
-    with open(L_to_dz_file, 'w') as outfile:
-        json.dump({"DFLtoZ": DFLtoZ}, outfile, indent=2)
+    #     nS = 0
+    #     iNode = 0
+    #     for iCut, z1z2 in core.NE.zcoord.items(): # span het. cuts
+    #         z1, z2 = z1z2
+    #         nE = nS+core.NE.AxialConfig.splitz[iCut]
+    #         for node in core.NE.AxialConfig.AxNodes[nS:nE]: # 
+    #             if node < z1 or node > z2:
+    #                 raise OSError("Something is wrong with the nodes!")
+    #             zn1 = z1 if iNode == 0 else zn2
+    #             zn2 = zn1+core.NE.AxialConfig.dz[iNode]
+    #             for asstype in core.NE.AxialConfig.config_str.keys():
+    #                 reg = core.NE.AxialConfig.config_str[asstype][iCut]
+    #                 DFLtoZ[asstype].append([zn1, zn2, DFLmax[reg]/core.NE.AxialConfig.dz[iNode]])
+    #             iNode += 1
+    #         nS = nE
+    # else:
+    #     # preallocation
+    #     DFLtoZ = {}
+    #     for asstype in core.NE.regions.values():
+    #         DFLtoZ[asstype] = DFLmax[asstype]/np.sqrt(core.Geometry.AssemblyGeometry.area)
+
+    # L_to_dz_file = path.parent.joinpath('auxiliary', 'NE', 'DiffLength_to_NodeSize.json')
+    # with open(L_to_dz_file, 'w') as outfile:
+    #     json.dump({"DFLtoZ": DFLtoZ}, outfile, indent=2)
 
 
 def writeConfig(core, path):
