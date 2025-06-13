@@ -33,7 +33,7 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
         Precursors' families decay constants
     beta0 : ndarray
         Precursors' families physical neutron delayed fraction
-    temps : list
+    temperatures : list
         List of tuples with T fuel and T coolant used to evaluate NE data
     unimap : dict
         Dictionary mapping in which list each universe is located in
@@ -250,8 +250,6 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
     -------
     ``None``
     """
-    # TODO FIXME
-    # the code assumes that Tf=673 and Tc=673
     # --- define list of output filenames
     if core.NE.MGClibrary.use_nxn:
         scat_key = 'Sp0'
@@ -284,23 +282,38 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
     fh5 = h5.File(h5filepath, "a")
 
     # --- write general info (Tf, Tc, energy grid)
-    # PATCH FIXME TODO
-    TfTc = [(float(Ttup[0]), float(Ttup[1])) for Ttup in [[673, 673]]]
-    fh5.create_dataset('TfTc', data=TfTc)
-    fh5.create_dataset('Tf', data=[673.0])
-    fh5.create_dataset('Tc', data=[673.0])
+    param_names = core.NE.MGClibrary.parameters.names
+    param_value = core.NE.MGClibrary.parameters.values
+    if len(param_names) != 2:
+        raise ValueError(f"Cannot write FRENETIC input handling parameters {param_names}! Only 2 parameters (Tf, Tc) can be handled.")
+    else:
+        if 'Tf' in param_names and 'Tc' in param_names:
+            idTf = param_names.index('Tf')
+            idTc = param_names.index('Tc')
+            temperatures = np.zeros((len(param_value), 2))
+            for i, v in enumerate(param_value.values()):
+                temperatures[i, 0] = v[idTf]
+                temperatures[i, 1] = v[idTc]
+        else:
+            raise ValueError(f"Cannot write FRENETIC input handling parameters {param_names}! Only Tf and Tc can be parsed.")
+
+    TfTc = [(float(Ttup[0]), float(Ttup[1])) for Ttup in temperatures]
+    Tf = sorted( list( set(temperatures[:, 0]) ) )
+    Tc = sorted( list( set(temperatures[:, 1]) ) )
+
+    fh5.create_dataset('TfTc', data=temperatures)
+    fh5.create_dataset('Tf', data=Tf)
+    fh5.create_dataset('Tc', data=Tc)
     fh5.create_dataset('energy_grid', data=core.NE.MGClibrary.energy_grid)
     fh5.create_dataset('energy_grid_name', data=core.NE.MGClibrary.energy_grid_name)
 
-    temps = [(673.0, 673.0)]
-    Tf, Tc = zip(*temps)
-
     # --- define temperature matrix to be filled with data
-    n, m = len(set(Tf))+2, len(set(Tc))+1  # temp matrix dimensions
+    n = len(Tf) + 2
+    m = len(Tc) + 1
     frendata = np.zeros((n, m))
-    frendata[0, 0], frendata[0, 1] = n-2, m-1  # write matrix size
-    frendata[2:, 0] = [673.0]
-    frendata[1, 1:] = [673.0]
+    frendata[0, 0], frendata[0, 1] = n - 2, m - 1  # write matrix size
+    frendata[2:, 0] = Tf
+    frendata[1, 1:] = Tc
 
     if txt:
         # create directory
@@ -317,7 +330,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
             os.mkdir("NEinputdata")
 
     # define tuple of couples of temperatures
-    temps.sort(key=lambda t: t[0])
+    temperatures = sorted(temperatures, key=lambda t: t[0])
     regmap = core.NE.regions.reverse()
     NEdata = core.NE.MGClibrary.data
     if H5fmt == 1:
@@ -329,7 +342,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                 where = {}
                 # temperature couples loop
                 # FIXME TODO make it consistent with core.NE.MGClibrary.parameters
-                for itup, tup in enumerate(temps):
+                for itup, tup in enumerate(temperatures):
                     # store value in proper position in temp matrix
                     row = np.where(frendata[:, 0] == tup[0])
                     col = np.where(frendata[1, :] == tup[1])
@@ -342,13 +355,13 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                             # edit name to include info on dep group
                             txtname = f"{dataname}_{ireg}_{gdep+1}_{g+1}"
                             gc = gdep+core.NE.MGClibrary.n_groups*g
-                            for itup, tup in enumerate(temps):
+                            for itup, tup in enumerate(temperatures):
                                 # select matrix entry
                                 r, c = where[tup]
                                 S0 = NEdata[tup][reg].__dict__[data].flatten(order='F')
                                 frendata[r, c] = S0[gc]
                                 # write output if last tuple is reached
-                                if itup == len(temps)-1:
+                                if itup == len(temperatures)-1:
                                     if txt or H5fmt == 0:
                                         # write txt file
                                         mysavetxt(txtname, frendata)
@@ -358,7 +371,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
 
                     else:
                         txtname = f"{dataname}_{ireg}_{g+1}"
-                        for itup, tup in enumerate(temps):  # loop over temps
+                        for itup, tup in enumerate(temperatures):  # loop over temperatures
                             # select matrix entry
                             r, c = where[tup]
                             if 'Esigf' in data:
@@ -366,7 +379,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                             else:
                                 frendata[r, c] = NEdata[tup][reg].__dict__[data][g]
                             # write data if all T tuples have been spanned
-                            if itup == len(temps)-1:
+                            if itup == len(temperatures)-1:
                                 if txt or H5fmt == 0:
                                     # write txt file
                                     mysavetxt(txtname, frendata)
@@ -378,7 +391,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
         # TODO FIXME check order scattering matrix, which should be: 1_1, 1_2, 1_3 with arr<--dep. The
         # numbers indicates row and col, not groups..it should be lower triangular
         # temperature couples loop
-        for itup, tup in enumerate(temps):
+        for itup, tup in enumerate(temperatures):
             for data, dataname in datakeys.items():  # loop over data
                 for regtype, reg in core.NE.MGClibrary.data[itup].items():
                     ireg = regmap[regtype]
@@ -422,7 +435,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
     # MFPmin = {}
     # DFLmax = {}
     # MFPmax = {}
-    # for itup, tup in enumerate(temps):
+    # for itup, tup in enumerate(temperatures):
     #     for regtype, reg in core.NE.MGClibrary.data[itup].items():
     #         if not hasattr(reg, 'DiffLength'):
     #             if not hasattr(reg, 'Sigma_rem'):
