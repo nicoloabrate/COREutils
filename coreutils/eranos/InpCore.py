@@ -12,9 +12,8 @@ def genMaterialList(core):
     axialCutsDf = newRegionLabels(core)
     regLabels = set()
     for (start, end), row in axialCutsDf.iterrows():
-        regions = list(row.values)
-        for reg in regions:
-            regLabels.add(reg)
+        region = row.values[0]
+        regLabels.add(region)
 
     regLabels = sorted(list(regLabels))
     reg_dict = defaultdict(list)
@@ -33,10 +32,10 @@ def printMaterials(core):
     """
     reg_dict = genMaterialList(core)
     for unit, materials in reg_dict.items():
-        print(f"   UNIT '{unit}'          (PN)   MEDIUM  '{unit}'     STRUCTURE")
+        print(f"   UNIT '{unit}'          (PN)   MEDIUM  '{unit}'  ")
         for mat in materials:
             if mat != unit:
-                print(f"                               MEDIUM  '{mat}'  STRUCTURE")
+                print(f"                               MEDIUM  '{mat}'  ")
 
 
 def defineSubAssemblies(core):

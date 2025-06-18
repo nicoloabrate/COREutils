@@ -739,6 +739,61 @@ def isDark(color):
         return True
 
 
+def RadialMap2D(core, quantity_vec, lattice_pitch=16.7):
+    """
+    Plots a 2D radial map of a quantity hexagonally distributed.
+
+    Parameters
+    ----------
+    quantity_vec : numpy.ndarray
+        A numpy array with quantity values.
+    lattice_pitch : float, optional
+        The lattice pitch of the hexagonal grid. Defaults to 16.7.
+
+    Returns
+    -------
+    None
+        Displays the 3D surface plot.
+    """
+
+    n_hex = np.count_nonzero(core.Map.type)
+
+    if len(quantity_vec) != n_hex:
+        print("Error: Inconsistent number of hexagons between data and map.")
+        return
+
+    x_vals = []
+    y_vals = []
+    eranosmap = core.Map._Map__draweranosmap()
+    for (i, j) in eranosmap:
+        # Conversion from hexagonal indices to Cartesian coordinates
+        x_cart = lattice_pitch * (i * np.cos(-np.pi / 6) + j * np.cos(np.pi / 6))
+        y_cart = lattice_pitch * (j * np.cos(-np.pi / 3) + i * np.cos(-2 * np.pi / 3))
+        x_vals.append(x_cart)
+        y_vals.append(y_cart)
+
+    # Create interpolation grid
+    xi = np.linspace(min(x_vals), max(x_vals), 100)
+    yi = np.linspace(min(y_vals), max(y_vals), 100)
+    Xi, Yi = np.meshgrid(xi, yi)
+    Zi = griddata((x_vals, y_vals), quantity_vec, (Xi, Yi), method='cubic')
+
+    # Plotting
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    surf = ax.plot_surface(Xi, Yi, Zi, cmap='viridis', edgecolor='none')
+
+    ax.set_xlabel('X [cm]')
+    ax.set_ylabel('Y [cm]')
+    ax.set_zlim([0, max(quantity_vec)])
+    ax.set_zlabel('Power [-]')
+    ax.set_title(f'2D Radial Power Map')
+    ax.set_box_aspect([1, 1, 0.5])
+    ax.set_zlim(np.nanmin(quantity_vec), np.nanmax(quantity_vec))
+
+    plt.show()
+
+
 def TransientRadialMap(time_vector, power_matrix, detector_locations, lattice_pitch=16.7):
     """
     Creates a 3D transient plot of detector power over time as a surface,
@@ -824,7 +879,7 @@ def TransientRadialMap(time_vector, power_matrix, detector_locations, lattice_pi
         # Set Z axis limits
         ax.set_zlim(z_min, z_max)
 
-        plt.pause(0.5)
+        plt.pause(0.1)
 
     plt.show()
 

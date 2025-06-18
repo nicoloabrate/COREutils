@@ -52,6 +52,9 @@ class Map:
     fren2eranos: dict
         Dictionary mapping the assemblies according to the FRENETIC numeration 
         to the one employed by ERANOS.
+    eranos2fren: dict
+        Dictionary mapping the assemblies according to the ERANOS numeration 
+        to the one employed by FRENETIC.
     serpcentermap: dict
         Dictionary mapping assembly number to its center coordinates.
 
@@ -123,7 +126,7 @@ class Map:
         serpmap = Map.__drawserpmap(self, Geom)  # Serpent numeration
         # define assembly centers coordinate
         coord = Map.__findcenters(self, Geom)
-        eranosmap = Map.__draweranosmap(self)  # ERANOS numeration
+        eranosmap = Map.__eranosCoords(self)  # ERANOS numeration
 
         if Geom.type == "H":
             # define assembly numeration according to FRENETIC
@@ -131,6 +134,8 @@ class Map:
             # Serpent to FRENETIC dict
             self.serp2fren = OrderedDict(zip(serpmap[:], frenmap[:]))
             self.fren2eranos = dict(zip(frenmap, eranosmap))
+            # ERANOS to FRENETIC dict
+            self.eranos2fren = dict(zip(eranosmap, frenmap))
             # sort FRENETIC map in ascending way
             sortind = np.argsort(frenmap)
             frenmap = frenmap[sortind]
@@ -442,7 +447,7 @@ class Map:
         return frenmap
 
 
-    def __draweranosmap(self, center = (30,30)):
+    def __eranosCoords(self, center = (30,30)):
         """
         Define the core map according to ERANOS code ordering.
 
@@ -481,7 +486,7 @@ class Map:
         return eranosmap
 
 
-    def __drawvariantmap(self,num_rings, center=(30, 30)):
+    def __draweranosmap(self, center=(30, 30)):
         """
         Generates an array that maps the enumeration of hexagons to their coordinates
         in a concentric hexagonal lattice, with the correct starting point for each ring.
@@ -496,6 +501,12 @@ class Map:
         variantmap = []
         xx, yy = center
         variantmap.append((xx, yy))
+        num_hex = np.count_nonzero(self.type)
+        num_rings = max(np.roots([3,3,1-num_hex])) # solves 3R^2 + 3R + 1 = num_hex
+        # FIXME: this function is not general, it only works for perfect hexagonal lattices
+        if not num_rings.is_integer():
+            raise ValueError(f"n_hex = {num_hex} does not correspond to a perfect hexagonal lattice.")
+        num_rings = int(num_rings)
 
         for ring in range(1, num_rings + 1):
             #starting point for each ring

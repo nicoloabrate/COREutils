@@ -5,8 +5,18 @@ from collections import defaultdict
 
 def genDictAxialCutsTrans(core):
     """
-    Generate a dictionary of axial cuts for the translated assemblies
+    Generates a dictionary that contains what the axial regions of the translated CRs see during the transient.
+    Parameters
+    ----------
+    core : Core
+        The core object containing the axial cuts information.
+    Returns
+    -------
+    dict : 
+        A dictionary where the keys are tuples representing the z-coordinates of the axial cuts,
+        and the values are dictionaries with the time instants as keys and the region names as values.
     """
+
     dict_ass_cuts = core.NE.AxialConfig.cuts
     ass = dict_ass_cuts.keys()
     trans_ass = [assembly for assembly in ass if 'CR' in assembly]
@@ -189,7 +199,7 @@ def genKIN3DfullDetectors(core, filename="detector_specs.txt"):
     """
     Generates the detector specifications for KIN3D, one for each subassembly
     """
-    ass_positions = core.Map._Map__draweranosmap()
+    ass_positions = core.Map._Map__eranosCoords()
     with open(filename, "w") as f:
         pass
     for pos in ass_positions:
