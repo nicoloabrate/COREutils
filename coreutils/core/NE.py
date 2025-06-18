@@ -345,10 +345,15 @@ class NE:
                             # update names of the axial regions (assuming that different spectra are used at different times)
                             for i, name in enumerate(AxialConfig_cuts[sa_name_new].reg):
                                 AxialConfig_cuts[sa_name_new].reg[i] = f"({name})-T{nT}"
-                                for M in AxialConfig_cutsregions[sa_name_new].keys():
-                                    for iCell in range(len(AxialConfig_cutsregions[sa_name_new][M])):
-                                        if AxialConfig_cutsregions[sa_name_new][M][iCell] != 0:
-                                            AxialConfig_cutsregions[sa_name_new][M][iCell] = f"({name})-T{nT}"
+
+                            for i, name in enumerate(AxialConfig_cuts[sa_name_new].labels):
+                                AxialConfig_cuts[sa_name_new].labels[i] = f"({name})-T{nT}"
+
+                            for M in AxialConfig_cutsregions[sa_name_new].keys():
+                                for iCell in range(len(AxialConfig_cutsregions[sa_name_new][M])):
+                                    if AxialConfig_cutsregions[sa_name_new][M][iCell] != 0:
+                                        AxialConfig_cutsregions[sa_name_new][M][iCell] = f"({AxialConfig_cutsregions[sa_name_new][M][iCell]})-T{nT}"
+                                        AxialConfig_cutslabels[sa_name_new][M][iCell] = f"({AxialConfig_cutslabels[sa_name_new][M][iCell]})-T{nT}"
 
                             for n in range(1, nR+1):
                                 if univ_str_newT[n-1] not in regions.values():
@@ -452,6 +457,22 @@ class NE:
                 self.regionslabel = dict(zip(lst, lst))
         else:
             self.regionslabel = NEargs["regionslabel"]
+
+        if self.plot["AXcolors"] is None:
+            self.plot["AXcolors"] = {} # dict(zip(self.AxialConfig.regions.values(), mycols1))
+            idx_col = 0
+            # assign colors to each assembly axial configuration
+            for NEty, ty_dict in self.AxialConfig.cutsregions.items():
+                self.AxialConfig.cutscolors[NEty] = {}
+                for n, reg_lst in ty_dict.items():
+                    self.AxialConfig.cutscolors[NEty][n] = [0]*len(reg_lst)
+                    for i, regcol in enumerate(reg_lst):
+                        if regcol != 0:
+                            if regcol not in self.plot["AXcolors"].keys():
+                                self.plot["AXcolors"][regcol] = mycols1[idx_col]
+                                idx_col += 1
+
+                            self.AxialConfig.cutscolors[NEty][n][i] = self.plot["AXcolors"][regcol]
 
         # # FIXME TODO temporary patch
         # for v in self.labels.values():
@@ -843,7 +864,7 @@ class NE:
                                     mat4hom[name] = self.MGClibrary.data[temp][name]
                                 vol4hom = {"homog": dict(zip(names, V_homog)), 
                                         "heter": dict(zip(names, V_heter))}
-                                tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata, self.add_missing_MGC)
+                                tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata, self.energy_grid, add_missing_MGC=self.add_missing_MGC)
 
                 # --- update info in object
                 if newtype not in self.assemblytypes.keys():
@@ -1261,7 +1282,7 @@ class NE:
                                     mat4hom[name] = self.MGClibrary.data[iPar][name]
                                 vol4hom = {"homog": dict(zip(names, V_homog)), 
                                         "heter": dict(zip(names, V_heter))}
-                                tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata)
+                                tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.MGClibrary.fixdata, self.MGClibrary.energy_grid, add_missing_MGC=self.MGClibrary.add_missing_MGC)
 
                     # # --- update info in object
                     # if newtype not in self.assemblytypes.keys():
@@ -1512,7 +1533,7 @@ class MGClibrary():
 
                     data_name = gc_in_dict_all_param[BU][iPar]["data_name"]
                     self.data[iPar][data_name] = NEMaterial(data_in_dict=gc_in_dict_all_param[BU][iPar], energy_grid=self.energy_grid,
-                                                            fixdata=self.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
+                                                            fixdata=self.MGClibrary.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
                                                             add_missing_MGC=self.add_missing_MGC)
 
         # --- parse parameter-wise data
@@ -1525,7 +1546,7 @@ class MGClibrary():
                     for f in gc_path_param[iPar][reader]:
                         gc_in_dict = MGC_reader(reader, f)
                         self.data[iPar][gc_in_dict['data_name']] = NEMaterial(data_in_dict=gc_in_dict, energy_grid=self.energy_grid,
-                                                                            fixdata=self.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
+                                                                            fixdata=self.MGClibrary.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
                                                                             add_missing_MGC=self.add_missing_MGC)
                 else:
                     for f in gc_path_param[iPar][reader]:

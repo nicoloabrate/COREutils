@@ -139,19 +139,6 @@ def AxialGeomPlot(core, which, time=0, label=False, assembly_name=False,
 
     nReg = len(reg)
 
-    # TODO FIXME these lines should be in NE
-    if core.NE.plot["AXcolors"] is None:
-        core.NE.plot["AXcolors"] = dict(zip(reg, mycols1))
-        # assign colors to each assembly axial configuration
-        for NEty, ty_dict in core.NE.AxialConfig.cutsregions.items():
-            core.NE.AxialConfig.cutscolors[NEty] = {}
-            for n, reg_lst in ty_dict.items():
-                core.NE.AxialConfig.cutscolors[NEty][n] = [0]*len(reg_lst)
-                for i, regcol in enumerate(reg_lst):
-                    if regcol != 0:
-                        col = core.NE.plot["AXcolors"][regcol]
-                        core.NE.AxialConfig.cutscolors[NEty][n][i] = col
-
     # open figure
     idx = 0
     labels = []
