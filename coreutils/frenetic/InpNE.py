@@ -374,7 +374,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                         for itup, tup in enumerate(temperatures):  # loop over temperatures
                             # select matrix entry
                             r, c = where[tup]
-                            if 'Esigf' in data:
+                            if 'fiss_energy' in data:
                                 frendata[r, c] = NEdata[tup][reg].__dict__['Sigma_fiss'][g]*NEdata[tup][reg].__dict__['fiss_energy'][g]*1.60217653e-13                  
                             else:
                                 frendata[r, c] = NEdata[tup][reg].__dict__[data][g]
@@ -402,14 +402,14 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                         fh5.create_group(tmpgrp)
                     fh5_TfTc = fh5[tmpgrp]
 
-                    if data not in ['nuSigma_fiss', 'Esigf']:
+                    if data not in ['nuSigma_fiss', 'fiss_energy']:
                         xsdata = reg.__dict__[data]
                     else:
                         if data == 'nuSigma_fiss':
                             nu_fiss = reg.nu_fiss
                             Sigma_fiss = reg.Sigma_fiss
                             xsdata = nu_fiss*Sigma_fiss
-                        elif data == 'Esigf':
+                        elif data == 'fiss_energy':
                             fiss_energy = reg.fiss_energy
                             Sigma_fiss = reg.Sigma_fiss
                             xsdata = fiss_energy*Sigma_fiss*1.60217653e-13
