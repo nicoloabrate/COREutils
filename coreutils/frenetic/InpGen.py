@@ -481,11 +481,19 @@ def inpgen(core, jsonpath):
             lambda0 = [mat0.__dict__['lambda_tot']]
         else:
             raise OSError("Cannot deal with 'nPrec'!=1!")
+
+        H5fmt = core.FreneticNamelist['CONTROL']['iHDF5Inp']
+
+        if H5fmt == 0:
+            txt = True
+        else:
+            txt = False
+
         # --- write macro.nml
-        writemacro(core, NEpath, nmix, vel, lambda0, beta0, core.NE.regions, H5fmt=2)
+        writemacro(core, NEpath, nmix, vel, lambda0, beta0, core.NE.regions, H5fmt)
 
         # -- write NE_data.h5
-        writeNEdata(core, NEpath, verbose=False, H5fmt=2, txt=0)
+        writeNEdata(core, NEpath, H5fmt, txt, verbose=False, )
 
     else:
         logger.warn('macro.nml and NE_data.h5 not written!')

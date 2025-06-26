@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def writemacro(core, path, nmix, vel, lambda0, beta0,
-               unimap, H5fmt=2):
+               unimap, H5fmt):
     """
     Write the input file "macro.nml" for the NE module of FRENETIC.
 
@@ -178,7 +178,13 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
 
             if macro == "XS_SCATT":
 
-                if H5fmt == 1:
+                if H5fmt == 0:
+                    for igrostart in range(core.NE.MGClibrary.n_groups):
+                        f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.MGClibrary.n_groups}) =')
+                        for igroend in range(core.NE.MGClibrary.n_groups):
+                            f.write(f" 'NEinputdata/{macro}_{imix+1}_{igrostart+1}_{igroend+1}.txt', ")
+                        f.write('\n')
+                elif H5fmt == 1:
                     for igrostart in range(core.NE.MGClibrary.n_groups):
                         f.write(f'{inp}({imix+1},{igrostart+1},1:{core.NE.MGClibrary.n_groups}) =')
                         for igroend in range(core.NE.MGClibrary.n_groups):
@@ -192,7 +198,12 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
                         f.write('\n')
 
             else:
-                if H5fmt == 1:
+                if H5fmt == 0:
+                    f.write(f'{inp}({imix+1},1:{core.NE.MGClibrary.n_groups}) =')
+                    for igro in range(core.NE.MGClibrary.n_groups):
+                        f.write(f" 'NEinputdata/{macro}_{imix+1:d}_{igro+1:d}.txt', ")
+                    f.write('\n')
+                elif H5fmt == 1:
                     f.write(f'{inp}({imix+1},1:{core.NE.MGClibrary.n_groups}) =')
                     for igro in range(core.NE.MGClibrary.n_groups):
                         f.write(f" '{macro}_{imix+1:d}_{igro+1:d}', ")
@@ -203,7 +214,7 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
                         f.write(f" '{imix+1}/{macro}', ")
                     f.write('\n')
 
-        if nGrp> 0:
+        if nGrp > 0:
             for inp, macro in zip(inpnamesp, macronamesp):
 
                 if macro == "XS_SCATT_P":
@@ -227,7 +238,7 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
     f.write('/\n')
 
 
-def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
+def writeNEdata(core, path, H5fmt, txt, verbose=False, ):
     """
     Generate FRENETIC NE module input (HDF5 file or many txt).
 
@@ -317,23 +328,24 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
 
     if txt:
         # create directory
-        if os.path.isdir("NEinputdata"):
+        
+        if os.path.isdir(path.joinpath("NEinputdata")):
             logger.info("'NEinputdata' directory exists. Overwriting...")
             ans = "yes" # input()
         else:
             ans = "no"
 
         if ans == "yes" or ans == "y":
-            rmtree("NEinputdata")
-            os.mkdir("NEinputdata")
+            rmtree(path.joinpath("NEinputdata"))
+            os.mkdir(path.joinpath("NEinputdata"))
         else:
-            os.mkdir("NEinputdata")
+            os.mkdir(path.joinpath("NEinputdata"))
 
     # define tuple of couples of temperatures
     temperatures = sorted(temperatures, key=lambda t: t[0])
     regmap = core.NE.regions.reverse()
     NEdata = core.NE.MGClibrary.data
-    if H5fmt == 1:
+    if H5fmt != 2:
         # FIXME TODO remove [0] and make it more robust
         for reg in core.NE.MGClibrary.data[0].keys():
             ireg = regmap[reg]
@@ -346,25 +358,25 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                     # store value in proper position in temp matrix
                     row = np.where(frendata[:, 0] == tup[0])
                     col = np.where(frendata[1, :] == tup[1])
-                    where[tup] = (row, col)
+                    where[tuple(tup)] = (row, col)
                 # -- split homogdata in regions and groups
                 for g in range(core.NE.MGClibrary.n_groups):  # loop over energy groups
                     # check if matrix
-                    if 'S' in data or 'Sp' in data:
+                    if 'S0' in data or 'Sp0' in data:
                         for gdep in range(core.NE.MGClibrary.n_groups):  # loop over departure g
                             # edit name to include info on dep group
                             txtname = f"{dataname}_{ireg}_{gdep+1}_{g+1}"
-                            gc = gdep+core.NE.MGClibrary.n_groups*g
+                            gc = gdep + core.NE.MGClibrary.n_groups * g
                             for itup, tup in enumerate(temperatures):
                                 # select matrix entry
-                                r, c = where[tup]
-                                S0 = NEdata[tup][reg].__dict__[data].flatten(order='F')
+                                r, c = where[tuple(tup)]
+                                S0 = NEdata[itup][reg].__dict__[data].flatten(order='F')
                                 frendata[r, c] = S0[gc]
                                 # write output if last tuple is reached
-                                if itup == len(temperatures)-1:
+                                if itup == len(temperatures) - 1:
                                     if txt or H5fmt == 0:
                                         # write txt file
-                                        mysavetxt(txtname, frendata)
+                                        mysavetxt(txtname, frendata, path)
                                     # save in h5 file
                                     tmp = np.array(frendata, dtype=float)
                                     fh5.create_dataset(txtname, data=tmp)
@@ -373,21 +385,21 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                         txtname = f"{dataname}_{ireg}_{g+1}"
                         for itup, tup in enumerate(temperatures):  # loop over temperatures
                             # select matrix entry
-                            r, c = where[tup]
+                            r, c = where[tuple(tup)]
                             if 'fiss_energy' in data:
-                                frendata[r, c] = NEdata[tup][reg].__dict__['Sigma_fiss'][g]*NEdata[tup][reg].__dict__['fiss_energy'][g]*1.60217653e-13                  
+                                frendata[r, c] = NEdata[itup][reg].__dict__['Sigma_fiss'][g]*NEdata[itup][reg].__dict__['fiss_energy'][g]*1.60217653e-13                  
                             else:
-                                frendata[r, c] = NEdata[tup][reg].__dict__[data][g]
+                                frendata[r, c] = NEdata[itup][reg].__dict__[data][g]
                             # write data if all T tuples have been spanned
-                            if itup == len(temperatures)-1:
+                            if itup == len(temperatures) - 1:
                                 if txt or H5fmt == 0:
                                     # write txt file
-                                    mysavetxt(txtname, frendata)
+                                    mysavetxt(txtname, frendata, path)
                                 # save in h5 file
                                 tmp = np.array(frendata, dtype=float)
                                 fh5.create_dataset(txtname, data=tmp)
 
-    elif H5fmt == 2:
+    else:
         # TODO FIXME check order scattering matrix, which should be: 1_1, 1_2, 1_3 with arr<--dep. The
         # numbers indicates row and col, not groups..it should be lower triangular
         # temperature couples loop
@@ -427,6 +439,7 @@ def writeNEdata(core, path, verbose=False, txt=False, H5fmt=2):
                     fh5_ih.attrs['label'] = str(core.NE.labels[regtype])
 
                     fh5_ih.create_dataset(dataname, data=tmp)
+
 
     fh5.close()
     # FIXME TODO 
@@ -684,7 +697,7 @@ def makeNEinput(core, path, H5fmt=2):
         f.write("/\n")
 
 
-def mysavetxt(fname, x, fmt="%.6e", delimiter=' '):
+def mysavetxt(fname, x, path, fmt="%.6e", delimiter=' '):
     """
     Write file in txt format.
 
@@ -705,7 +718,7 @@ def mysavetxt(fname, x, fmt="%.6e", delimiter=' '):
 
     """
     fname = fname+".txt"  # add file extension
-    fname = os.path.join("NEinputdata", fname)
+    fname = path.joinpath("NEinputdata").joinpath(fname)
     with open(fname, 'w') as f:
         for idx, row in enumerate(x):
             if idx == 0:
