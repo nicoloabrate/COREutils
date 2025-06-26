@@ -88,10 +88,10 @@ class Core:
     """
 
     def __init__(self, inpjson):
-        if '.h5' in inpjson:
+        if '.h5' in str(inpjson):
             write_coreutils_msg(f"Build core object from an existing .h5 file, {inpjson}")
             self._from_h5(inpjson)
-        elif ".json" in inpjson:
+        elif ".json" in str(inpjson):
             write_coreutils_msg(f"Build core object from a .json input file, {inpjson}")
             self.from_json(inpjson)
         else:
