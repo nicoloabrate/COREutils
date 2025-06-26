@@ -1546,7 +1546,7 @@ class MGClibrary():
                     for f in gc_path_param[iPar][reader]:
                         gc_in_dict = MGC_reader(reader, f)
                         self.data[iPar][gc_in_dict['data_name']] = NEMaterial(data_in_dict=gc_in_dict, energy_grid=self.energy_grid,
-                                                                            fixdata=self.MGClibrary.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
+                                                                            fixdata=self.fixdata, P1consistent=self.P1consistent, use_nxn=self.use_nxn,
                                                                             add_missing_MGC=self.add_missing_MGC)
                 else:
                     for f in gc_path_param[iPar][reader]:
@@ -1566,7 +1566,7 @@ class MGClibrary():
         for iPar in self.data.keys():
             for reg in NE_regions:
                 if reg not in self.data[iPar].keys():
-                    raise NEError(f"Missing region {reg} in data library for the parameter combo n. {iPar} .")
+                    raise NEError(f"Missing region {reg} in data library for the parameter combo n. {iPar}.")
 
         # --- HOMOGENISATION (if any)
         if core.dim != 2:
