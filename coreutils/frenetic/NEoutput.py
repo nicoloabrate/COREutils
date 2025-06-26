@@ -45,10 +45,10 @@ class NEoutput:
         -------
         None.
         """
-        self.casepath = path
-        self.NEpath = os.path.join(path, 'NE')
+        self.casepath = Path(path)
+        self.NEpath = self.casepath.joinpath('NE')
         # looking for core.h5 file with core object
-        self.core = Core(os.path.join(path, 'core.h5'))
+        self.core = Core(self.casepath.joinpath('core.h5'))
         self.n_groups = self.core.NE.MGClibrary['_n_groups']
         # FIXME TODO
         self.ngrp = 0
@@ -219,15 +219,17 @@ class NEoutput:
         
         h5path = "/".join([f"Tf_{Tf:02d}_Tc_{Tc:02d}", "/", f"{id_reg}", "/", xs_name])
         # --- parse the file
-        xs = np.asarray(h5f[h5path])
-
+        try:
+            xs = np.asarray(h5f[h5path])
+        except KeyError:
+            raise NEOutputError(f"Cannot find {xs_name} in {h5path} in NE_data.h5 file! Does the file exist?")
         # --- close H5 file
         h5f.close()
 
         return xs
 
     def get_txt(self, what, t=None, z=None, hex=None, pre=None,
-            gro=None, metadata=False):
+            gro=None, metadata=False, particles="neutrons"):
         """
         Get profile from txt formatted output.
 
@@ -276,10 +278,6 @@ class NEoutput:
                 tot = True
                 hex = None # take all hex
 
-        datapath = os.path.join(self.NEpath, "intpow.out")
-        if not os.path.exists(datapath):
-            raise NEOutputError(f"No output in directory {self.NEpath}")
-
         if what in self.MapVersion["data"]["distributions"]:
             if what == "timeDistr":
                 # get time array from other output files
@@ -295,7 +293,7 @@ class NEoutput:
                 times = np.loadtxt(datapath, comments="#", usecols=(0))
                 return times
             else:
-                datapath = os.path.join(self.NEpath, f"{what}.out")
+                fname = f"{what}.out"
 
             isintegral = False
             idx = self.MapVersion["data"]["distributions"].index(what)
@@ -330,17 +328,46 @@ class NEoutput:
             # "times" refers to all time instants
             nTimeConfig = len(self.core.NE.time)
             if nTimeConfig == 1:
+                n_times = 1
                 times = None
-            else:  # parse time from h5 file
-                times = np.loadtxt(datapath, comments="#", usecols=(0))
-            # --- TIME AND AXIAL COORDINATE PARAMETERS
-            gro, grp, pre, prp, idt, idz = self._shift_index(gro, pre,t, z, times=times, 
-                                                            particles=particles)
-            dimdict = {'iTime': idt, 'iAxNode': idz, 'iHexNode': hex, 'Group': gro,
-                       'Family': pre}
+            else:  # parse time array
+                timepath = os.path.join(self.NEpath, fname)
+                times = np.loadtxt(timepath, comments="#", usecols=(0))
+                n_times = len(times)
 
             if t is not None:
                 timesSnap = self.core.TimeSnap # TODO distinguish existence of snapshots in simulations
+
+            # --- PARSE PROFILE FROM txt FILE
+            datapath = self.NEpath.joinpath(fname)
+            if datapath.exists():
+                profile = np.loadtxt(datapath, comments="#")
+            else:
+                raise NEOutputError(f"No output in directory {self.NEpath}")
+
+            # --- TIME AND AXIAL COORDINATE PARAMETERS
+            gro, grp, idt, idz = self._shift_index(gro, pre,t, z, times=times, 
+                                                            particles=particles)
+            dimdict = {'iTime': idt, 'iAxNode': idz, 'iHexNode': hex, 'Group': gro,
+                       'Family': pre}
+            sizedict = {'iTime': n_times, 'iAxNode': self.nelz, 'iHexNode': self.nhex, 'Group': self.n_groups,
+                       'Family': self.npre}
+
+            # parse specified time, assembly, axial node, group, prec. fam.
+            dims = self.MapVersion['metadata']['distributions']['dim'][what]
+            dimlst = []
+            dim_reshape = []
+            for d in dims:
+                x = dimdict[d]
+                if x is None:
+                    x = 0 if x == 'iTime' else slice(None)
+                dimlst.append(x)
+                dim_reshape.append(sizedict[d])
+
+            profile = profile.reshape(tuple(dim_reshape))
+            profile = profile[np.ix_(*dimlst)]
+            # TODO handle derived types
+
 
         else:  # integral data
             isintegral = True
@@ -350,7 +377,7 @@ class NEoutput:
                 if what in v:
                     dictkey = k
                     fname = f'{dictkey}.out'
-                    idx = v.index(what)+skip
+                    idx = v.index(what) + skip
                     notfound = False
                     break
                 elif what == 'betaeff':
@@ -370,14 +397,17 @@ class NEoutput:
             if notfound:
                 raise NEOutputError(f'{what} not found in data!')
 
-        # --- PARSE PROFILE FROM H5 FILE
-        datapath = os.path.join(self.NEpath, fname)
-        profile = np.loadtxt(datapath, comments="#", usecols=(idx))
+            # --- PARSE PROFILE FROM txt FILE
+            datapath = self.NEpath.joinpath(fname)
+            if datapath.exists():
+                profile = np.loadtxt(datapath, comments="#", usecols=(idx))
+            else:
+                raise NEOutputError(f"No output in directory {self.NEpath}")
 
         if profile.ndim > 0:
             return profile[:]
         else:
-            return profile
+            return np.array([profile])
 
     def get_v1(self, what, t=None, z=None, hex=None, pre=None,
                 gro=None, metadata=False, particles="neutrons"):
@@ -2149,11 +2179,11 @@ class NEoutput:
                 if os.path.exists(h5path):
                     h5f = h5.File(h5path, "r")
                 else:
-                    raise OSError(f"No output in directory {NEpath}")
-        except OSError as err:
-            if 'Unable to open file' in str(err):
+                    raise NEOutputError(f"No output in directory {NEpath}")
+        except NEOutputError as err:
+            if 'No output in directory' in str(err):
                 if not os.path.exists(h5path):
-                    raise OSError(f"No output in directory {NEpath}")
+                    raise NEOutputError(f"No output in directory {NEpath}")
                 else:
                     raise NEOutputError(f"{str(err)}\n{h5path} is probably corrupted!")
             else:
@@ -2170,12 +2200,12 @@ class NEoutput:
                 version = h5f.attrs["output version"][0].decode()
             else:
                 version = "1.0"
-        except OSError as err:
-            if 'Unable to open file' in str(err):
+        except NEOutputError as err:
+            if 'No output in directory' in str(err):
                 # look for txt files (deprecated format)
-                intparf = MapOutput["1.0"]["data"]["integralParameters"].keys()
-                dostrf = MapOutput["1.0"]["data"]["distributions"]
-                txt_files = distrf + intparf
+                intparf = MapOutput['MapVersion']["1.0"]["data"]["integralParameters"].keys()
+                distrf = MapOutput['MapVersion']["1.0"]["data"]["distributions"]
+                txt_files = distrf + list(intparf)
                 for f in txt_files:
                     datapath = os.path.join(NEpath, f"{f}.out")
                     if os.path.exists(datapath):
