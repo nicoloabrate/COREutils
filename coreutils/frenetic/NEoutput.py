@@ -833,6 +833,8 @@ class NEoutput:
                     rel_path = path.split("/")[-1]
                     if "power_density" in path:
                         rel_path = "power_density/" + rel_path
+                    elif "temperatures" in path:
+                        rel_path = "temperatures/" + rel_path
                     color = self.MapVersion["metadata"]["colormap"][rel_path]
                 else:
                     color = "Plasma"
