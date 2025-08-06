@@ -1911,6 +1911,31 @@ class NEoutput:
 
         return str(", ".join(label))
 
+    def plot_iter_hist(self, ax=None, figname=None, style='sty1D.mplstyle'):
+
+        n_iter, err_flx, err_curr, err_eig = self.get_iter_hist()  # check if iterhist.out exists
+        # plot against axial coordinate
+        ax = plt.gca() if ax is None else ax
+        ax.plot(n_iter, err_flx, label='Error on flux', color='blue')
+        ax.plot(n_iter, err_curr, label='Error on current', color='black', ls='--')
+        ax.plot(n_iter, err_eig, label='Error on eigenvalue', color='red', ls=':')
+
+        ax.set_xlabel('Iteration number')
+        ax.set_ylabel('Error')
+        ax.set_yscale('log')
+        ax.legend(loc='upper center', ncol=3, shadow=True,
+                  bbox_to_anchor=(0.5, 1.15), fontsize='small')
+
+    def get_iter_hist(self):
+
+        if self.NEpath.joinpath("iterhist.out").exists():
+            n_iter, err_flx, err_curr, err_eig = np.loadtxt(self.NEpath.joinpath("iterhist.out"), comments='#', unpack=True)
+        else:
+            raise NEOutputError("iterhist.out not found! \
+                                Cannot parse iteration history.")
+
+        return n_iter, err_flx, err_curr, err_eig
+
     @staticmethod
     def _fill_deprec_vers_metadata(MapVersion, npre, n_groups, nprp, ngrp):
             # fill group and precursors entries
