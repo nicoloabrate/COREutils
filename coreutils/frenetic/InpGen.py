@@ -473,14 +473,13 @@ def inpgen(core, jsonpath):
             raise OSError("U should not be here!")
 
         vel = 1/mat0.inv_vel
-        if core.NE.MGClibrary.n_prec is None:
-            beta0 = mat0.beta
-            lambda0 = mat0.__dict__['lambda']
-        elif core.NE.MGClibrary.n_prec == 1:
+        if core.NE.MGClibrary.n_prec == 1:
             beta0 = [mat0.beta_tot]
             lambda0 = [mat0.__dict__['lambda_tot']]
         else:
-            raise OSError("Cannot deal with 'nPrec'!=1!")
+            beta0 = mat0.beta
+            lambda0 = mat0.__dict__['lambda']
+
 
         H5fmt = core.FreneticNamelist['CONTROL']['iHDF5Inp']
 
