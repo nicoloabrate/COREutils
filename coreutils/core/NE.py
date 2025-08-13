@@ -1402,8 +1402,8 @@ class MGClibrary():
         else:
             self.use_nxn = False
 
-        if "n_precursor" in MMGCdata.keys():
-            self.n_prec = MMGCdata["n_precursor"]
+        if "n_precursors" in MMGCdata.keys():
+            self.n_prec = MMGCdata["n_precursors"]
         else:
             self.n_prec = 1
 
