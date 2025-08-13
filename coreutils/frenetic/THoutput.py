@@ -464,10 +464,10 @@ class THoutput:
             # "t" refers to slicing
             nTimeConfig = len(self.core.TH.BCtime)
             if t is None:
-                if nTimeConfig == 1:
+                if nTimeConfig == 1 and not self.core.trans:
                     t = [0]  # time instant, not python index!
             # "times" refers to all time instants
-            if nTimeConfig == 1:
+            if nTimeConfig == 1 and not self.core.trans:
                 times = None
             else:  # parse time from h5 file
                 if read_distr:
