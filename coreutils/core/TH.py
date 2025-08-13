@@ -17,6 +17,8 @@ from coreutils.input.TH_input import *
 
 logger = logging.getLogger(__name__)
 
+n_digits_max = 14
+
 class TH:
     """
     Define TH core configurations.
@@ -122,6 +124,12 @@ class TH:
             configtype = name.split('config')[0]
             if config is not None:
                 for time in config.keys():
+
+                    if "." in time:
+                        n_digits = len(time.split(".")[1])
+                        if n_digits > n_digits_max:
+                            raise THError(f"Time {time} [s] has > {n_digits_max} digits after the decimal point! ")
+
                     if time != '0':
                         t = float(time)
                         # increment time list

@@ -39,6 +39,7 @@ reader_ext = {
             "nemtab": ".XS",
              }
 
+n_digits_max = 14
 
 class NE:
     """
@@ -180,6 +181,11 @@ class NE:
         # consistent with the following one (translate, critical, perturb, replace, replaceSA)
         if config is not None:
             for time in config.keys():
+                if "." in time:
+                    n_digits = len(time.split(".")[1])
+                    if n_digits > n_digits_max:
+                        raise NEError(f"Time {time} [s] has > {n_digits_max} digits after the decimal point! ")
+
                 if float(time) != 0:
                     t = float(time)
                     # increment time list
@@ -1058,11 +1064,11 @@ class NE:
                             if r == oldreg:
                                 izpos.append(i)
                         # ensure region is not also in mix
-                        for r in self.regions.values():
-                            if "+" in r:
-                                if oldreg in r:
-                                    raise OSError('Cannot perturb region which is both alone and'
-                                                  ' in mix! Use separate perturbation cards!')                     
+                        # for r in self.regions.values():
+                        #     if "+" in r:
+                        #         if oldreg in r:
+                        #             raise OSError('Cannot perturb region which is both alone and'
+                        #                           ' in mix! Use separate perturbation cards!')                     
                         if izpos == []:  # look in xscuts
                             for i, r in enumerate(self.AxialConfig.cuts[atype].reg):
                                 if r == oldreg:
