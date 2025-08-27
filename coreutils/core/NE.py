@@ -1423,7 +1423,6 @@ class MGClibrary():
         write_coreutils_msg(f"Read and assign multi-group constants to NE object")
         self.get_material_data(MMGCdata, core, NE_geom, NE_regions)
 
-
     def get_MGC_path(self, lib_path):
 
         pattern = r"<par([0-9][0-9]*)>"
@@ -1666,6 +1665,13 @@ class MGClibrary():
     def n_groups(self, energy_grid):
         self._n_groups = len(energy_grid) - 1
 
+    @property
+    def regions(self):
+        iPar = list( self.data.keys() )[0]
+        regions = list( self.data[iPar].keys() )
+
+        return regions
+
     def get_PH_energy_grid(self, PHargs):
         if 'energy_grid_name' in PHargs.keys():
             ename = PHargs['energy_grid_name']
@@ -1703,6 +1709,133 @@ class MGClibrary():
 
         if self.energygridPH[0] < self.energygridPH[0]:
             self.energygridPH[np.argsort(-self.energygridPH)]
+
+    def to_nemtab(self, destination_path=None):
+        """Export MG library to files in the NEMTAB format.
+
+        Returns
+        -------
+        None
+        """
+        commchar = '*'
+        # --- prepare common header for all files
+        header = [commchar]
+        if self.parameters is not None:
+            parnames = list(self.parameters.names)
+
+            if len(parnames) < 6:
+                parnames += ['undef'] * ( 6 - len(parnames) )
+
+            header.append(f"{commchar} {'    '.join(parnames)}")
+            header.append(("    ".join([str(v) for v in self.parameters.n_values])))
+            for iPar in self.data.keys():
+                vals = []
+                for iVal, v in enumerate(self.parameters.values[iPar]):
+                    if isinstance(v, float):
+                        vals.append(f"{v:1.5e}")
+                    else:
+                        raise NEError(f"Parameter value {v} in {parnames[iVal]} not supported in NEMTAB output!")
+
+                header.append("   ".join(vals))
+
+            header.append(commchar)
+
+        else:
+            header = [
+                    commchar,
+                    f'{commchar}   undef          undef          undef          undef          undef          undef          ',
+                    '0              0              0              0              0              0',
+                    commchar]
+
+        header.append('* -------------------')
+        header.append('* BURNUP   0.00 GWd/t')
+        header.append('* -------------------')
+
+        # write group-wise data
+        data_list = {
+                    'Diffcoef': 'di',
+                    'Sigma_abs': 'ab',
+                    'nuSigma_fiss': 'nf',
+                    'fiss_energy': 'kf',
+                    'Sigma_fiss': 'fi',
+                    'Sigma_tot': 'to',
+                    'S0': 'P0 Scattering',
+                    'chi_tot': 'ch',
+                    'inv_vel': 'iv',
+                    'lambda': 'la',
+                    'beta': 'be'
+                    }
+
+        for reg in self.regions:
+            lines = list(header)
+            for key, nemtab_key in data_list.items():
+                # add header
+
+                # write data type
+                lines.append("\n".join([
+                            commchar,
+                            f"{commchar} {nemtab_key}",
+                            commchar
+                            ]))
+
+                if key in ['S0', 'S1']:
+
+                    # add group-wise data
+                    for h in range(self.n_groups):
+                        for g in range(self.n_groups):
+                            lines.append(f"GROUP   {h + 1} -> {g + 1}")
+
+                            vals = []
+                            for iPar in range(self.parameters.n_param):
+                                vals.append( self.data[iPar][reg].__dict__[key][g, h] )
+
+                            val_str = " ".join([f"{v:1.5e}" for v in vals])
+
+                            lines.append(f"  {val_str}")
+
+                else:
+                    
+                    if key in ['chi_tot', 'inv_vel', 'lambda', 'beta']:
+                        # add group-wise data
+                        lines.append(" ".join( [f"GROUP      {g + 1}" for g in range(self.n_groups)]) )
+                        iPar = list( self.data.keys() )[0]
+                        vals = [self.data[iPar][reg].__dict__[key][g] for g in range(self.n_groups)]
+                        val_str = " ".join([f"{v:1.5e}" for v in vals])
+                        lines.append(f"  {val_str}")
+                    
+                    else:
+                        # add group-wise data
+                        for g in range(self.n_groups):
+                            lines.append(f"GROUP   {g + 1}")
+                            
+                            vals = []
+                            for iPar in range(self.parameters.n_param):
+                                vals.append( self.data[iPar][reg].__dict__[key][g] )
+
+                            val_str = " ".join([f"{v:1.5e}" for v in vals])
+                            lines.append(f"  {val_str}")
+
+            lines.append("\n".join([
+                        commchar,
+                        "END"
+                        ]))
+
+            # dump to file
+            fname = f"{reg}.nemtab"
+            if destination_path is not None:
+                if isinstance(destination_path, Path):
+                    continue
+                elif isinstance(str, destination_path):
+                    destination_path = Path(destination_path)
+                else:
+                    raise NEError(f"Type of argument destination_path={destination_path} not valid. Must be string or Path-like object.")
+
+                if destination_path.exists():
+                    fname = destination_path.joinpath(fname)
+
+            with open(fname, "w") as f:
+                lines = "\n".join(lines)
+                f.write(lines)
 
 
 class Parameters():
@@ -1745,6 +1878,26 @@ class Parameters():
                 raise OSError(f"Unknown parameter {k} in 'parameters' dict in the json input!")
 
             self._values[i] = inpdict[k]
+
+    @property
+    def n_param(self):
+        return len(self.names)
+
+    @property
+    def n_combos(self):
+        return len(self.values.keys())
+
+    @property
+    def n_values(self):
+        mat_val = np.zeros((self.n_combos, self.n_param,), dtype=int)
+        for i, v in enumerate(self.values.values()):
+            mat_val[i, :] = v
+
+        n_val = []
+        for i in range(self.n_param):
+            n_val.append(len(set(mat_val[:, i])))
+
+        return n_val
 
 class NEError(Exception):
     pass
