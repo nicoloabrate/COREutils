@@ -163,8 +163,10 @@
                                                         }
                                                           }
                                         },
-                            "alias" : {"keff": "eigenvalue dir.", "k": "eigenvalue dir.", "flux": "fluxdir",
-                                        "keffa": "eigenvalue adj.","adjoint": "fluxadj", "powerdensity": "powertot", 
+                            "alias" : {"k-eigenvalue": "eigenvalue dir.", "keff": "eigenvalue dir.", "k": "eigenvalue dir.", 
+                                        "distributions/neutrons/flux": "fluxdir", "flux": "fluxdir",
+                                        "keffa": "eigenvalue adj.", "distributions/neutrons/flux_adj": "fluxadj", "adjoint": "fluxadj",
+                                        "power_density/total": "powertot", "distributions/neutrons/flux_adjoint": "powertot", 
                                         "rho": "reactivityn", "intpowtot": "power tot.", "intpowneu": "power neu.", 
                                         "intpowpho": "power pho.", "intpowfis": "power fis."}
                        },
