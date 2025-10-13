@@ -662,13 +662,21 @@ class NE:
                         newtype = f"{basetype}-{iR}{action}"
                         oldtype = atype
                     else:
-                        newtype = f"{basetype}-{action}"
-                        oldtype = atype
+                        if '-crit' not in basetype:
+                            newtype = f"{basetype}-{action}"
+                            oldtype = atype
+                        else:
+                            newtype = atype
+                            oldtype = atype
                 else:
                     if action != "crit":
                         newtype = f"{atype}-{iR}{action}"
                     else:
-                        newtype = f"{atype}-{action}"
+                        if '-crit' not in atype:
+                            newtype = f"{atype}-{action}"
+                        else:
+                            newtype = atype
+
                     oldtype = newtype
 
                 # --- identify new region number (int)
@@ -721,7 +729,6 @@ class NE:
                 else:
                     raise OSError("'with' key in replacemente must be list or string!")
 
-                nTypes = len(self.assemblytypes.keys())
                 newaxregions = cp(self.AxialConfig.config[itype])
                 newaxregions_str = cp(self.AxialConfig.config_str[atype])
                 if not incuts:
@@ -873,16 +880,31 @@ class NE:
                                 tmp[u0] = Homogenise(mat4hom, vol4hom, u0, self.fixdata, self.energy_grid, add_missing_MGC=self.add_missing_MGC)
 
                 # --- update info in object
-                if newtype not in self.assemblytypes.keys():
-                    self.assemblytypes.update({nTypes+1: newtype})
-                    self.assemblylabel.update({nTypes+1: newtype})
+                if newtype not in self.assemblytypes.values():
+                    nType = len(self.assemblytypes.keys()) + 1
+                    self.assemblytypes.update({nType: newtype})
+                    self.assemblylabel.update({nType: newtype})
+                    self.AxialConfig.config.update({nType: newaxregions})
+                else:
+                    nType = list(self.assemblytypes.values()).index(newtype) + 1
+                    self.AxialConfig.config.update({nType: newaxregions})
 
-                    self.AxialConfig.config.update({nTypes+1: newaxregions})
-                    self.AxialConfig.config_str.update({newtype: newaxregions_str})        
-                    # --- replace assembly
-                    if not isinstance(assbly, list):
-                        assbly = [assbly]
-                    self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
+                # TEST FIXME TODO temporary patch
+                    # self.AxialConfig.config.update({nTypes + 1: newaxregions})
+                    # self.AxialConfig.config_str.update({newtype: newaxregions_str})        
+                    # # --- replace assembly
+                    # if not isinstance(assbly, list):
+                    #     assbly = [assbly]
+                    # self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
+
+                # TEST FIXME TODO temporary patch for imposing criticality 
+                self.AxialConfig.config_str.update({newtype: newaxregions_str})        
+                # --- replace assembly
+                if not isinstance(assbly, list):
+                    assbly = [assbly]
+                self.replaceSA(core, {newtype: assbly}, time, isfren=isfren)
+
+
 
     def critical(self, core, prt, time):
         """
@@ -923,7 +945,8 @@ class NE:
                     perturb_list = []
                     if reg in self.MGClibrary.data[iPar].keys():
                         if self.MGClibrary.data[iPar][reg].isfiss():
-                            fiss_reg.append(reg)
+                            if reg not in fiss_reg:
+                                fiss_reg.append(reg)
                     break # just to perform the check
 
             perturb_list = []
@@ -932,7 +955,7 @@ class NE:
                 lst_app({"region": reg, "howmuch": [1/keff-1],
                         "what": "nu_fiss", "which": "all"})
 
-            self.perturb(core, perturb_list, time=time, action="crit")
+        self.perturb(core, perturb_list, time=time, action="crit")
 
     def perturb(self, core, prt, time=0, fixdata=True, isfren=True,
                 action='pert'):
@@ -995,17 +1018,16 @@ class NE:
 
             # parse all SAs including the "region" if specified by the user
             if prtdict['which'] == 'all':
+                prtdict['which'] = []
                 # determine integer type of SAs according to "region" and "where" keys
                 if core.dim != 2:
                     for iSA, SA_str in enumerate(self.AxialConfig.config_str.keys()):
                         if prtdict['region'] in self.AxialConfig.config_str[SA_str]:
-                            atype = iSA+1
+                            prtdict['which'] += core.getassemblylist(iSA + 1, config=self.config[now], isfren=isfren)
                 else:
                     for iSA, SA_str in enumerate(self.assemblytypes.values()):
                         if SA_str == prtdict['region']:
-                            atype = iSA+1
-
-                prtdict['which'] = core.getassemblylist(atype, config=self.config[now], isfren=isfren)
+                            prtdict['which'] += core.getassemblylist(iSA + 1, config=self.config[now], isfren=isfren)
 
             # arrange which into list of lists according to SA type
             whichlst = {}
@@ -1022,7 +1044,7 @@ class NE:
             if perturbation != 'density':
                 if len(howmuch) != self.MGClibrary.n_groups:
                     if len(howmuch) == 1:
-                        howmuch = howmuch*self.MGClibrary.n_groups
+                        howmuch = howmuch * self.MGClibrary.n_groups
                     else:
                         raise OSError('The perturbation intensities' 
                                       f' required should be list of 1 or {self.MGClibrary.n_groups} elements')
@@ -1082,23 +1104,32 @@ class NE:
                     prtreg = f"{oldreg}-{iP}{action}"
                 else:
                     prtreg = f"{oldreg}-{action}"
+
                 # --- perturb data and assign it
                 for iPar in self.MGClibrary.data.keys():
                     self.MGClibrary.data[iPar][prtreg] = cp(self.MGClibrary.data[iPar][oldreg])
                     self.MGClibrary.data[iPar][prtreg].perturb(perturbation, howmuch, depgro, fixdata=fixdata)
+
                 # --- add new assemblies
-                self.regions[self.nReg+1] = prtreg
+                if action != "crit":
+                    self.regions[self.nReg + 1] = prtreg
+                else:
+                    if prtreg not in self.regions.values():
+                        self.regions[self.nReg + 1] = prtreg
+
+                # --- add new label
                 if action != "crit":
                     self.labels[prtreg] = f"{self.labels[oldreg]}-{iP}{action}"
                 else:
                     self.labels[prtreg] = f"{self.labels[oldreg]}-{action}"
+
                 # --- define replacement dict to introduce perturbation
                 if core.dim == 2:
                     # --- update info in object
                     if prtreg not in self.assemblytypes.keys():
                         nTypes = len(self.assemblytypes.keys())
-                        self.assemblytypes.update({nTypes+1: prtreg})
-                        self.assemblylabel.update({nTypes+1: prtreg})
+                        self.assemblytypes.update({nTypes + 1: prtreg})
+                        self.assemblylabel.update({nTypes + 1: prtreg})
                     repl = {prtreg: assbly}
                     self.replaceSA(core, repl, time, isfren=isfren)
                 else:
