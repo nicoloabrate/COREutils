@@ -1759,11 +1759,11 @@ class MGClibrary():
 
             header.append(f"{commchar} {'    '.join(parnames)}")
             header.append(("    ".join([str(v) for v in self.parameters.n_values])))
-            for iPar in self.data.keys():
+            for iCom in self.data.keys():
                 vals = []
-                for iVal, v in enumerate(self.parameters.values[iPar]):
+                for iVal, v in enumerate(self.parameters.values[iCom]):
                     if isinstance(v, float):
-                        vals.append(f"{v:1.5e}")
+                        vals.append(f"{v:1.5E}")
                     else:
                         raise NEError(f"Parameter value {v} in {parnames[iVal]} not supported in NEMTAB output!")
 
@@ -1784,43 +1784,45 @@ class MGClibrary():
 
         # write group-wise data
         data_list = {
-                    'Diffcoef': 'di',
-                    'Sigma_abs': 'ab',
-                    'nuSigma_fiss': 'nf',
-                    'fiss_energy': 'kf',
-                    'Sigma_fiss': 'fi',
-                    'Sigma_tot': 'to',
+                    'Diffcoef': 'di (diffusion coefficient)',
+                    'Sigma_abs': 'ab (absorption cross-section)',
+                    'nuSigma_fiss': 'nf (nu*fission cross-section)',
+                    'fiss_energy*Sigma_fiss': 'kf (energy release*fission cross-section)',
+                    'Sigma_fiss': 'fi (fission cross-section)',
+                    'Sigma_tot': 'to (total cross-section)',
                     'S0': 'P0 Scattering',
-                    'chi_tot': 'ch',
-                    'inv_vel': 'iv',
-                    'lambda': 'la',
-                    'beta': 'be'
+                    'chi_tot': 'ch (total fission emission spectrum)',
+                    'chi_del': 'ch (delayed fission emission spectrum)',
+                    'inv_vel': 'in (1/v)',
+                    'lambda': 'la (decay constant)',
+                    'beta': 'be (delayed neutron fraction)'
                     }
+
+        iCom_del = 0 # parameter combo at which chi_del is saved
 
         for reg in self.regions:
             lines = list(header)
             for key, nemtab_key in data_list.items():
                 # add header
-
-                # write data type
-                lines.append("\n".join([
-                            commchar,
-                            f"{commchar} {nemtab_key}",
-                            commchar
-                            ]))
+                if key != 'chi_del':
+                    lines.append("\n".join([
+                                commchar,
+                                f"{commchar} {nemtab_key}",
+                                commchar
+                                ]))
 
                 if key in ['S0', 'S1']:
 
                     # add group-wise data
                     for h in range(self.n_groups):
                         for g in range(self.n_groups):
-                            lines.append(f"GROUP   {h + 1} -> {g + 1}")
+                            lines.append(f"GROUP   {h + 1} ->   {g + 1}")
 
                             vals = []
-                            for iPar in range(self.parameters.n_param):
-                                vals.append( self.data[iPar][reg].__dict__[key][g, h] )
+                            for iCom in range(self.parameters.n_combos):
+                                vals.append( self.data[iCom][reg].__dict__[key][g, h] )
 
-                            val_str = " ".join([f"{v:1.5e}" for v in vals])
+                            val_str = " ".join([f"{v:1.5E}" for v in vals])
 
                             lines.append(f"  {val_str}")
 
@@ -1828,22 +1830,56 @@ class MGClibrary():
                     
                     if key in ['chi_tot', 'inv_vel', 'lambda', 'beta']:
                         # add group-wise data
-                        lines.append(" ".join( [f"GROUP      {g + 1}" for g in range(self.n_groups)]) )
-                        iPar = list( self.data.keys() )[0]
-                        vals = [self.data[iPar][reg].__dict__[key][g] for g in range(self.n_groups)]
-                        val_str = " ".join([f"{v:1.5e}" for v in vals])
+                        lines.append("GROUP      " + "           ".join( [f"{g + 1}" for g in range(self.n_groups)]) )
+                        iCom = list( self.data.keys() )[0]
+                        if key == 'inv_vel':
+                            for reg_kp in self.regions:
+                                mat0 = self.data[iCom][reg_kp]
+                                if mat0.isfiss():
+                                    break
+                            vals = [mat0.__dict__[key][g] for g in range(self.n_groups)]
+                        else:
+                            vals = [self.data[iCom][reg].__dict__[key][g] for g in range(self.n_groups)]
+
+                        val_str = " ".join([f"{v:1.5E}" for v in vals])
                         lines.append(f"  {val_str}")
                     
+                    elif key == 'chi_del':
+                        # print separate ASCII file
+                        chi_del_reg = np.zeros((self.n_groups, self.n_prec))
+                        for p in range(self.n_prec):
+                            chi_del_reg[:, p] = self.data[iCom_del][reg].__dict__[key]
+
+                        fname = f"chi_del_{reg}.txt"
+
+                        if destination_path is not None:
+                            if isinstance(destination_path, str):
+                                destination_path = Path(destination_path)
+                            elif not isinstance(destination_path, Path):
+                                raise NEError(f"Type of argument destination_path={destination_path} not valid. Must be string or Path-like object.")
+
+                            if destination_path.exists():
+                                fname = destination_path.joinpath(fname)
+
+                        np.savetxt(fname, chi_del_reg)
+
                     else:
                         # add group-wise data
                         for g in range(self.n_groups):
                             lines.append(f"GROUP   {g + 1}")
                             
                             vals = []
-                            for iPar in range(self.parameters.n_param):
-                                vals.append( self.data[iPar][reg].__dict__[key][g] )
+                            for iCom in range(self.parameters.n_combos):
+                                if key == 'fiss_energy*Sigma_fiss':
+                                    key1, key2 = key.split('*')
+                                    vals.append( 
+                                                self.data[iCom][reg].__dict__[key1][g] * 1.602E-13 * # 1.602E-13 to be consistent with GRS scripts
+                                                self.data[iCom][reg].__dict__[key2][g]
+                                                )
+                                else:
+                                    vals.append( self.data[iCom][reg].__dict__[key][g] )
 
-                            val_str = " ".join([f"{v:1.5e}" for v in vals])
+                            val_str = " ".join([f"{v:1.5E}" for v in vals])
                             lines.append(f"  {val_str}")
 
             lines.append("\n".join([
@@ -1852,13 +1888,11 @@ class MGClibrary():
                         ]))
 
             # dump to file
-            fname = f"{reg}.nemtab"
+            fname = f"XS_{reg}.nemtab"
             if destination_path is not None:
-                if isinstance(destination_path, Path):
-                    continue
-                elif isinstance(str, destination_path):
+                if isinstance(destination_path, str):
                     destination_path = Path(destination_path)
-                else:
+                elif not isinstance(destination_path, Path):
                     raise NEError(f"Type of argument destination_path={destination_path} not valid. Must be string or Path-like object.")
 
                 if destination_path.exists():
