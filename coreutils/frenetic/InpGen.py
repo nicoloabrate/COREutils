@@ -464,8 +464,9 @@ def inpgen(core, jsonpath):
         n_groups = core.NE.MGClibrary.n_groups
         NPRE = core.NE.MGClibrary.n_prec
         # --- get kinetic parameters (equal for each material)
+        iCom = list( core.NE.MGClibrary.data.keys() )[0] # get 1st parameter combo as convention
         for iReg in core.NE.regions.keys():
-            mat0 = core.NE.MGClibrary.data[0][core.NE.regions[iReg]]
+            mat0 = core.NE.MGClibrary.data[iCom][core.NE.regions[iReg]]
             if mat0.isfiss():
                 break
 
