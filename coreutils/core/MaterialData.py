@@ -182,14 +182,20 @@ def _serpres_to_dict(serpres):
                     vals = data.infExp[serpkey]
                     rsd = data.infUnc[serpkey]
 
-            # if rsd.size > 1:
-            #     max_rsd = rsd.max().max()
-            # else:
-            #     max_rsd = rsd.max()
+            if rsd.size > 1:
+                max_rsd = rsd.max().max()
+                min_rsd = rsd.min().min()
+                max_val = vals.max().max()
+            else:
+                max_rsd = rsd.max()
+                min_rsd = rsd.min()
+                min_val = vals.min()
 
-            # if max_rsd*100 > 1:
-            #     g_max = np.argmax(rsd)
-            #     logger.warning(f'Serpent PRSD of {my_key} = {max_rsd*100:.1f} in group={g_max+1} in {data_name}.')
+            if max_rsd*100 > 1 or min_rsd <= 1E-12:
+                g_max = np.argmax(rsd)
+                g_min = np.argmin(rsd)
+                if max_val >= 1E-12:
+                    logger.warning(f'Serpent PRSD on {CUkey} : max={max_rsd*100:.1f} in g={g_max+1}, min={min_rsd*100:.1f} in g={g_min+1} in {data_name}.')
 
             data_in_dict[CUkey] = vals
             data_in_dict[f'{CUkey}_rsd'] = 2*rsd
@@ -427,7 +433,7 @@ def from_nemtab(path):
                     continue
                 elif "* GROUP" in line:
                     # parse group number
-                    grps = findall("\d+", line)
+                    grps = findall(r'\d+', line)
                     if len(grps) == 1:
                         g = int(grps[0])
                     elif len(grps) == 2:
@@ -461,7 +467,7 @@ def from_nemtab(path):
             elif "* GROUP" in line:
                 i_combo = 0
                 # parse group number
-                grps = findall("\d+", line)
+                grps = findall(r'\d+', line)
                 if len(grps) == 1:
                     g = int(grps[0])
                 elif len(grps) == 2:
@@ -472,7 +478,7 @@ def from_nemtab(path):
             elif "* " in line:
                 if "BURNUP" in line:
                     # parse burnup level
-                    BU = float(findall("\d+", line)[0])
+                    BU = float(findall(r'\d+', line)[0])
                     gconst[BU] = OrderedDict()
                     for i_combo in range(n_combos):
                         gconst[BU][i_combo] = {}
@@ -781,7 +787,7 @@ class NEMaterial():
         else:
             for k, v in data_in_dict.items():
                 self.__dict__[k] = v
-
+        # FIXME 
         # if reader == 'nemtab':
             # fname = path.join(tpath, fname_ext)
             # if Path(fname).exists():
@@ -838,6 +844,7 @@ class NEMaterial():
 
         if fixdata:
             self.repair_MGC()
+
 
     def get_MGC(self, key, pos1=None, pos2=None):
         """Get material data (for a certain energy group, if needed).
@@ -1381,6 +1388,7 @@ class NEMaterial():
             if s not in datavail:
                 kincons = False
                 self.__dict__[s] = np.zeros((self.NPF,))
+                # FIXME this produces "nu_fiss_del_tot" which is meaningless
                 self.__dict__[f"{s}_tot"] = np.zeros((self.NPF,))
 
         if kincons:
@@ -1616,7 +1624,7 @@ class NEMaterial():
     def isfiss(self):
         """Assess whether the material is fissile"""
         return self.Sigma_fiss.max() > 0 and self.nu_fiss.max() > 0
-
+    
 
 class HTHexData():
     """Assign TH material data to the reactor core.
