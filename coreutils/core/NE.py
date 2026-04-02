@@ -35,9 +35,12 @@ mycols1.extend(xkcd)
 reader_ext = {
             "serpent": "_res.m",
             "json": ".json",
+            "scone": ".json",
             "txt": ".txt",
             "nemtab": ".XS",
              }
+
+multi_material_readers = ["serpent", "scone"]
 
 n_digits_max = 14
 
@@ -160,7 +163,7 @@ class NE:
             for k in self.AxialConfig.cuts.keys():
                 NE_regions.extend(self.AxialConfig.cuts[k].reg)
         else:
-            univ = cp(assemblynames)  # regions are assembly names
+            NE_regions = cp(assemblynames)  # regions are assembly names
         # squeeze repetitions
         NE_regions = list(set(NE_regions))
 
@@ -464,21 +467,22 @@ class NE:
         else:
             self.regionslabel = NEargs["regionslabel"]
 
-        if self.plot["AXcolors"] is None:
-            self.plot["AXcolors"] = {} # dict(zip(self.AxialConfig.regions.values(), mycols1))
-            idx_col = 0
-            # assign colors to each assembly axial configuration
-            for NEty, ty_dict in self.AxialConfig.cutsregions.items():
-                self.AxialConfig.cutscolors[NEty] = {}
-                for n, reg_lst in ty_dict.items():
-                    self.AxialConfig.cutscolors[NEty][n] = [0]*len(reg_lst)
-                    for i, regcol in enumerate(reg_lst):
-                        if regcol != 0:
-                            if regcol not in self.plot["AXcolors"].keys():
-                                self.plot["AXcolors"][regcol] = mycols1[idx_col]
-                                idx_col += 1
+        if CI.dim != 2:
+            if self.plot["AXcolors"] is None:
+                self.plot["AXcolors"] = {} # dict(zip(self.AxialConfig.regions.values(), mycols1))
+                idx_col = 0
+                # assign colors to each assembly axial configuration
+                for NEty, ty_dict in self.AxialConfig.cutsregions.items():
+                    self.AxialConfig.cutscolors[NEty] = {}
+                    for n, reg_lst in ty_dict.items():
+                        self.AxialConfig.cutscolors[NEty][n] = [0]*len(reg_lst)
+                        for i, regcol in enumerate(reg_lst):
+                            if regcol != 0:
+                                if regcol not in self.plot["AXcolors"].keys():
+                                    self.plot["AXcolors"][regcol] = mycols1[idx_col]
+                                    idx_col += 1
 
-                            self.AxialConfig.cutscolors[NEty][n][i] = self.plot["AXcolors"][regcol]
+                                self.AxialConfig.cutscolors[NEty][n][i] = self.plot["AXcolors"][regcol]
 
         # # FIXME TODO temporary patch
         # for v in self.labels.values():
@@ -1578,7 +1582,7 @@ class MGClibrary():
                 self.data[iPar] = {}
 
             for reader in gc_path_param[iPar].keys():
-                if reader != "serpent":
+                if reader not in multi_material_readers:
                     for f in gc_path_param[iPar][reader]:
                         gc_in_dict = MGC_reader(reader, f)
                         self.data[iPar][gc_in_dict['data_name']] = NEMaterial(data_in_dict=gc_in_dict, energy_grid=self.energy_grid,
@@ -1591,7 +1595,7 @@ class MGClibrary():
                             if self.n_groups != len(data_in_dict["energy_grid"])-1:
                                 raise NEError(f"Mismatch between the number of groups of the grid {self.energy_grid_name} and the energy grid in the Serpent _res files.")
                             elif not np.allclose(data_in_dict["energy_grid"], self.energy_grid):
-                                raise NEError(f"Group boundaries mismatch between {self.energy_grid_name} and the energy grid in the Serpent _res files.")
+                                raise NEError(f"Group boundaries mismatch between {self.energy_grid_name} and the energy grid in the MGC input files.")
                             else:
                                 data_in_dict.pop("energy_grid")
                                 self.data[iPar][data_in_dict['data_name']] = NEMaterial(data_in_dict=data_in_dict, energy_grid=self.energy_grid,
@@ -1685,8 +1689,8 @@ class MGClibrary():
             raise OSError(f'Unknown energy_grid \
                             {type(energy_grid)}')
         # --- ensure sorting
-        if self._energy_grid[0] < self._energy_grid[0]:
-            self._energy_grid[np.argsort(-self._energy_grid)]
+        if self._energy_grid[0] < self._energy_grid[1]:
+            self._energy_grid = self._energy_grid[np.argsort(-self._energy_grid)]
 
     @property
     def n_groups(self):
@@ -1741,8 +1745,14 @@ class MGClibrary():
         if self.energygridPH[0] < self.energygridPH[0]:
             self.energygridPH[np.argsort(-self.energygridPH)]
 
-    def to_nemtab(self, destination_path=None):
+    def to_nemtab(self, destination_path=None, name_map=None):
         """Export MG library to files in the NEMTAB format.
+
+        destination_path : str or Path-like, optional
+            Path to which the NEMTAB files will be saved. If not provided, files will be saved in the current working directory.
+        name_map : dict, optional
+            Dictionary to map region names in the NE object to region names in the NEMTAB files. 
+            If not provided, region names in the NE object will be used as they are in the NEMTAB files.
 
         Returns
         -------
@@ -1791,6 +1801,7 @@ class MGClibrary():
                     'Sigma_fiss': 'fi (fission cross-section)',
                     'Sigma_tot': 'to (total cross-section)',
                     'S0': 'P0 Scattering',
+                    'Sigma_transp': 'tr (transport cross-section)',
                     'chi_tot': 'ch (total fission emission spectrum)',
                     'chi_del': 'ch (delayed fission emission spectrum)',
                     'inv_vel': 'in (1/v)',
@@ -1801,6 +1812,12 @@ class MGClibrary():
         iCom_del = 0 # parameter combo at which chi_del is saved
 
         for reg in self.regions:
+
+            if name_map is not None and reg in name_map.keys():
+                regname = name_map[reg]
+            else:
+                regname = reg
+
             lines = list(header)
             for key, nemtab_key in data_list.items():
                 # add header
@@ -1839,7 +1856,11 @@ class MGClibrary():
                                     break
                             vals = [mat0.__dict__[key][g] for g in range(self.n_groups)]
                         else:
-                            vals = [self.data[iCom][reg].__dict__[key][g] for g in range(self.n_groups)]
+                            if key in ['lambda', 'beta']:
+                                vec_size = self.n_prec
+                            else:
+                                vec_size = self.n_groups
+                            vals = [self.data[iCom][reg].__dict__[key][i] for i in range(vec_size)]
 
                         val_str = " ".join([f"{v:1.5E}" for v in vals])
                         lines.append(f"  {val_str}")
@@ -1848,9 +1869,9 @@ class MGClibrary():
                         # print separate ASCII file
                         chi_del_reg = np.zeros((self.n_groups, self.n_prec))
                         for p in range(self.n_prec):
-                            chi_del_reg[:, p] = self.data[iCom_del][reg].__dict__[key]
+                            chi_del_reg[:, p] = self.data[iCom_del][reg].__dict__[key][p, :]
 
-                        fname = f"chi_del_{reg}.txt"
+                        fname = f"chi_del_{regname}.txt"
 
                         if destination_path is not None:
                             if isinstance(destination_path, str):
@@ -1888,7 +1909,7 @@ class MGClibrary():
                         ]))
 
             # dump to file
-            fname = f"XS_{reg}.nemtab"
+            fname = f"XS_{regname}.nemtab"
             if destination_path is not None:
                 if isinstance(destination_path, str):
                     destination_path = Path(destination_path)
