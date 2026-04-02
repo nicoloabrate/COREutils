@@ -2,6 +2,8 @@ import numpy as np
 from coreutils.core.Map import Map
 from coreutils.tools.utils import MyDict
 from coreutils.core.UnfoldCore import UnfoldCore
+from coreutils.core.MaterialData import IsotopicComposition
+
 
 class Geometry:
     """Define an object representing the geometry of the core.
@@ -42,7 +44,7 @@ class Geometry:
 
     def _init(self, inpdict):
         # assign geometric quantities
-        # --- ASSEMBLY        
+        # --- ASSEMBLY
         self.AssemblyGeometry = AssemblyGeometry(inpdict['lattice_pitch'], inpdict['shape'])
 
         # assign further info, if provided
@@ -96,21 +98,11 @@ class Geometry:
                 if not isinstance(latdict, dict):
                     raise TypeError(f"``pin`` should be of type `dict`, not `{type(inpdict['pin'])}`")
                 self.Pin = {}
-                for pinName, pindict in inpdict['pin'].items():
-                    if isinstance(pindict, dict):
-                        self.Pin[pinName] = PinGeometry(pindict)
-                        # sanity check
-                        nmat_min = 4 if self.Pin[pinName].isAnnular else 3
-                        if len(self.Pin[pinName].materials) < nmat_min:
-                            if len(self.Pin[pinName].materials) == 1:
-                                pass
-                            elif len(self.Pin[pinName].materials) == 2 and self.Pin[pinName].isAnnular:
-                                pass
-                            else:
-                                raise OSError(f"Gap or Cladding not specified in pin {pinName}!")
-
+                for pinName, pindata in inpdict['pin'].items():
+                    if isinstance(pindata, (dict, list)):
+                        self.Pin[pinName] = PinGeometry(pindata)
                     else:
-                        raise TypeError(f"{pinName} entry of `pin`` dict should be of type `dict`, not `{type(pin)}`")
+                        raise TypeError(f"{pinName} entry of `pin`` dict should be of type `dict`, not `{type(pindata)}`")
 
             for name, lat in latdict.items():
                 lattype = inpdict['shape'] if 'shape' not in lat.keys() else lat['shape']
@@ -160,6 +152,14 @@ class Geometry:
                 else:
                     inter_ass_width = 0
 
+                if 'coolant' in lat.keys():
+                    if isinstance(lat['coolant'], (str)):
+                        coolant = lat['coolant']
+                    else:
+                        raise TypeError(f"``coolant`` should be of type `str`, not {type(lat['inter_ass_width'])}")
+                else:
+                    coolant = None
+
                 self.LatticeType[name] = pin_types
                 # FIXME assuming all pin_types have the same radius
                 if pin_types[0] in self.Pin.keys():
@@ -167,7 +167,7 @@ class Geometry:
                 else:
                     raise GeometryError(f"{pin_types[0]} not in lattice {name}!")
                 self.LatticeGeometry[name] = LatticeGeometry(self.AssemblyGeometry.pitch, n_pins, pin_radius, pin_pitch, 
-                                                        lattype, wrap_width, wrap_mat, inter_ass_width)
+                                                        lattype, wrap_width, wrap_mat, inter_ass_width, coolant)
 
         if inpdict['dim'] != 1:
             tmp = UnfoldCore(inpdict['filename'], inpdict['rotation'], assemblynames)
@@ -185,6 +185,12 @@ class Geometry:
         if inpdict["replacesa"] is not None:
             self.replaceSA(self.config[0], inpdict["replacesa"], 0, inpdict["dim"], 
                             isfren=inpdict['fren'])
+
+        # --- Materials
+        if inpdict['materials'] is not None:
+            self.material_composition = {}
+            for name in inpdict['materials'].keys():
+                self.material_composition[name] = IsotopicComposition(name, inpdict['materials'][name])
 
         # additional parameters
         self.plot = {}
@@ -279,6 +285,110 @@ class Geometry:
                 newcore[rows, cols] = asstypes[GEtype]
 
             self.config[float(time)] = newcore
+
+    def homogenise_pin(self, pin_types=None):
+
+        if not hasattr(self, "Pin"):
+            raise GeometryError("Geometry object does not have Pin attribute.")
+
+        if pin_types is None:
+            pin_types = list(self.Pin.keys())
+        elif isinstance(pin_types, str):
+            pin_types = [pin_types]
+        elif not isinstance(pin_types, (list, tuple)):
+            raise TypeError(f"Cannot handle 'lattice_types' of type {type(pin_types)}")
+
+        for pin_name in pin_types:
+            materials = self.Pin[pin_name].materials
+            radii = self.Pin[pin_name].radii
+
+            area_tot = np.pi * radii.max() ** 2
+
+            mass_dens_homog = {}
+            tot_mass_dens_homog = 0
+
+            for i, mat in enumerate(materials):
+                if mat == 'void':
+                    continue
+                elif mat not in self.material_composition.keys():
+                    raise ValueError(f"Compsition for material {mat} is missing in 'material_compositions'")
+                else:
+                    if i == 0:
+                        area_i = np.pi * radii[i] ** 2
+                    else:
+                        area_i = np.pi * (radii[i] ** 2 - radii[i-1] ** 2)
+
+                    af = area_i / area_tot
+
+                    for iso, mdf in self.material_composition[mat].mass_fraction.items():
+                        delta = self.material_composition[mat].mass_density * mdf * af
+                        if iso not in mass_dens_homog.keys():
+                            mass_dens_homog[iso] = - delta
+                        else:
+                            mass_dens_homog[iso] += - delta
+
+                        tot_mass_dens_homog += delta
+
+            mat_dict = {'composition': mass_dens_homog, 'density': -tot_mass_dens_homog}
+            self.material_composition[pin_name] = IsotopicComposition(pin_name, mat_dict)
+
+    def homogenise_lattice(self, lattice_types=None):
+
+        if not hasattr(self, "LatticeGeometry"):
+            raise GeometryError("Geometry object does not have LatticeGeometry attribute.")
+
+        if lattice_types is None:
+            lattice_types = list(self.LatticeGeometry.keys())
+        elif isinstance(lattice_types, str):
+            lattice_types = [lattice_types]
+        elif not isinstance(lattice_types, (list, tuple)):
+            raise TypeError(f"Cannot handle 'lattice_types' of type {type(lattice_types)}")
+
+        for lat_name in lattice_types:
+
+            list_pin_types = self.LatticeType[lat_name]
+            lat = self.LatticeGeometry[lat_name]
+
+            if len(list_pin_types) > 1:
+                # FIXME consider more pin types 
+                raise ValueError(f"Cannot homogenise with more pin types!") 
+
+            self.homogenise_pin(pin_types=list_pin_types[0])
+
+            area_tot = lat.coolArea + lat.pinArea + lat.wrapArea + lat.interassArea
+
+            homog_dict = {}
+            materials = [list_pin_types[0], lat.coolantMat, lat.wrapMat]
+            areas = [lat.pinArea / area_tot, (lat.coolArea + lat.interassArea) / area_tot, lat.wrapArea / area_tot]
+            for k, v in tuple(zip(materials, areas)):
+                if k in homog_dict.keys():
+                    homog_dict[k] += v
+                else:
+                    homog_dict[k] = v
+
+            mass_dens_homog = {}
+            tot_mass_dens_homog = 0
+
+            for i, (mat_i, af_i) in enumerate(homog_dict.items()):
+                if mat_i == 'void':
+                    continue
+                elif mat_i not in self.material_composition.keys():
+                    raise ValueError(f"Compsition for material {mat_i} is missing in 'material_compositions'")
+                else:
+                    for iso, mdf in self.material_composition[mat_i].mass_fraction.items():
+                        delta = self.material_composition[mat_i].mass_density * mdf * af_i
+                        if iso not in mass_dens_homog.keys():
+                            mass_dens_homog[iso] = - delta
+                        else:
+                            mass_dens_homog[iso] += - delta
+
+                        tot_mass_dens_homog += delta
+
+            homog_inpdict = {'composition': mass_dens_homog, 'density': -tot_mass_dens_homog}
+
+            self.material_composition[lat_name] = IsotopicComposition(lat_name, homog_inpdict)
+
+
 
 class AssemblyGeometry:
     """
@@ -410,6 +520,9 @@ class LatticeGeometry:
         clearance), by default 0.
     inpdict: dict, optional
         Object stored as a dict, by default ``None``.
+    coolant: str, optional
+        Name of the material used as coolant in the lattice, by default ``None``.
+
 
     Attributes
     ----------
@@ -442,15 +555,15 @@ class LatticeGeometry:
 
     def __init__(self, ass_pitch=None, n_pins=None, pin_radius=None, 
                  pin_pitch=None, lattype=None, wrap_width=0, wrap_mat=None,
-                 inter_ass_width=0, inpdict=None):
+                 inter_ass_width=0, coolant=None, inpdict=None):
         if inpdict is None:
             self._init(ass_pitch, n_pins, pin_radius, pin_pitch, lattype, 
-                       wrap_width=wrap_width, wrap_mat=wrap_mat, inter_ass_width=inter_ass_width)
+                       wrap_width=wrap_width, wrap_mat=wrap_mat, inter_ass_width=inter_ass_width, coolant=coolant)
         else:
             self._from_dict(inpdict)
 
     def _init(self, ass_pitch, n_pins, pin_radius, pin_pitch, lattype, 
-              wrap_width, wrap_mat, inter_ass_width):
+              wrap_width, wrap_mat, inter_ass_width, coolant):
         self.type = lattype
         self.nPins = n_pins
         self.pinRad = pin_radius
@@ -458,15 +571,16 @@ class LatticeGeometry:
         self.interassWidth = inter_ass_width
         self.wrapWidth = wrap_width
         self.wrapMat = wrap_mat
-        self.pinArea = self.nPins*(np.pi*self.pinRad**2)
-        self.wetPerimeter = self.nPins*(np.pi*2*self.pinRad)
+        self.pinArea = self.nPins * ( np.pi * self.pinRad ** 2 )
+        self.wetPerimeter = self.nPins * ( np.pi * 2 * self.pinRad )
+        self.coolantMat = coolant
         # --- hexagonal lattice (LFRs)
         if lattype == 'H':
-            inner_pitch = ass_pitch-2*inter_ass_width
-            self.wrapArea = np.sqrt(3)/2*(inner_pitch)**2-np.sqrt(3)/2*(inner_pitch-2*wrap_width)**2
-            self.interassArea = np.sqrt(3)/2*(ass_pitch)**2-np.sqrt(3)/2*(inner_pitch)**2
-            self.coolArea = np.sqrt(3)/2*(inner_pitch-2*wrap_width)**2-self.pinArea
-            self.flowArea = np.sqrt(3)/4*pin_pitch-np.pi/2*pin_radius**2
+            inner_pitch = ass_pitch - 2 * inter_ass_width
+            self.wrapArea = np.sqrt(3)/2 * (inner_pitch)**2 - np.sqrt(3)/2 * (inner_pitch-2*wrap_width)**2
+            self.interassArea = np.sqrt(3)/2*(ass_pitch)**2 - np.sqrt(3)/2 * (inner_pitch)**2
+            self.coolArea = np.sqrt(3)/2 * (inner_pitch-2*wrap_width)**2-self.pinArea
+            self.flowArea = np.sqrt(3)/4 * pin_pitch - np.pi/2 * pin_radius ** 2
         # --- square lattice (LWRs)
         elif lattype == 'S':
             inner_pitch = ass_pitch-2*inter_ass_width
@@ -504,10 +618,11 @@ class PinGeometry:
 
     Parameters
     ----------
-    pindict: dict, optional
-        Dict containing materials as keys and radius in cm as values, by deafult ``None``.
-    inpdict: dict, optional
-        Object stored as a dict, by default ``None``.
+    pindata: dict or list, optional
+        Data structure containing materials (keys if dict, 1st item if list) 
+        and radius in cm (values if dict, 2nd item if list), by deafult ``None``.
+    inpdata: dict or list, optional
+        Object stored as a dict or list, by default ``None``.
 
     Attributes
     ----------
@@ -517,16 +632,23 @@ class PinGeometry:
         Array with pin radii in increasing order.
     """
 
-    def __init__(self, pindict=None, inpdict=None):
+    def __init__(self, pindata=None, inpdict=None):
         if inpdict is None:
-            self._init(pindict)
+            self._init(pindata)
         else:
             self._from_dict(inpdict)
 
-    def _init(self, pindict):
+    def _init(self, pindata):
         # parse materials and radii
-        mats = [k for k in pindict.keys()]
-        radi = [v for v in pindict.values()]
+        if isinstance(pindata, dict):
+            mats = [k for k in pindata.keys()]
+            radi = [v for v in pindata.values()]
+        elif isinstance(pindata, list):
+            mats = []
+            radi = []
+            for vals in pindata:
+                mats.append(vals[0])
+                radi.append(vals[1])
         # sort from smaller to larger
         idx = np.argsort(radi).tolist()
         mats = [mats[i] for i in idx]
@@ -539,7 +661,6 @@ class PinGeometry:
 
         self.materials = mats
         self.radii = radi
-
 
     def _from_dict(self, inpdict):
         """Parse object from dictionary.
@@ -994,3 +1115,4 @@ class AxialCuts:
 
 class GeometryError(Exception):
     pass
+
