@@ -316,7 +316,13 @@ class Map:
         # define core central assembly
         yc, xc = [np.max(y), np.min(x)]
         # compute number of assemblies
-        Nx, Ny = [np.max(x)-xc, yc-np.min(y)+1]
+        if len(x) == 1 and len(y) == 1:
+            # only one assembly in the core
+            Nx, Ny = 1, 1
+            frenmap = np.array([1])
+            return frenmap
+        else:
+            Nx, Ny = [np.max(x)-xc, yc-np.min(y)+1]
         # frenmap[yc, xc] = 1  # first assembly is the central one
         iS = 1  # the 1st assembly is the central
         for irow in range(0, Ny):
