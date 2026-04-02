@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import numpy as np
 import pandas as pd
@@ -17,6 +18,8 @@ from os.path import join
 from itertools import product
 from collections import OrderedDict
 from re import findall
+import periodictable as pt
+import matplotlib.colors as mcolors
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +79,21 @@ serpent2coreutils = {
 
 serp_phot_keys = ['KermaPh', 'Rayleigh', 'Compton', 'PProduction', 'Photoelectric', 'nuPh', 'TotPhProd']
 
+# --- scone
+scone2coreutils = {
+                    'capture': 'Sigma_capt', 
+                    'fission': 'Sigma_fiss', 
+                    'P0': 'S0', 
+                    'nu': 'nu_fiss', 
+                    'chi_d': 'chi_del',
+                    'chi_p': 'chi_pro', 
+                    'chi': 'chi_tot', 
+                    'beta': 'beta',
+                    'transportOutScatter': 'Sigma_transp',
+                    # 'TransportFluxLimited': 'Sigma_transp',
+                    'lambda': 'lambda' # TODO currently attached with external .py script to SCONE files
+                    }
+
 # --- nemtab
 nemtab2coreutils = {"transport": "Sigma_transp" ,"absorption": "Sigma_abs" ,
                     "nuFission": "nuSigma_fiss" ,"kappaFission": "fiss_energy" ,
@@ -83,7 +101,9 @@ nemtab2coreutils = {"transport": "Sigma_transp" ,"absorption": "Sigma_abs" ,
                     "inverseVelocity": "inv_vel" , "lambda": "lambda",
                     "beta": "beta"}
 
-list_av_reader = ["serpent", "json", "txt", "nemtab", ] # "HDF5", "ecco"
+list_av_reader = ["serpent", "json", "txt", "nemtab", "scone"] # "HDF5", "ecco"
+
+N_AV = 6.02214076E23  # Avogadro number [1/mol]
 
 
 def MGC_reader(reader, file):
@@ -99,6 +119,9 @@ def MGC_reader(reader, file):
 
     elif reader == "nemtab":
         data_in_dict = from_nemtab(file)
+
+    elif reader == "scone":
+        data_in_dict = from_scone(file)
 
     # elif reader == "HDF5":
     #     data_in_dict = from_hdf5(file)
@@ -143,151 +166,110 @@ def from_json(path):
     return data_in_dict
 
 
-def _serpres_to_dict(serpres):
-    """Transform :class:`serpentTools.ResultsReader` object 
-        into a list of dictionaries, one for each universe stored in the _res file.
+def from_scone(path):
+    """
+    Read data from a json file produced by the SCONE Monte Carlo code.
 
     Parameters
     ----------
-    serpres : dict
-        Dictionary of :class:`serpentTools.ResultsReader` objects.
-    data_name : str
-        Name of the material.
+    path: str
+        Path to json file.
 
     Returns
     -------
-    list_data_in_dict: list
-        List of dictionaries containing the data read from the _res file.
+    data_in_dict: dict
+        Dictionary containing the data read from the json file.
+
     """
+    with open(path) as f:
+        data_in_json = json.load(f)
+
+    G = len(data_in_json["active"]["xssMG"]["EnergyBounds"][0])
+    energy_grid = np.zeros((G + 1, ))
+    energy_grid[0:G] = data_in_json["active"]["xssMG"]["EnergyBounds"][0]
+    energy_grid[G] = data_in_json["active"]["xssMG"]["EnergyBounds"][1][-1]
+
+    energy_grid = energy_grid[::-1]
+
     list_data_in_dict = []
-    lstapp = list_data_in_dict.append
+    list_data_in_dict_app = list_data_in_dict.append
 
-    for data in serpres.universes.values():
-        nE = len(data.infExp['infTot'])
-        data_name = data.name
-        data_in_dict = {}
-        data_in_dict["data_name"] = data_name
-        data_in_dict["data_origin"] = "serpent"
-        data_in_dict["energy_grid"] = data.groups
-        data_in_dict["energy_grid"][0] = 20
-        data_in_dict["energy_grid"][-1] = 1e-11
-        for serpkey, CUkey in serpent2coreutils.items():
-            if serpkey in ["lambda", "beta"]:
-                continue
-            else:
-                if serpkey.startswith('infS') or serpkey.startswith('infSp'):
-                    vals = np.reshape(data.infExp[serpkey], (nE, nE), order='F')
-                    rsd = np.reshape(data.infUnc[serpkey], (nE, nE), order='F')
+    inv_vel = np.zeros((G,))
+    inv_vel_res = np.zeros((G,))
+
+    for iU, universe in enumerate(data_in_json["active"]["xssMG"]["MaterialBins"]):
+        data_in_dict = {
+                        'data_name': universe[0],
+                        'data_origin' : 'scone',
+                        'energy_grid': energy_grid,
+                        }
+
+        for k, v in data_in_json["active"]["xssMG"].items():
+            if k in scone2coreutils.keys():
+
+                CU_key = scone2coreutils[k]
+
+                if k == 'beta' or k == 'lambda':
+                    avg, rsd = [], []
+                elif k != 'P0':
+                    avg, rsd = np.zeros((G, )), np.zeros((G, ))
                 else:
-                    vals = data.infExp[serpkey]
-                    rsd = data.infUnc[serpkey]
+                    avg, rsd = np.zeros((G * G)), np.zeros((G * G))
 
-            if rsd.size > 1:
-                max_rsd = rsd.max().max()
-                min_rsd = rsd.min().min()
-                max_val = vals.max().max()
-            else:
-                max_rsd = rsd.max()
-                min_rsd = rsd.min()
-                min_val = vals.min()
+                if k == 'beta' or k == 'lambda':
+                    for val in v:
+                        avg.append(val)
+                        rsd.append(-1)
+                    avg = np.asarray(avg)
+                    rsd = np.asarray(rsd)
+                    
+                else:
 
-            if max_rsd*100 > 1 or min_rsd <= 1E-12:
-                g_max = np.argmax(rsd)
-                g_min = np.argmin(rsd)
-                if max_val >= 1E-12:
-                    logger.warning(f'Serpent PRSD on {CUkey} : max={max_rsd*100:.1f} in g={g_max+1}, min={min_rsd*100:.1f} in g={g_min+1} in {data_name}.')
+                    for ig, MC_bin in enumerate(v[iU]):
+                        avg[ig] = MC_bin[0]
+                        if MC_bin[0] > 0:
+                            rsd[ig] = MC_bin[1] / MC_bin[0]
+                        else:
+                            rsd[ig] = 0
 
-            data_in_dict[CUkey] = vals
-            data_in_dict[f'{CUkey}_rsd'] = 2*rsd
+                if k == 'P0':
+                    data_in_dict[CU_key] = np.reshape(avg, (G, G), order='F') 
+                    data_in_dict[f'{CU_key}_rsd'] = np.reshape(2 * rsd, (G, G), order='F') 
+                else:
+                    data_in_dict[CU_key] = avg
+                    data_in_dict[f'{CU_key}_rsd'] = 2 * rsd
 
-        # kinetics parameters
-        fwd_beta = serpres.resdata['fwdAnaBetaZero'][::2]
-        fwd_beta_rsd = serpres.resdata['fwdAnaBetaZero'][1::2]
+                if rsd.size > 1:
+                    max_rsd = rsd.max().max()
+                    min_rsd = rsd.min().min()
+                    max_val = avg.max().max()
+                else:
+                    max_rsd = rsd.max()
+                    min_rsd = rsd.min()
+                    min_val = avg.min()
 
-        data_in_dict['beta_tot'] = fwd_beta[0]
-        data_in_dict['beta_tot_rsd'] = fwd_beta_rsd[0]
-        if len(fwd_beta) > 1:
-            data_in_dict['beta'] = fwd_beta[1:]
-            data_in_dict['beta_rsd'] = fwd_beta_rsd[1:]
-        else:
-            data_in_dict['beta'] = np.array([data_in_dict['beta_tot']])
-            data_in_dict['beta_rsd'] = np.array([data_in_dict['beta_tot_rsd']])
-        # --- avoid issues with python lambda function
-        lambdas = serpres.resdata['fwdAnaLambda'][::2]
-        lambdas_rsd = serpres.resdata['fwdAnaLambda'][1::2]
+                if max_rsd*100 > 1 or min_rsd <= 1E-12:
+                    g_max = np.argmax(rsd)
+                    g_min = np.argmin(rsd)
+                    if max_val >= 1E-12:
+                        logger.warning(f'SCONE PRSD on {CU_key} : max={max_rsd*100:.1f} in g={g_max+1}, min={min_rsd*100:.1f} in g={g_min+1} in {universe}.')
 
-        data_in_dict['lambda_tot'] = lambdas[0]
-        data_in_dict['lambda_tot'] = lambdas_rsd[0]
-        if len(lambdas) > 1:
-            data_in_dict['lambda'] = lambdas[1:]
-            data_in_dict['lambda_rsd'] = lambdas_rsd[1:]
-        else:
-            data_in_dict['lambda'] = np.array([data_in_dict['lambda_tot']])
-            data_in_dict['lambda_rsd'] = np.array([data_in_dict['lambda_tot_rsd']])
 
-        lstapp(data_in_dict)
+        val = data_in_json["active"]["fluxMG"]["Res"]
+        for ig in range(G):
+            num = val[ig][iU][1][0]
+            den = val[ig][iU][0][0]
+            inv_vel[ig] += np.divide(num, den, out=np.zeros_like(den), where=den!=0)
+            # inv_vel_res[ig] += np.divide( np.sqrt( val[ig][0][iU][0]**2 + val[ig][1][iU][1]**2 ) , inv_vel[ig], where=inv_vel[ig]!=0)
+
+        list_data_in_dict_app(data_in_dict)
+
+    # add velocity and kinetic data
+    inv_vel = inv_vel[::-1]
+    for data_in_dict in list_data_in_dict:
+        data_in_dict["inv_vel"] = inv_vel
 
     return list_data_in_dict
-
-
-def _readserpentdet(self, serpdet, data_name, nE, nEPH):
-    """Transform :class:`serpentTools.ResultsReader` object 
-        into :class:``coreutils.NEMaterial`` object.
-
-    Parameters
-    ----------
-    serpdet : dict
-        Dictionary of :class:`serpentTools.DetectorsReader` objects.
-    data_name : str
-        Name of the material.
-    nE: int
-        Number of energy groups.
-    nEPH: int
-        Number of photon energy groups.
-
-    Raises
-    ------
-    OSError
-        If the material indicated by ``data_name`` is not available.
-    OSError
-        If the number of energy groups indicated by ``nE`` is not available.
-    """
-    data = None
-    data_name = f"{data_name}__nkerma"
-
-    for det in serpdet.values():
-        if data_name in det.detectors.keys():
-            det_data = det[data_name]
-            if len(det_data.energy) != nE:
-                raise OSError(f'{data_name} energy groups in _det do not match with \
-                                input grid!')
-
-            data = det_data.tallies
-
-    if data is None:
-        logger.warning(f'{data_name} data not available in Serpent files!')
-    else:
-        selfdic = self.__dict__
-
-        selfdic["Kerma"] = data[::-1]
-        rsd = det_data.errors
-
-        if rsd.max()*100 > 1:
-            g_max = np.argmax(rsd)
-            logger.warning(f'Serpent PRSD of kerma = {rsd.max()*100} in group={g_max+1} in {data_name}.')
-
-    # FIXME TODO work in progress
-    if nEPH > 0:
-        for mykey in serp_phot_keys:
-            data_name = f"{data_name}__{mykey}"
-            # loop over elements in this universe
-            # TODO
-            det_data = det[data_name]
-            if len(det_data.energy) != nEPH:
-                raise OSError(f'{data_name} PH energy groups in _det do not match with \
-                                input grid!')
-
-            data = det_data.tallies
 
 
 def from_txt(fname):
@@ -546,6 +528,153 @@ def from_serpent(filepath):
     return data_in_serpdict
 
 
+def _serpres_to_dict(serpres):
+    """Transform :class:`serpentTools.ResultsReader` object 
+        into a list of dictionaries, one for each universe stored in the _res file.
+
+    Parameters
+    ----------
+    serpres : dict
+        Dictionary of :class:`serpentTools.ResultsReader` objects.
+    data_name : str
+        Name of the material.
+
+    Returns
+    -------
+    list_data_in_dict: list
+        List of dictionaries containing the data read from the _res file.
+    """
+    list_data_in_dict = []
+    lstapp = list_data_in_dict.append
+
+    for data in serpres.universes.values():
+        nE = len(data.infExp['infTot'])
+        data_name = data.name
+        data_in_dict = {}
+        data_in_dict["data_name"] = data_name
+        data_in_dict["data_origin"] = "serpent"
+        data_in_dict["energy_grid"] = data.groups
+        data_in_dict["energy_grid"][0] = 20
+        data_in_dict["energy_grid"][-1] = 1e-11
+        for serpkey, CUkey in serpent2coreutils.items():
+            if serpkey in ["lambda", "beta"]:
+                continue
+            else:
+                if serpkey.startswith('infS') or serpkey.startswith('infSp'):
+                    vals = np.reshape(data.infExp[serpkey], (nE, nE), order='F')
+                    rsd = np.reshape(data.infUnc[serpkey], (nE, nE), order='F')
+                else:
+                    vals = data.infExp[serpkey]
+                    rsd = data.infUnc[serpkey]
+
+            if rsd.size > 1:
+                max_rsd = rsd.max().max()
+                min_rsd = rsd.min().min()
+                max_val = vals.max().max()
+            else:
+                max_rsd = rsd.max()
+                min_rsd = rsd.min()
+                min_val = vals.min()
+
+            if max_rsd*100 > 1 or min_rsd <= 1E-12:
+                g_max = np.argmax(rsd)
+                g_min = np.argmin(rsd)
+                if max_val >= 1E-12:
+                    logger.warning(f'Serpent PRSD on {CUkey} : max={max_rsd*100:.1f} in g={g_max+1}, min={min_rsd*100:.1f} in g={g_min+1} in {data_name}.')
+
+            data_in_dict[CUkey] = vals
+            data_in_dict[f'{CUkey}_rsd'] = 2*rsd
+
+        # kinetics parameters
+        fwd_beta = serpres.resdata['fwdAnaBetaZero'][::2]
+        fwd_beta_rsd = serpres.resdata['fwdAnaBetaZero'][1::2]
+
+        data_in_dict['beta_tot'] = fwd_beta[0]
+        data_in_dict['beta_tot_rsd'] = fwd_beta_rsd[0]
+        if len(fwd_beta) > 1:
+            data_in_dict['beta'] = fwd_beta[1:]
+            data_in_dict['beta_rsd'] = fwd_beta_rsd[1:]
+        else:
+            data_in_dict['beta'] = np.array([data_in_dict['beta_tot']])
+            data_in_dict['beta_rsd'] = np.array([data_in_dict['beta_tot_rsd']])
+        # --- avoid issues with python lambda function
+        lambdas = serpres.resdata['fwdAnaLambda'][::2]
+        lambdas_rsd = serpres.resdata['fwdAnaLambda'][1::2]
+
+        data_in_dict['lambda_tot'] = lambdas[0]
+        data_in_dict['lambda_tot'] = lambdas_rsd[0]
+        if len(lambdas) > 1:
+            data_in_dict['lambda'] = lambdas[1:]
+            data_in_dict['lambda_rsd'] = lambdas_rsd[1:]
+        else:
+            data_in_dict['lambda'] = np.array([data_in_dict['lambda_tot']])
+            data_in_dict['lambda_rsd'] = np.array([data_in_dict['lambda_tot_rsd']])
+
+        lstapp(data_in_dict)
+
+    return list_data_in_dict
+
+
+def _readserpentdet(self, serpdet, data_name, nE, nEPH):
+    """Transform :class:`serpentTools.ResultsReader` object 
+        into :class:``coreutils.NEMaterial`` object.
+
+    Parameters
+    ----------
+    serpdet : dict
+        Dictionary of :class:`serpentTools.DetectorsReader` objects.
+    data_name : str
+        Name of the material.
+    nE: int
+        Number of energy groups.
+    nEPH: int
+        Number of photon energy groups.
+
+    Raises
+    ------
+    OSError
+        If the material indicated by ``data_name`` is not available.
+    OSError
+        If the number of energy groups indicated by ``nE`` is not available.
+    """
+    data = None
+    data_name = f"{data_name}__nkerma"
+
+    for det in serpdet.values():
+        if data_name in det.detectors.keys():
+            det_data = det[data_name]
+            if len(det_data.energy) != nE:
+                raise OSError(f'{data_name} energy groups in _det do not match with \
+                                input grid!')
+
+            data = det_data.tallies
+
+    if data is None:
+        logger.warning(f'{data_name} data not available in Serpent files!')
+    else:
+        selfdic = self.__dict__
+
+        selfdic["Kerma"] = data[::-1]
+        rsd = det_data.errors
+
+        if rsd.max()*100 > 1:
+            g_max = np.argmax(rsd)
+            logger.warning(f'Serpent PRSD of kerma = {rsd.max()*100} in group={g_max+1} in {data_name}.')
+
+    # FIXME TODO work in progress
+    if nEPH > 0:
+        for mykey in serp_phot_keys:
+            data_name = f"{data_name}__{mykey}"
+            # loop over elements in this universe
+            # TODO
+            det_data = det[data_name]
+            if len(det_data.energy) != nEPH:
+                raise OSError(f'{data_name} PH energy groups in _det do not match with \
+                                input grid!')
+
+            data = det_data.tallies
+
+
 def Homogenise(materials, volume, mixname, fixdata, energy_grid, add_missing_MGC=True):
     """Homogenise multi-group parameters.
 
@@ -679,6 +808,232 @@ def Homogenise(materials, volume, mixname, fixdata, energy_grid, add_missing_MGC
         homogmat.repair_MGC()
 
     return homogmat
+
+
+class IsotopicComposition():
+
+    def __init__(self, name, inpdict):
+
+        if isinstance(inpdict, dict):
+
+            mass_fraction = {}
+            atomic_fraction = {}
+            composition = {}
+            molar_masses = {}
+
+            tot_sum = abs(sum(list(inpdict["composition"].values())))
+
+            # --- sanity check
+            sign = [-1 if v < 0 else 1 for v in inpdict['composition'].values()]
+            size = sum(sign)
+            if abs(size) != len(sign):
+                raise IsotopicCompositionError(f"The densities of {name} must have uniform sign (all < 0 or > 0)")
+
+            if size > 0:
+                is_atom_density = True
+            else:
+                is_atom_density = False
+
+            if 'density' in inpdict.keys():
+                if inpdict['density'] > 0:
+                    self.atomic_density = inpdict['density']
+                else:
+                    self.mass_density = -inpdict['density']
+            else:
+                if is_atom_density:
+                    self.atomic_density = tot_sum
+                else:
+                    self.mass_density = tot_sum
+
+            if abs(tot_sum - 1) < 1E-6:
+                normalised = True
+            elif abs(tot_sum - abs(inpdict["density"])) < 1E-6:
+                normalised = False
+            elif abs(tot_sum - 100)/tot_sum < 1E-6:
+                for k, v in inpdict['composition'].items():
+                    inpdict['composition'][k] /= tot_sum
+                normalised = True
+            else:
+                raise IsotopicCompositionError(f"Compositions of {name} are not normalised to 1 or to the total density!")
+
+            # --- build mass fraction and atomic density
+            molar_weights = np.zeros((abs(size), ))
+            isotopes = []
+            inp_val = np.zeros((abs(size), ))
+            for i, (k, v) in enumerate(inpdict["composition"].items()):
+                symbol, A = self.parse_isotope_id(k)
+                inp_val[i] = inpdict["composition"][k]
+                try:
+                    iso = getattr(pt, symbol)[A]
+                    MM = iso.mass
+                except Exception:
+                    raise IsotopicCompositionError(f"Isotope {symbol}-{A} in {name} not found in the database!")
+                    MM = None
+
+                molar_weights[i] = MM
+                isotopes.append(f"{symbol}-{A}")
+
+            atomic_fraction = np.zeros((abs(size), ))
+            mass_fraction = np.zeros((abs(size), ))
+
+            if (is_atom_density and hasattr(self, "atomic_density")):
+                if normalised:
+                    atomic_fraction = inp_val
+                else:
+                    atomic_fraction = inp_val / self.atomic_density
+
+                mass_fraction = atomic_fraction * self.atomic_density * molar_weights / N_AV
+                mass_fraction /= mass_fraction.sum()
+                MW_avg = atomic_fraction.dot(molar_weights)
+                md = self.atomdens_2_massdens(self.atomic_density, MW_avg)
+                if md > 0:
+                    self.mass_density = md
+                else:
+                    raise IsotopicCompositionError(f"Mass density < 0 for {name}!")
+
+
+            elif (not is_atom_density and hasattr(self, "mass_density")):
+                if normalised:
+                    mass_fraction = -inp_val
+                else:
+                    mass_fraction = -inp_val / self.mass_density
+
+                atomic_fraction = mass_fraction * self.mass_density * N_AV / molar_weights
+                atomic_fraction /= atomic_fraction.sum()
+                MW_avg = atomic_fraction.dot(molar_weights)
+                ad = self.massdens_2_atomdens(self.mass_density, MW_avg)
+                if ad > 0:
+                    self.atomic_density = ad
+                else:
+                    raise IsotopicCompositionError(f"Atomic density < 0 for {name}!")
+
+            elif (is_atom_density and hasattr(self, "mass_density")):
+                if normalised:
+                    atomic_fraction = inp_val
+                else:
+                    atomic_fraction = inp_val / inp_val.sum()
+
+                MW_avg = atomic_fraction.dot(molar_weights)
+                mass_fraction = atomic_fraction * molar_weights / MW_avg
+                ad = self.massdens_2_atomdens(self.mass_density, MW_avg)
+                if ad > 0:
+                    self.atomic_density = ad
+                else:
+                    raise IsotopicCompositionError(f"Atomic density < 0 for {name}!")
+
+            elif (not is_atom_density and hasattr(self, "atomic_density")):
+                if normalised:
+                    mass_fraction = -inp_val
+                else:
+                    mass_fraction = -inp_val / inp_val.sum()
+
+                MW_avg = 1 / mass_fraction.dot(1/molar_weights)
+                atomic_fraction = atomic_fraction * molar_weights / MW_avg
+                md = self.atomdens_2_massdens(self.atomic_density, MW_avg)
+                if md > 0:
+                    self.mass_density = md
+                else:
+                    raise IsotopicCompositionError(f"Mass density < 0 for {name}!")
+
+            else:
+                raise IsotopicCompositionError(f"Cannot instantiate NuclearMaterial for {name}. Missing data!")
+
+        else:
+            raise IsotopicCompositionError(f"Cannot instantiate NuclearMaterial with input of type {type(inpdict)}")
+
+        self.atomic_fraction = dict(zip(isotopes, atomic_fraction))
+        self.mass_fraction = dict(zip(isotopes, mass_fraction))
+        self.molar_weight = dict(zip(isotopes, molar_weights))
+
+    def to_serpent(self, name, temperatures=None, rgb=None, mass_dens=True, absolute=False):
+
+        if temperatures is None:
+            temperatures = [300]
+        elif isinstance(temperatures, (int, float)):
+            temperatures = [temperatures]
+        elif not isinstance(temperatures, (list, tuple, np.array)):
+            raise IsotopicCompositionError(f"Temperatures must be int, float or iterable!")
+
+        if isinstance(rgb, (str)):
+            r, g, b = mcolors.to_rgb(rgb)  
+            rgb = [(int(round(r * 255)), int(round(g * 255)), int(round(b * 255)))]
+        elif not isinstance(rgb, (list, tuple, np.array)):
+            raise IsotopicCompositionError(f"RGB must be and iterable or an iterable of iterables!")
+        else:
+            if len(temperatures) != len(rgb):
+                raise IsotopicCompositionError(f"Number of RGB and Temperature mismatch!")
+
+        if mass_dens:
+            dens = - self.mass_density
+            composition = self.mass_fraction
+        else:
+            dens = self.atomic_density * 1E-24
+            composition = self.atomic_fraction
+
+        for i, T in enumerate(temperatures):
+            tmp_suff = self._temp_ACE_suffix(T)
+            if rgb is None:
+                rgb_head = ""
+            else:
+                if len(rgb[i]) != 3:
+                    raise IsotopicCompositionError(f"RGB must be an iterable of three elements!")
+                else:
+                    r, g, b = rgb[i]
+                    rgb_head = f"rgb {r} {g} {b}"
+
+            header = f"mat {name}_{T} {dens:1.8e} tmp {T:4.3f} {rgb_head}"
+            inp_serp = [header]
+            for iso, frac in composition.items():
+                dens_frac = -frac if mass_dens else frac
+                if absolute:
+                    dens_frac = frac * dens
+
+                inp_serp.append(f"{iso}.{tmp_suff}      {dens_frac:1.15e}")
+
+            input_str = "\n".join(inp_serp)
+            return input_str
+
+    @staticmethod
+    def _temp_ACE_suffix(T):
+        t = int(T)
+        idx = t // 300
+        if idx < 1:
+            idx = 1
+        if idx > 7:
+            idx = 7
+        return f"{idx * 3:02d}c"
+
+    @staticmethod
+    def massdens_2_atomdens(mass_dens, MW):
+        return mass_dens * N_AV / MW
+
+    @staticmethod
+    def atomdens_2_massdens(atom_dens, MW):
+        return atom_dens * MW / N_AV
+
+    @staticmethod
+    def parse_isotope_id(id_in):
+
+        # Z*1000+A format
+        if isinstance(id_in, str) and id_in.isdigit():
+            id_in = int(id_in)
+
+        if isinstance(id_in, (int, float)):
+
+            Z = int(id_in) // 1000
+            A = int(id_in) % 1000
+            symbol = pt.elements[Z].symbol
+            return symbol, A
+
+        s = str(id_in).strip()
+
+        # "AS-A" format
+        m = re.match(r"^([A-Za-z]+)[\-\s]?(\d+)$", s)
+        if m:
+            symbol, A = m.groups()
+            return symbol.capitalize(), int(A)
+
+        raise ValueError(f"Unknown isotope symbol: {id_in}")
 
 
 class NEMaterial():
@@ -844,7 +1199,6 @@ class NEMaterial():
 
         if fixdata:
             self.repair_MGC()
-
 
     def get_MGC(self, key, pos1=None, pos2=None):
         """Get material data (for a certain energy group, if needed).
@@ -1188,6 +1542,8 @@ class NEMaterial():
                     continue
                 elif (s == 'S0' and 'Sp0' in datavail) or (s == 'Sp0' and 'S0' in datavail):
                     continue
+                elif (s == 'chi_tot' and ('chi_del' in datavail) and ('chi_pro' in datavail) and ('beta' in datavail)):
+                    continue
                 else:
                     msg = f'{s} is missing in {self.data_name} data!'
                     logger.error(msg)
@@ -1379,7 +1735,12 @@ class NEMaterial():
 
         if not hasattr(self, "chi_tot"):
             if isFiss:
-                raise OSError(f"'chi_tot' is missing from data {self.data_name}")
+                # FIXME ensure consistency with chi_del depending on R familites
+                self.chi_tot = np.zeros((len(energy_grid) - 1, ))
+                for ig in range(len(energy_grid) - 1):
+                    self.chi_tot[ig] = self.chi_pro[ig] * (1-sum(self.beta)) + sum(self.beta) * self.chi_del[ig]
+
+                # raise OSError(f"'chi_tot' is missing from data {self.data_name}")
             else:
                 self.chi_tot = np.zeros((len(self.Sigma_abs), ))
 
@@ -1624,7 +1985,7 @@ class NEMaterial():
     def isfiss(self):
         """Assess whether the material is fissile"""
         return self.Sigma_fiss.max() > 0 and self.nu_fiss.max() > 0
-    
+
 
 class HTHexData():
     """Assign TH material data to the reactor core.
@@ -1661,6 +2022,10 @@ class HTHexData():
         self.htcCorr = inpdict["htc_corr"]
         self.frictCorr = inpdict["frict_corr"]
         self.chanCouplCorr = inpdict["chan_coupling_corr"]
+
+
+class IsotopicCompositionError(Exception):
+    pass
 
 
 class NEMaterialError(Exception):

@@ -21,6 +21,7 @@ setToValue = {
                       },
                 'GE': {
                         'rotation': None,
+                        'materials': None,
                         'pin': None,
                         'lattice': None,
                         'assembly': None,
@@ -458,7 +459,7 @@ def __parseFRN(inp, CIargs, GEargs, NEargs, THargs):
     for inptype, lst in frenml.mandatory.items(): # check each input type
         for k in lst: # check each kw
             # check each argument
-            if inptype == "NE":
+            if inptype == "NE" and NE:
                 if k.lower() not in inp.keys():
                     if k == "SplitZ":
                         if "splitz" in NEargs.keys():
@@ -469,8 +470,8 @@ def __parseFRN(inp, CIargs, GEargs, NEargs, THargs):
                             raise ParserError(f"'splitz' kw is mandatory for FRENETIC-NML and is missing in .json file!")
                     else:
                         raise ParserError(f"Mandatory '{k}' key missing in FRENETIC-NML dict!")
-            elif inptype == "TH":
-                if GEargs["dim"] == 3 and TH:
+            elif inptype == "TH" and TH:
+                if GEargs["dim"] == 3:
                     if k.lower() not in inp.keys():
                         if k.lower() == "xLengt".lower():
                             if "zmesh" in THargs.keys():
@@ -479,8 +480,8 @@ def __parseFRN(inp, CIargs, GEargs, NEargs, THargs):
                                 raise ParserError(f"'zmesh' kw is mandatory for FRENETIC-NML but is missing in .json file!")
                         else:
                             raise ParserError(f"Mandatory '{k}' key missing in FRENETIC-NML dict!")
-            else:
-                raise ParserError(f"Consistency check for {inptype} not implemented!")
+            # else:
+            #     raise ParserError(f"Consistency check for {inptype} not implemented!")
 
     # override default value with keys provided by the user
     lowcaseFRNargs = [s.lower() for s in FRNargs.keys()]
