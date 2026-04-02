@@ -215,10 +215,19 @@ def fillFreneticNamelist(core):
             latname = core.Geometry.AssemblyDefinition[GEtype].reg[0]
             lattice = core.Geometry.LatticeGeometry[latname]
             # TODO only one pin type per lattice, more should be considered
+            # sanity check
             pinname = core.Geometry.LatticeType[latname][0]
             pin = core.Geometry.Pin[pinname]
             isHomog = len(pin.materials) < 3
             n = 2 if pin.isAnnular else 1
+            nmat_min = 4 if core.Geometry.Pin[pinname].isAnnular else 3
+            if len(core.Geometry.Pin[pinname].materials) < nmat_min:
+                if len(core.Geometry.Pin[pinname].materials) == 1:
+                    pass
+                elif len(core.Geometry.Pin[pinname].materials) == 2 and core.Geometry.Pin[pinname].isAnnular:
+                    pass
+                else:
+                    raise OSError(f"Gap or Cladding not specified in pin {pinname}!")
 
             HAdict['flagRadHomog'] = 1 if isHomog else 0
             HAdict['nFuelPin'] = lattice.nPins
@@ -314,6 +323,14 @@ def fillFreneticNamelist(core):
                       "nTimeProfTH", "iMatX", "RadMatInd", "RadHeatInd"]
         for key in setToValue:
             core.FreneticNamelist[key] = -1
+
+    # power
+    if hasattr(core, "NE"):
+        core.FreneticNamelist['powtot0'] = 0.
+    else:
+        core.FreneticNamelist['powtot0'] = core.power if hasattr(core, "power") else np.nan
+        core.FreneticNamelist['power'] = 0.
+
 
     # --- final sanity check
     for k, v in core.FreneticNamelist.items():
@@ -442,61 +459,58 @@ def inpgen(core, jsonpath):
         # --- write input.inp
         makeNEinput(core, NEpath)
 
-    else:
-        logger.warn('No NE object: input.inp and config.inp not written!')
+        # write NE data
+        if hasattr(core.NE.MGClibrary, 'data') or isNE1D:
+            # -- prepare data
+            par_names = core.NE.MGClibrary.parameters.names
+            # get temperatures couples
+            if par_names != ['Tc', 'Tf'] and par_names != ['Tf', 'Tc']:
+                raise OSError("Cannot build the FRENETIC input for more than 2 parameters!")
 
-    # write NE data
-    if hasattr(core.NE.MGClibrary, 'data') or isNE1D:
-        # -- prepare data
-        par_names = core.NE.MGClibrary.parameters.names
-        # get temperatures couples
-        if par_names != ['Tc', 'Tf'] and par_names != ['Tf', 'Tc']:
-            raise OSError("Cannot build the FRENETIC input for more than 2 parameters!")
+            temp = core.NE.MGClibrary.parameters.values
+            # get n_groups
+            unifuel = None
 
-        temp = core.NE.MGClibrary.parameters.values
-        # get n_groups
-        unifuel = None
+            # reference temperatures defined as minima
+            # FIXME TODO
+            mincouple = temp[0]
+            Tf, Tc = mincouple
+            n_groups = core.NE.MGClibrary.n_groups
+            NPRE = core.NE.MGClibrary.n_prec
+            # --- get kinetic parameters (equal for each material)
+            iCom = list( core.NE.MGClibrary.data.keys() )[0] # get 1st parameter combo as convention
+            for iReg in core.NE.regions.keys():
+                mat0 = core.NE.MGClibrary.data[iCom][core.NE.regions[iReg]]
+                if mat0.isfiss():
+                    break
 
-        # reference temperatures defined as minima
-        # FIXME TODO
-        mincouple = temp[0]
-        Tf, Tc = mincouple
-        n_groups = core.NE.MGClibrary.n_groups
-        NPRE = core.NE.MGClibrary.n_prec
-        # --- get kinetic parameters (equal for each material)
-        iCom = list( core.NE.MGClibrary.data.keys() )[0] # get 1st parameter combo as convention
-        for iReg in core.NE.regions.keys():
-            mat0 = core.NE.MGClibrary.data[iCom][core.NE.regions[iReg]]
-            if mat0.isfiss():
-                break
+            if not mat0.isfiss():
+                raise OSError("U should not be here!")
 
-        if not mat0.isfiss():
-            raise OSError("U should not be here!")
+            vel = 1/mat0.inv_vel
+            if core.NE.MGClibrary.n_prec == 1:
+                beta0 = [mat0.beta_tot]
+                lambda0 = [mat0.__dict__['lambda_tot']]
+            else:
+                beta0 = mat0.beta
+                lambda0 = mat0.__dict__['lambda']
 
-        vel = 1/mat0.inv_vel
-        if core.NE.MGClibrary.n_prec == 1:
-            beta0 = [mat0.beta_tot]
-            lambda0 = [mat0.__dict__['lambda_tot']]
+
+            H5fmt = core.FreneticNamelist['CONTROL']['iHDF5Inp']
+
+            if H5fmt == 0:
+                txt = True
+            else:
+                txt = False
+
+            # --- write macro.nml
+            writemacro(core, NEpath, nmix, vel, lambda0, beta0, core.NE.regions, H5fmt)
+
+            # -- write NE_data.h5
+            writeNEdata(core, NEpath, H5fmt, txt, verbose=False, )
+
         else:
-            beta0 = mat0.beta
-            lambda0 = mat0.__dict__['lambda']
-
-
-        H5fmt = core.FreneticNamelist['CONTROL']['iHDF5Inp']
-
-        if H5fmt == 0:
-            txt = True
-        else:
-            txt = False
-
-        # --- write macro.nml
-        writemacro(core, NEpath, nmix, vel, lambda0, beta0, core.NE.regions, H5fmt)
-
-        # -- write NE_data.h5
-        writeNEdata(core, NEpath, H5fmt, txt, verbose=False, )
-
-    else:
-        logger.warn('macro.nml and NE_data.h5 not written!')
+            logger.warn('No NE object: NE input not created!')
 
     TH = True if hasattr(core, "TH") else False
 
