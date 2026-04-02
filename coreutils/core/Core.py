@@ -19,6 +19,8 @@ from coreutils.core.UnfoldCore import UnfoldCore
 from coreutils.core.MaterialData import *
 from coreutils.core.Geometry import Geometry, AxialConfig, AxialCuts
 from coreutils.frenetic.InpGen import inpgen, fillFreneticNamelist
+from coreutils.tools.plot import RadialMap, AxialGeomPlot, SlabPlot
+
 
 write_log_header()
 logging.basicConfig(filename="coreutils.log",
@@ -140,8 +142,8 @@ class Core:
             isTH = True if THargs is not None else False
             if isNE:
                 isPH = True if 'PH' in NEargs.keys() else False
-            if isPH:
-                PHargs = NEargs['PH']
+                if isPH:
+                    PHargs = NEargs['PH']
 
         # --- sanity check
         if dim != 1 and shape == 'H':
@@ -486,3 +488,41 @@ class Core:
                     comments=comm)
         else:
             return typelabel
+
+    def plot(self, config, mode='radial'):
+        # plot configurations
+
+        if config in ['GE', 'Geometry', 'geometry']:
+            config = 'Geometry'
+        elif config in ['NE', 'neutronics', 'Neutronics']:
+            config = 'NE'
+        elif config in ['TH', 'thermohydraulics', 'Thermohydraulics']:
+            config = 'TH'
+        else:
+            raise OSError(f'Configuration {config} not recognized!')
+
+        if mode == 'radial':
+
+            asslabel = self.Geometry.assemblytypes
+
+            if self.Geometry.plot["SAcolors"] is not None:
+                colors_dict = {} 
+                for idx, name  in self.Geometry.assemblytypes.items():
+                    colors_dict[idx] = self.Geometry.plot["SAcolors"][name]
+            else:
+                colors_dict = None
+
+            # --- plot core radial configuration
+            if self.dim != 1:
+                # assembly numbers
+                RadialMap(self, label=True, fren=True, whichconf=config, 
+                            legend=True, asstype=True, colors_dict=colors_dict,
+                        )
+
+                # radial configurations
+                RadialMap(self, time=0, label=True, fren=True, 
+                            whichconf=config, dictname=asslabel,
+                            legend=True, asstype=True, colors_dict=colors_dict,
+                            )
+        else:
+            raise OSError(f'Plot mode {mode} not implemented yet!')

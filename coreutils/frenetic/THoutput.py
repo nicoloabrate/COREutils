@@ -766,7 +766,7 @@ class THoutput:
 
     def RadialMap(self, what, z=0, t=0,
                   label=False, figname=None, hex=None,
-                  vmin=None, vmax=None,
+                  vmin=None, vmax=None, uom=None, descr=None,
                   usetex=False, fill=True, axes=None, cmap=None,
                   thresh=None, cbarLabel=True, xlabel=None, ylabel=None,
                   log=None, title=True, scale=1, fmt="%.2f", **kwargs):
@@ -847,7 +847,10 @@ class THoutput:
                 raise OSError("unit of measure should be provided!")
             if descr is None:
                 raise OSError("data legend should be provided!")
-            color = "inferno"
+            if cmap is None:
+                color = "inferno"
+            else:
+                color = cmap
         else:
             raise TypeError('Input must be str, dict or list!')
 
@@ -875,7 +878,7 @@ class THoutput:
                 uom = uom.replace(c, '{%s}' % c)
             uom = uom.replace('*', '~')
             # uom = '$%s$' % uom if usetex is True else uom
-            cbarLabel = r'%s $%s$' % (descr, uom)
+            cbarLabel = r'%s ($%s$)' % (descr, uom)
 
         RadialMap(self.core, tallies=tallies, z=z, time=t, 
                   label=label,
@@ -967,7 +970,6 @@ class THoutput:
             idz = None
 
         return idt, idz
-
 
     @staticmethod
     def __wopen(h5name, ans=None):
