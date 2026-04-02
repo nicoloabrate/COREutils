@@ -1773,7 +1773,7 @@ class MGClibrary():
                 vals = []
                 for iVal, v in enumerate(self.parameters.values[iCom]):
                     if isinstance(v, float):
-                        vals.append(f"{v:1.5E}")
+                        vals.append(f"{v:1.5E}\n")
                     else:
                         raise NEError(f"Parameter value {v} in {parnames[iVal]} not supported in NEMTAB output!")
 
