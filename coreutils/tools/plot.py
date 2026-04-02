@@ -517,6 +517,14 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                                         orientation=orientation, color=col, ec='k', lw=0.5,
                                         fill=fill, label=SAslabels[atype], **kwargs)
                 ax.add_patch(asspatch)
+                patchesapp(asspatch)
+
+        if len(patches) > 0:
+            xmin, xmax, ymin, ymax = _patches_data_bbox(patches)
+            # tiny extra margin so edges are not visually clipped by the axes frame
+            eps = 0.02 * L * scale
+            ax.set_xlim(xmin - eps, xmax + eps)
+            ax.set_ylim(ymin - eps, ymax + eps)
 
         if tallies is not None:  # plot physics
             coord = np.asarray(coord)
@@ -637,7 +645,8 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                         except KeyError:
                             continue
 
-        ax.axis('equal')
+        ax.set_aspect('equal', adjustable='box')
+
         if xlabel is None and ylabel is None:
             plt.axis('off')
 
@@ -651,10 +660,9 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
                     plt.legend(by_label.values(), by_label.keys(), ncol=4,
                             loc='lower center', bbox_to_anchor=(0.5, -0.2))
 
-        plt.tight_layout()
-        # save figure
+
         if figname is not None:
-            fig.savefig(figname)
+            fig.savefig(figname, bbox_inches='tight', pad_inches=0.02, transparent=True)
 
 
 def SlabPlot(core, time=0, ax=None, xlabel=None, figname=None, ncols=None, style='axgeom.mplstyle'):
@@ -723,3 +731,22 @@ def isDark(color):
         return False
     else:
         return True
+
+
+def _patches_data_bbox(patches):
+    """
+    Return exact data-space bounds of a list of matplotlib patches.
+    Works for RegularPolygon, Rectangle, etc.
+    """
+    xmin, ymin = np.inf, np.inf
+    xmax, ymax = -np.inf, -np.inf
+
+    for p in patches:
+        verts = p.get_path().vertices
+        verts = p.get_patch_transform().transform(verts)
+        xmin = min(xmin, verts[:, 0].min())
+        xmax = max(xmax, verts[:, 0].max())
+        ymin = min(ymin, verts[:, 1].min())
+        ymax = max(ymax, verts[:, 1].max())
+
+    return xmin, xmax, ymin, ymax
