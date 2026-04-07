@@ -326,9 +326,9 @@ def fillFreneticNamelist(core):
 
     # power
     if hasattr(core, "NE"):
-        core.FreneticNamelist['powtot0'] = 0.
+        core.FreneticNamelist['pow0'] = 0.
     else:
-        core.FreneticNamelist['powtot0'] = core.power if hasattr(core, "power") else np.nan
+        core.FreneticNamelist['pow0'] = core.power if hasattr(core, "power") else np.nan
         core.FreneticNamelist['power'] = 0.
 
 
