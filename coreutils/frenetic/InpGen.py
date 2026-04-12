@@ -324,12 +324,32 @@ def fillFreneticNamelist(core):
         for key in setToValue:
             core.FreneticNamelist[key] = -1
 
-    # power
+    # power: the variable powtot0 was substituted by pow0 to be consistent with the general analysis and with the rest of the files
+    # if hasattr(core, "NE"):
+    #     core.FreneticNamelist['pow0'] = 0.
+    # else:
+    #     core.FreneticNamelist['pow0'] = core.power if hasattr(core, "power") else np.nan
+    #     core.FreneticNamelist['power'] = 0.
+
+    # It is possible to use another alternative of the code in order to be aligned with the unit of measure: since we use pow0 (that is in W/m) and this file is for the power
+    # expressed in W, we have to use the parameter of zmesh (present in the file TH.py) to obtain W/m already in the input file for the various cases:
     if hasattr(core, "NE"):
-        core.FreneticNamelist['pow0'] = 0.
+        core.FreneticNamelist['Pow0'] = 0.
     else:
-        core.FreneticNamelist['pow0'] = core.power if hasattr(core, "power") else np.nan
-        core.FreneticNamelist['power'] = 0.
+        if hasattr(core, "power"):
+            try:
+               # Extract the value in meters (thanks to the division by 100 in TH.py at lines 161-168)
+               channel_length = core.TH.zmesh[1]-core.TH.zmesh[0]
+               if channel_length <= 0:
+                   raise ValueError("Channel length calculated from zmesh is less than or equal to zero.")             
+            except (AttributeError, TypeError, IndexError, KeyError) as e:
+               raise RuntimeError(f"CRITICAL ERROR (InpGen): Impossible to determine the channel length from 'zmesh'. Check the JSON file. Error details: {e}")
+            # Calculate the W/m and save the value:
+            core.FreneticNamelist['Pow0'] = core.power / channel_length
+            core.FreneticNamelist['power'] = 0.0
+        else:
+            core.FreneticNamelist['Pow0'] = np.nan
+            core.FreneticNamelist['power'] = np.nan
 
 
     # --- final sanity check

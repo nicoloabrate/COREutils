@@ -16,9 +16,10 @@ _int_types = (int, bool, int8, int16, int32, int64)
 _iter_types = (ndarray, list)
 
 # git repo info
-repopath = Path(__file__).resolve().parents[2]
-repo = git.Repo(repopath)
-sha = repo.head.object.hexsha  # commit id
+# repopath = Path(__file__).resolve().parents[2]
+# repo = git.Repo(repopath)
+# sha = repo.head.object.hexsha  # commit id
+sha = "no_branch"
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +48,9 @@ def write_log_header():
             f.write(f"USERNAME: {os.getlogin()} \n")
         except OSError:
             f.write(f"USERNAME: unknown \n")
-        f.write(f"GIT_REPO_URL: {repo.remotes.origin.url} \n")
-        f.write(f"GIT_COMMIT_ID: {sha} \n")
-        f.write(f"GIT_BRANCH: {repo.active_branch} \n")
+        # f.write(f"GIT_REPO_URL: {repo.remotes.origin.url} \n")
+        # f.write(f"GIT_COMMIT_ID: {sha} \n")
+        # f.write(f"GIT_BRANCH: {repo.active_branch} \n")
         f.write(f"DDYYMMHH: {mmddyyhh} \n")
         f.write(f"{sep}")
 
