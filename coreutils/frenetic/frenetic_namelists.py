@@ -129,7 +129,7 @@ class FreneticNamelist():
                            "DTTISC": "?! Deprecated",
                            "TolToSteady": "Relative error tolerance for steady state condition",
                            "method": "Method choice for steady state model. It could be 'PSEUDO' or 'RAMP'",
-                           "HeatingType": "Type of input power profile. (-1=external function for the Q(z,t) dependence; 0=square wave form; -2=external function for the Q(z,t) dependence)", 
+                           "HeatingType": "Type of input power profile. (-1=time-dependent channel power; 0=square wave form, spatially uniform; -2=time constant axial profile; 1=fixed 3D shape with time-dependent amplitude; 2=time-dependent 3D distribution)",
                            "zPowStart": "Beginning of the heated zone [m]",
                            "zPowEnd": "End of the heated zone [m]",
                            "dzPow0": "??? Width of the axial bins between zPowStart and zPowEnd for constant heating[m]",

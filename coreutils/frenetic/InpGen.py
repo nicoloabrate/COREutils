@@ -14,7 +14,7 @@ from coreutils.tools.utils import fortranformatter # InputGeneratorError,
 # from coreutils.frenetic.FreneticInput import FreneticInput
 
 from coreutils.tools.plot import RadialMap, AxialGeomPlot, SlabPlot
-from .InpTH import writeHTdata, writeBCdata, makeTHinput
+from .InpTH import writeHTdata, writeBCdata, writePowerData, makeTHinput
 from .InpNE import writeConfig, makeNEinput, writemacro, writeNEdata
 import coreutils.tools.h5 as myh5
 from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticNamelistError
@@ -102,8 +102,10 @@ def fillFreneticNamelist(core):
         TimeNETHConfig.extend(core.NE.time)
     if hasattr(core, "TH"):
         TimeNETHConfig.extend(core.TH.BCtime)
+        if getattr(core.TH, "Power", None) is not None:
+            TimeNETHConfig.extend(core.TH.Power["time"].tolist())
 
-    TimeNETHConfig = list(set(TimeNETHConfig))
+    TimeNETHConfig = sorted(set(TimeNETHConfig))
 
     # --- is NE
     core.FreneticNamelist['nDim'] = core.dim
@@ -172,6 +174,9 @@ def fillFreneticNamelist(core):
         if np.isnan(core.FreneticNamelist['nTimeProfTH']):
             core.FreneticNamelist['TimeProfTH'] = TimeNETHConfig
             core.FreneticNamelist['nTimeProfTH'] = len(core.FreneticNamelist['TimeProfTH'])
+
+        if getattr(core.TH, "Power", None) is not None:
+            core.FreneticNamelist['HeatingType'] = core.TH.Power["heatingtype"]
 
         # smart initialisation
         if np.isnan(core.FreneticNamelist['initTemp']):
@@ -523,6 +528,8 @@ def inpgen(core, jsonpath):
         THpath = mkdir("TH", tmp_casepath)
         # write BC .txt data
         writeBCdata(core, THpath)
+        # write TH power data when provided
+        writePowerData(core, THpath)
         # write input.inp
         makeTHinput(core, THpath)
     else:
@@ -872,5 +879,3 @@ def mkdir(dirname, indirs=None):
     os.makedirs((path), exist_ok=True)
 
     return Path(path)
-
-

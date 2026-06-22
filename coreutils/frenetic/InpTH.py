@@ -7,6 +7,82 @@ from coreutils.frenetic.frenetic_namelists import FreneticNamelist, FreneticName
 
 logger = logging.getLogger(__name__)
 
+def _unlink_if_exists(filepath):
+    if filepath.exists():
+        filepath.unlink()
+        logger.warning(f'Overwriting file {filepath.name}')
+
+
+def _write_table(filepath, rows):
+    with io.open(filepath, 'w', newline='\n') as f:
+        for row in rows:
+            f.write(f'{ff(row)} \n')
+
+
+def _active_length(core):
+    # FIXME check if zPowEnd and zPowStart are defined in TH
+    if hasattr(core.TH, "axstep"):
+        return float(np.sum(core.TH.axstep))
+    return float(core.TH.zmesh[1]-core.TH.zmesh[0])
+
+
+def _axial_steps(core):
+    if hasattr(core.TH, "axstep"):
+        return np.asarray(core.TH.axstep, dtype=float)
+    n_z = int(core.TH.nVol)
+    return np.ones((n_z,))*_active_length(core)/n_z
+
+
+def writePowerData(core, path):
+    """
+    Generate TH power input data.
+
+    COREutils stores power in W. FRENETIC input is written as linear power
+    in W/m where the selected HeatingType needs spatially distributed values.
+    """
+    if not hasattr(core.TH, "Power") or core.TH.Power is None:
+        return
+
+    power = core.TH.Power
+    powerpath = path.joinpath("power.inp")
+    _unlink_if_exists(powerpath)
+
+    if power["mode"] == "channels":
+        length = _active_length(core)
+        values = power["values"]/length
+        rows = [[len(power["time"])]]
+        for it, t in enumerate(power["time"]):
+            rows.append([t]+values[it, :].tolist())
+        _write_table(powerpath, rows)
+
+    elif power["mode"] == "shape":
+        dz = _axial_steps(core)
+        shape = power["shape_factors"]/power["shape_factors"].sum()
+        shape = shape/dz[:, np.newaxis]
+
+        shapepath = path.joinpath("shape_factors.txt")
+        _unlink_if_exists(shapepath)
+        _write_table(shapepath, shape.tolist())
+
+        rows = [[len(power["time"])]]
+        for t, amplitude in zip(power["time"], power["amplitude"]):
+            rows.append([t, amplitude])
+        _write_table(powerpath, rows)
+
+    elif power["mode"] == "variable_shape":
+        dz = _axial_steps(core)
+        values = power["values"]/dz[np.newaxis, :, np.newaxis]
+        n_rows = len(power["time"])*values.shape[1]
+        rows = [[n_rows]]
+        for it, t in enumerate(power["time"]):
+            for iz in range(values.shape[1]):
+                rows.append([t]+values[it, iz, :].tolist())
+        _write_table(powerpath, rows)
+
+    else:
+        raise FreneticNamelistError(f'Unknown power mode {power["mode"]}!')
+
+
 def writeBCdata(core, path):
     """
     Generate TH input data related to cooling zones.
@@ -41,7 +117,7 @@ def writeBCdata(core, path):
 
         f.write(f"{n_time}, \n")
         isSym = core.FreneticNamelist['PRELIMINARY']['isSym']
-        N = int(core.nAss/6*isSym+1) if isSym else core.nAss
+        N = int(core.nAss / 6 * isSym + 1) if isSym else core.nAss
         values = core.TH.BCs[what]["values"]
         for it, t in enumerate(core.TH.BCs[what]["time"]):
             # loop over each assembly
@@ -143,5 +219,3 @@ def writeHTdata(core, path):
                     f.write(f"{key} = {val}\n")
                 # write to file
                 f.write("/\n")
-
-
