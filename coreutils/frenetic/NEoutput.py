@@ -49,18 +49,25 @@ class NEoutput:
         self.NEpath = self.casepath.joinpath('NE')
         # looking for core.h5 file with core object
         self.core = Core(self.casepath.joinpath('core.h5'))
-        self.n_groups = self.core.NE.MGClibrary['_n_groups']
+        if hasattr(self.core.NE, "MGClibrary"):
+            self.n_groups = self.core.NE.MGClibrary['_n_groups']
+        else:
+            self.n_groups = self.core.NE.nGro
         # FIXME TODO
         self.ngrp = 0
-        if "n_prec" in self.core.NE.MGClibrary.keys():
-            if self.core.NE.MGClibrary["n_prec"] is None:
-                self.npre = self.core.NE.MGClibrary["n_prec"]
+        if hasattr(self.core.NE, "MGClibrary"):
+            if "n_prec" in self.core.NE.MGClibrary.keys():
+                if self.core.NE.MGClibrary["n_prec"] is None:
+                    self.npre = self.core.NE.MGClibrary["n_prec"]
+                else:
+                    self.npre = self.core.NE.MGClibrary["n_prec"]
+                self.nprp = 0 # self.core.NE.nPrp
             else:
-                self.npre = self.core.NE.MGClibrary["n_prec"]
-            self.nprp = 0 # self.core.NE.nPrp
+                self.npre = 0 # self.core.NE.nPre
+                self.nprp = 0 # self.core.NE.nPrp
         else:
-            self.npre = 0 # self.core.NE.nPre
-            self.nprp = 0 # self.core.NE.nPrp
+            self.npre = self.core.NE.nPre
+            self.nprp = self.core.NE.nPrp
 
         if hasattr(self.core, "FreneticNamelist"):
             isSym = self.core.FreneticNamelist["PRELIMINARY"]["isSym"]
@@ -955,7 +962,12 @@ class NEoutput:
 
             if gro is None:
                 # FIXME
-                for g in range(self.core.NE.MGClibrary["_n_groups"]):
+                if hasattr(self.core.NE, "MGClibrary"):
+                    self.core.NE.MGClibrary["_n_groups"]
+                else:
+                    n_groups = self.core.NE.nGro
+
+                for g in range(n_groups):
                     profile[:, g, :, :] = flux[:, g, :, :]/nvel[g]
             else:
                 profile[:, :, :, :] = flux/nvel[gro]
@@ -1778,7 +1790,10 @@ class NEoutput:
         else:
             if particles == "neutrons":
                 # FIXME
-                ngmax = self.core.NE.MGClibrary['_n_groups']
+                if hasattr(self.core.NE, "MGClibrary"):
+                    ngmax = self.core.NE.MGClibrary['_n_groups']
+                else:
+                    ngmax = self.nGro
             elif particles == "photons":
                 ngmax = self.ngrp # FIXME
             gro = np.arange(0, ngmax).tolist()
