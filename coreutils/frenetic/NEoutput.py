@@ -1007,7 +1007,7 @@ class NEoutput:
         else:
             loglog = False
 
-        E = self.core.NE.energy_grid
+        E = self.core.NE.MGClibrary.energy_grid
         if eflx is None:
             raise OSError("TODO: implement automatic space integration")
 
@@ -1804,7 +1804,7 @@ class NEoutput:
             pre = [p-1 for p in pre]
         else:
             if particles == "neutrons":
-                npmax = self.core.NE.MGClibrary['n_prec']
+                npmax = self.core.NE.MGClibrary.n_prec
             elif particles == "photons":
                 npmax = self.nprp # FIXME
             pre = np.arange(0, npmax).tolist()

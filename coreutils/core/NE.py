@@ -468,7 +468,7 @@ class NE:
             self.regionslabel = NEargs["regionslabel"]
 
         if CI.dim != 2:
-            if self.plot["AXcolors"] is None:
+            if self.plot["AXcolors"] is None and self.plot["axplot"]:
                 self.plot["AXcolors"] = {} # dict(zip(self.AxialConfig.regions.values(), mycols1))
                 idx_col = 0
                 # assign colors to each assembly axial configuration
@@ -496,6 +496,8 @@ class NE:
         for k, v in inpdict.items():
             if k == "AxialConfig":
                 setattr(self, k, AxialConfig(inpdict=v))
+            elif k == 'MGClibrary':
+                setattr(self, k, MGClibrary(inpdict=v))
             else:
                 if k in mydicts:
                     setattr(self, k, MyDict(v))
@@ -959,7 +961,7 @@ class NE:
                 lst_app({"region": reg, "howmuch": [1/keff-1],
                         "what": "nu_fiss", "which": "all"})
 
-        self.perturb(core, perturb_list, time=time, action="crit")
+            self.perturb(core, perturb_list, time=time, action="crit")
 
     def perturb(self, core, prt, time=0, fixdata=True, isfren=True,
                 action='pert'):
@@ -1418,9 +1420,19 @@ class NE:
 
         return few_into_multigrp
 
+class NEError(Exception):
+    pass
+
 class MGClibrary():
 
-    def __init__(self, MMGCdata, NE_regions, core, NE_geom):
+    def __init__(self, MMGCdata=None, NE_regions=None, core=None, 
+                 NE_geom=None, inpdict=None, ):
+        if inpdict is None:
+            self._init(MMGCdata, NE_regions, core, NE_geom)
+        else:
+            self._from_dict(inpdict)
+
+    def _init(self, MMGCdata, NE_regions, core, NE_geom):
 
         if "add_missing_MGC" in MMGCdata.keys():
             self.add_missing_MGC = MMGCdata["add_missing_MGC"]
@@ -1923,11 +1935,42 @@ class MGClibrary():
                 lines = "\n".join(lines)
                 f.write(lines)
 
+    def _from_dict(self, inpdict):
+        """Parse object from dictionary.
 
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
+        plain_attributes = ['add_missing_MGC', 'fixdata', 'use_nxn', 'n_prec', 'P1consistent', 'energy_grid_name']
+        for k, v in inpdict.items():
+            if k in plain_attributes:
+                setattr(self, k, v)
+            elif k == "_energy_grid" or k == "energy_grid":
+                self.energy_grid = {"energy_grid": v }
+            elif k == 'n_groups' or k == '_n_groups':
+                continue
+            elif k == "parameters":
+                self.parameters = Parameters(inpdict=v)
+            else:
+                raise NEError(f"Unknown attribute {k} in MGClibrary input dictionary!")
+
+        self.n_groups = self.energy_grid
+
+class MGClibraryError(Exception):
+    pass
 class Parameters():
     """Define "Parameters" object.
     """
-    def __init__(self, names, units, values):
+    def __init__(self, names=None, values=None, units=None, inpdict=None):
+        if inpdict is None:
+            self._init(names, values, units)
+        else:
+            self._from_dict(inpdict)
+
+    def _init(self, names, units, values):
         self.names = names
         self.units = units
         self.values = values
@@ -1937,16 +1980,16 @@ class Parameters():
         return self._names
 
     @names.setter
-    def names(self, values):
-        self._names = values
+    def names(self, names):
+        self._names = names
 
     @property
     def units(self):
         return self._units
 
     @units.setter
-    def units(self, values):
-        self._units = values
+    def units(self, units):
+        self._units = units
 
     @property
     def values(self):
@@ -1985,5 +2028,22 @@ class Parameters():
 
         return n_val
 
-class NEError(Exception):
+    def _from_dict(self, inpdict):
+        """Parse object from dictionary.
+
+        Parameters
+        ----------
+        inpdict : dict
+            Input dictionary containing the class object (maybe read from 
+            external file).
+        """
+        for k, v in inpdict.items():
+            if k in ["_names", "_units", "_values"]:
+                setattr(self, k, v)
+            else:
+                raise ParametersError(f"Unknown attribute {k} in Parameters input dictionary!")
+
+class ParametersError(Exception):
     pass
+
+
