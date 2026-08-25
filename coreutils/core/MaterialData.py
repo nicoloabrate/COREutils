@@ -184,10 +184,15 @@ def from_scone(path):
     with open(path) as f:
         data_in_json = json.load(f)
 
-    G = len(data_in_json["active"]["xssMG"]["EnergyBounds"][0])
+    if "active" in data_in_json.keys():
+        scone_dict = data_in_json["active"]
+    else:
+        scone_dict = data_in_json
+
+    G = len(scone_dict["xssMG"]["EnergyBounds"][0])
     energy_grid = np.zeros((G + 1, ))
-    energy_grid[0:G] = data_in_json["active"]["xssMG"]["EnergyBounds"][0]
-    energy_grid[G] = data_in_json["active"]["xssMG"]["EnergyBounds"][1][-1]
+    energy_grid[0:G] = scone_dict["xssMG"]["EnergyBounds"][0]
+    energy_grid[G] = scone_dict["xssMG"]["EnergyBounds"][1][-1]
 
     energy_grid = energy_grid[::-1]
 
@@ -197,14 +202,17 @@ def from_scone(path):
     inv_vel = np.zeros((G,))
     inv_vel_res = np.zeros((G,))
 
-    for iU, universe in enumerate(data_in_json["active"]["xssMG"]["MaterialBins"]):
+    for iU, universe in enumerate(scone_dict["xssMG"]["MaterialBins"]):
         data_in_dict = {
                         'data_name': universe[0],
                         'data_origin' : 'scone',
                         'energy_grid': energy_grid,
                         }
 
-        for k, v in data_in_json["active"]["xssMG"].items():
+        flux = np.zeros((G,))
+        flux_rsd = np.zeros((G,))
+
+        for k, v in scone_dict["xssMG"].items():
             if k in scone2coreutils.keys():
 
                 CU_key = scone2coreutils[k]
@@ -254,14 +262,36 @@ def from_scone(path):
                     if max_val >= 1E-12:
                         logger.warning(f'SCONE PRSD on {CU_key} : max={max_rsd*100:.1f} in g={g_max+1}, min={min_rsd*100:.1f} in g={g_min+1} in {universe}.')
 
+        P = len(data_in_dict["beta"])
+        chi_del = np.zeros((P, G))
+        chi_del_rsd = np.zeros((P, G))
+        for p in range(P):
+            chi_del[p, :] = data_in_dict["chi_del"][:]
+            chi_del_rsd[p, :] = data_in_dict["chi_del_rsd"][:]
 
-        val = data_in_json["active"]["fluxMG"]["Res"]
+        data_in_dict["chi_del"] = chi_del
+        data_in_dict["chi_del_rsd"] = chi_del_rsd
+
+        if "chi_del" and "chi_pro" in scone_dict["xssMG"].keys():
+            _ = data_in_dict.pop("chi_tot")
+
+        data_in_dict["flux"] = np.zeros((G,))
+        data_in_dict["flux_rsd"] = np.zeros((G,))
+        
+        val = scone_dict["fluxMG"]["Res"]
         for ig in range(G):
             num = val[ig][iU][1][0]
             den = val[ig][iU][0][0]
             inv_vel[ig] += np.divide(num, den, out=np.zeros_like(den), where=den!=0)
-            # inv_vel_res[ig] += np.divide( np.sqrt( val[ig][0][iU][0]**2 + val[ig][1][iU][1]**2 ) , inv_vel[ig], where=inv_vel[ig]!=0)
+            data_in_dict["flux"][ig] = den
+            if num > 0:
+                data_in_dict["flux_rsd"][ig] = val[ig][iU][1][1] / num
+            else:
+                data_in_dict["flux_rsd"][ig] = 0
 
+            # inv_vel_res[ig] += np.divide( np.sqrt( val[ig][0][iU][0]**2 + val[ig][1][iU][1]**2 ) , inv_vel[ig], where=inv_vel[ig]!=0)
+        data_in_dict["flux"] = data_in_dict["flux"][::-1]
+        data_in_dict["flux_rsd"] = data_in_dict["flux_rsd"][::-1]
         list_data_in_dict_app(data_in_dict)
 
     # add velocity and kinetic data
@@ -1474,13 +1504,13 @@ class NEMaterial():
         if isFiss:
             self.chi_tot /= self.chi_tot.sum()
 
-        kincons = True
+        has_kinetic_data = True
         for s in kinetic_data:
             if s not in datavail:
-                kincons = False
+                has_kinetic_data = False
                 self.__dict__[s] = [0]
 
-        if kincons:
+        if has_kinetic_data:
             if isFiss:
                 if len(self.chi_del.shape) == 1:
                     # each family has same emission spectrum
@@ -1736,55 +1766,63 @@ class NEMaterial():
         if not hasattr(self, "chi_tot"):
             if isFiss:
                 # FIXME ensure consistency with chi_del depending on R familites
-                self.chi_tot = np.zeros((len(energy_grid) - 1, ))
-                for ig in range(len(energy_grid) - 1):
-                    self.chi_tot[ig] = self.chi_pro[ig] * (1-sum(self.beta)) + sum(self.beta) * self.chi_del[ig]
-
-                # raise OSError(f"'chi_tot' is missing from data {self.data_name}")
+                self.chi_tot = np.zeros((n_groups, ))
+                for ig in range(n_groups):
+                    self.chi_tot[ig] = self.chi_pro[ig] * (1-sum(self.beta)) + np.dot(self.beta,  self.chi_del[:, ig])
             else:
                 self.chi_tot = np.zeros((len(self.Sigma_abs), ))
 
-        kincons = True
+        has_kinetic_data = True
         for s in kinetic_data:
+
             if s not in datavail:
-                kincons = False
-                self.__dict__[s] = np.zeros((self.NPF,))
-                # FIXME this produces "nu_fiss_del_tot" which is meaningless
-                self.__dict__[f"{s}_tot"] = np.zeros((self.NPF,))
 
-        if kincons:
-            if not hasattr(self, "beta"):
-                if isFiss:
-                    raise OSError(f"'beta' is missing for {self.data_name}")
-                else:
-                    self.beta = np.zeros((self.NPF,))
+                if s == 'lambda':
+                    if isFiss:
+                        raise OSError(f"'lambda' is missing for {self.data_name}")
+                    else:
+                        self.__dict__["lambda"] = np.zeros((self.NPF,))
+                        has_kinetic_data = False
 
-            if not hasattr(self, "lambda"):
-                if isFiss:
-                    raise OSError(f"'lambda' is missing for {self.data_name}")
-                else:
-                    self.__dict__["lambda"] = np.zeros((self.NPF,))
+                if s == 'nu_fiss_del':
+                    self.nu_fiss_del = np.zeros((self.NPF, n_groups))
+                    if hasattr(self, "beta"):
+                        for p in range(self.NPF):
+                            self.nu_fiss_del[p, :] = self.nu_fiss * self.beta[p]
+                    else:
+                        has_kinetic_data = False
+
+                elif s == 'beta':
+                    if hasattr(self, "nu_fiss_del") and isFiss:
+                        self.beta = self.nu_fiss_del[0, :] / self.nu_fiss
+                    else:
+                        if not isFiss:
+                            self.beta = np.zeros((self.NPF,))
+                            has_kinetic_data = False
+                        else:
+                            raise OSError(f"'beta' is missing for {self.data_name}")
+                
+                elif s == 'chi_del':
+                    self.chi_del = np.zeros((self.NPF, n_groups))
+                    if isFiss:
+                        raise OSError(f"'chi_del' is missing for {self.data_name}")
+
+                elif s == 'chi_pro':
+                    self.chi_pro = np.zeros((n_groups, ))
+                    if hasattr(self, "beta") and hasattr(self, "chi_del") and hasattr(self, "chi_tot"):
+                        for g in range(n_groups):
+                            self.chi_pro[g] = (self.chi_tot[g]-np.dot(self.beta, self.chi_del[:, g]))/(1-self.beta.sum())
+                    else:
+                        has_kinetic_data = False
+
+        if has_kinetic_data:
 
             if not hasattr(self,"beta_tot"):
                 self.beta_tot = self.beta.sum()
+
             if not hasattr(self, "lambda_tot"):
                 # FIXME # TODO
                 self.__dict__["lambda_tot"] = np.mean(self.__dict__["lambda"])
-
-            if not hasattr(self, "chi_pro"):
-                if isFiss:
-                    if hasattr(self, "chi_del"):
-                        self.chi_pro = (self.chi_tot-np.dot(self.beta, self.chi_del))/(1-self.beta.sum())
-                    else:
-                        raise OSError(f"'chi_pro' is missing from data {self.data_name}")
-                else:
-                    self.chi_pro = np.zeros((len(self.Sigma_abs), ))
-
-            if not hasattr(self, "chi_del"):
-                if isFiss:
-                    self.chi_del = (self.chi_tot-self.chi_pro*(1-self.beta.sum()))/(self.beta.sum())
-                else:
-                    self.chi_del = np.zeros((self.NPF, len(self.Sigma_abs)))
 
         if not hasattr(self, "kerma"):
             self.kerma = np.zeros((len(self.Sigma_abs), ))
@@ -1793,6 +1831,7 @@ class NEMaterial():
             # FIXME: an improved option can be estimating the flux axial prof. with analytical profiles
             # e.g. cos(Bz) if self.Sigma_fiss != 0 or exp(-z/L)+exp(+z/L) if self.Sigma_fiss = 0
             self.flux = np.ones((len(self.Sigma_abs), ))
+
 
     def to_json(self, fname=None):
         """Dump object to json file.

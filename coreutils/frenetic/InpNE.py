@@ -131,7 +131,13 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
         whichmix = core.NE.regions[imix+1]
         chit = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('chi_tot')[np.newaxis, :]
         chid = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('chi_del')[np.newaxis, :]
-        
+        chip = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('chi_pro')[np.newaxis, :]
+        beta = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('beta')
+
+        chit = chip*(1-beta.sum())
+        for ig in range(chip.shape[1]):
+             chit[0, ig] += np.dot(beta, chid[0, :, ig])
+
         imixF = 0
         # look for root universe
         if core.dim == 2:
@@ -152,9 +158,12 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
 
         # write kinetic and spectrum parameters
         f.write(f'chiT0({imix+1},1:{core.NE.MGClibrary.n_groups}) = ')
+        if np.isnan(chit).any():
+            raise FreneticNamelistError(f"NaN found in chiT data for mix {whichmix}!")
+
         for igro in range(core.NE.MGClibrary.n_groups):
             f.write(f'{ff(chit[imixF, igro])},')
-        
+
         # single photon group --> all emitted in this group
         if nGrp> 0:
             f.write(f'\nzetaT0({imix+1:d},1:{core.NE.nGrp:d}) = 1.0E+0,')
