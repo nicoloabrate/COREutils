@@ -199,9 +199,9 @@ def from_scone(path):
     list_data_in_dict = []
     list_data_in_dict_app = list_data_in_dict.append
 
-    inv_vel = np.zeros((G,))
+    inv_vel_num = np.zeros((G,))
+    inv_vel_den = np.zeros((G,))
     inv_vel_res = np.zeros((G,))
-
     for iU, universe in enumerate(scone_dict["xssMG"]["MaterialBins"]):
         data_in_dict = {
                         'data_name': universe[0],
@@ -282,7 +282,8 @@ def from_scone(path):
         for ig in range(G):
             num = val[ig][iU][1][0]
             den = val[ig][iU][0][0]
-            inv_vel[ig] += np.divide(num, den, out=np.zeros_like(den), where=den!=0)
+            inv_vel_num[ig] += num
+            inv_vel_den[ig] += den
             data_in_dict["flux"][ig] = den
             if num > 0:
                 data_in_dict["flux_rsd"][ig] = val[ig][iU][1][1] / num
@@ -295,7 +296,9 @@ def from_scone(path):
         list_data_in_dict_app(data_in_dict)
 
     # add velocity and kinetic data
-    inv_vel = inv_vel[::-1]
+    inv_vel = np.divide(inv_vel_num, inv_vel_den,
+                        out=np.zeros_like(inv_vel_num),
+                        where=inv_vel_den != 0)[::-1]
     for data_in_dict in list_data_in_dict:
         data_in_dict["inv_vel"] = inv_vel
 
@@ -1757,6 +1760,7 @@ class NEMaterial():
                 self.MeanFreePath = 1/self.Sigma_tot.max()
         # --- ensure consistency kinetic parameters (if fissile medium)
         isFiss = self.Sigma_fiss.max() > 0
+        n_groups = len(energy_grid) - 1 if energy_grid is not None else len(self.Sigma_abs)
         if not hasattr(self, "fiss_energy"):
             if isFiss:
                 self.fiss_energy = np.asarray([200]*len(self.nu_fiss))
@@ -1770,7 +1774,7 @@ class NEMaterial():
                 for ig in range(n_groups):
                     self.chi_tot[ig] = self.chi_pro[ig] * (1-sum(self.beta)) + np.dot(self.beta,  self.chi_del[:, ig])
             else:
-                self.chi_tot = np.zeros((len(self.Sigma_abs), ))
+                self.chi_tot = np.zeros((n_groups, ))
 
         has_kinetic_data = True
         for s in kinetic_data:
@@ -1825,12 +1829,12 @@ class NEMaterial():
                 self.__dict__["lambda_tot"] = np.mean(self.__dict__["lambda"])
 
         if not hasattr(self, "kerma"):
-            self.kerma = np.zeros((len(self.Sigma_abs), ))
+            self.kerma = np.zeros((n_groups, ))
 
         if not hasattr(self, "flux"):
             # FIXME: an improved option can be estimating the flux axial prof. with analytical profiles
             # e.g. cos(Bz) if self.Sigma_fiss != 0 or exp(-z/L)+exp(+z/L) if self.Sigma_fiss = 0
-            self.flux = np.ones((len(self.Sigma_abs), ))
+            self.flux = np.ones((n_groups, ))
 
 
     def to_json(self, fname=None):
