@@ -935,6 +935,8 @@ class NE:
             keff = prt['keff']
 
         SA_fiss = self.get_fissile_types(t=now)
+        perturb_list = []
+        seen_reg = []
         # impose criticality in each FA type
         for SA in SA_fiss:
             if hasattr(self, "AxialConfig"):
@@ -948,18 +950,18 @@ class NE:
                 reg = self.regions[ireg]
                 # check that reg is fissile
                 for iPar in self.MGClibrary.parameters.values.keys():
-                    perturb_list = []
                     if reg in self.MGClibrary.data[iPar].keys():
                         if self.MGClibrary.data[iPar][reg].isfiss():
                             if reg not in fiss_reg:
                                 fiss_reg.append(reg)
                     break # just to perform the check
 
-            perturb_list = []
-            lst_app = perturb_list.append
             for reg in fiss_reg:
-                lst_app({"region": reg, "howmuch": [1/keff-1],
-                        "what": "nu_fiss", "which": "all"})
+                if reg in seen_reg:   # a region shared by two types must not be scaled twice
+                    continue
+                seen_reg.append(reg)
+                perturb_list.append({"region": reg, "howmuch": [1/keff-1],
+                                     "what": "nu_fiss", "which": "all"})
 
             self.perturb(core, perturb_list, time=time, action="crit")
 
