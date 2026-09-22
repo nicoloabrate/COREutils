@@ -1459,12 +1459,11 @@ class MGClibrary():
         isPH = True if 'PH' in MMGCdata.keys() else False
 
         self.energy_grid = MMGCdata
-        # FIXME
         self.n_groups = self.energy_grid
-        if "energy_grid_name" not in MMGCdata.keys():
-            self.energy_grid_name = f'{self.MGClibrary.n_groups}G' 
-        else:
+        if "energy_grid_name" in MMGCdata.keys():
             self.energy_grid_name = MMGCdata["energy_grid_name"]
+        elif not hasattr(self, "energy_grid_name"):
+            self.energy_grid_name = f'{self.n_groups}G'
 
         if isPH:
             self.get_PH_energy_grid(MMGCdata["PH"])
@@ -1682,8 +1681,12 @@ class MGClibrary():
         # --- load user-defined energy grid
         if isinstance(energy_grid, (list, np.ndarray, tuple)):
             self._energy_grid = np.asarray(energy_grid)
+            if ename is not None:
+                self.energy_grid_name = str(ename)
+            elif not hasattr(self, "energy_grid_name"):
+                self.energy_grid_name = f'{len(self._energy_grid) - 1}G'
         # --- load pre-defined energy group structure
-        elif isinstance(energy_grid, (str, float, int)):
+        elif isinstance(energy_grid, (str, float, int, np.floating, np.integer)):
             pwd = Path(__file__).parent.parent.parent
             if 'COREutils'.lower() not in str(pwd).lower():
                 raise NEError(f'Check COREutils tree for NEdata: {pwd}')
@@ -1691,10 +1694,10 @@ class MGClibrary():
                 pwd = pwd.joinpath('NEdata')
                 if isinstance(energy_grid, str):
                     fgname = f'{energy_grid}.txt'
-                    self._energy_grid_name = str(energy_grid)
-                else:
-                    fgname = f'{energy_grid}G.txt'
                     self.energy_grid_name = str(energy_grid)
+                else:
+                    self.energy_grid_name = f'{energy_grid:g}G'
+                    fgname = f'{self.energy_grid_name}.txt'
 
                 egridpath = pwd.joinpath('group_structures', fgname)
                 self._energy_grid = np.loadtxt(egridpath)
@@ -1947,6 +1950,7 @@ class MGClibrary():
             external file).
         """
         plain_attributes = ['add_missing_MGC', 'fixdata', 'use_nxn', 'n_prec', 'P1consistent', 'energy_grid_name']
+        legacy_energy_grid_name = None
         for k, v in inpdict.items():
             if k in plain_attributes:
                 setattr(self, k, v)
@@ -1954,10 +1958,15 @@ class MGClibrary():
                 self.energy_grid = {"energy_grid": v }
             elif k == 'n_groups' or k == '_n_groups':
                 continue
+            elif k == "_energy_grid_name":
+                legacy_energy_grid_name = v
             elif k == "parameters":
                 self.parameters = Parameters(inpdict=v)
             else:
                 raise NEError(f"Unknown attribute {k} in MGClibrary input dictionary!")
+
+        if "energy_grid_name" not in inpdict and legacy_energy_grid_name is not None:
+            self.energy_grid_name = legacy_energy_grid_name
 
         self.n_groups = self.energy_grid
 
@@ -2047,5 +2056,3 @@ class Parameters():
 
 class ParametersError(Exception):
     pass
-
-

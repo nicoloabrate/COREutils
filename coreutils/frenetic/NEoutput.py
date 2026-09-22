@@ -49,18 +49,13 @@ class NEoutput:
         self.NEpath = self.casepath.joinpath('NE')
         # looking for core.h5 file with core object
         self.core = Core(self.casepath.joinpath('core.h5'))
-        if hasattr(self.core.NE, "MGClibrary"):
-            self.n_groups = self.core.NE.MGClibrary['_n_groups']
-        else:
-            self.n_groups = self.core.NE.nGro
+        self.n_groups = self._get_ne_n_groups()
         # FIXME TODO
         self.ngrp = 0
         if hasattr(self.core.NE, "MGClibrary"):
-            if "n_prec" in self.core.NE.MGClibrary.keys():
-                if self.core.NE.MGClibrary["n_prec"] is None:
-                    self.npre = self.core.NE.MGClibrary["n_prec"]
-                else:
-                    self.npre = self.core.NE.MGClibrary["n_prec"]
+            n_prec = self._get_mgc_attr(self.core.NE.MGClibrary, "n_prec")
+            if n_prec is not None:
+                self.npre = n_prec
                 self.nprp = 0 # self.core.NE.nPrp
             else:
                 self.npre = 0 # self.core.NE.nPre
@@ -118,6 +113,25 @@ class NEoutput:
             self.dupl = dupl_dist + dupl_intp + ["time"]
         else:
             pass
+
+    @staticmethod
+    def _get_mgc_attr(mgc, *names, default=None):
+        if isinstance(mgc, dict):
+            for name in names:
+                if name in mgc:
+                    return mgc[name]
+        else:
+            for name in names:
+                if hasattr(mgc, name):
+                    return getattr(mgc, name)
+
+        return default
+
+    def _get_ne_n_groups(self):
+        if hasattr(self.core.NE, "MGClibrary"):
+            return self._get_mgc_attr(self.core.NE.MGClibrary, "n_groups", "_n_groups")
+
+        return self.core.NE.nGro
 
     def get(self, what, t=None, z=None, hex=None, pre=None,
             gro=None, metadata=False):
@@ -961,11 +975,7 @@ class NEoutput:
                         nvel = [float(v.replace("d", "e")) for v in nvel[:-1]]
 
             if gro is None:
-                # FIXME
-                if hasattr(self.core.NE, "MGClibrary"):
-                    self.core.NE.MGClibrary["_n_groups"]
-                else:
-                    n_groups = self.core.NE.nGro
+                n_groups = self._get_ne_n_groups()
 
                 for g in range(n_groups):
                     profile[:, g, :, :] = flux[:, g, :, :]/nvel[g]
@@ -1789,11 +1799,7 @@ class NEoutput:
             gro = [g-1 for g in gro]
         else:
             if particles == "neutrons":
-                # FIXME
-                if hasattr(self.core.NE, "MGClibrary"):
-                    ngmax = self.core.NE.MGClibrary['_n_groups']
-                else:
-                    ngmax = self.nGro
+                ngmax = self._get_ne_n_groups()
             elif particles == "photons":
                 ngmax = self.ngrp # FIXME
             gro = np.arange(0, ngmax).tolist()
