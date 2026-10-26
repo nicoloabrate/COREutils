@@ -129,14 +129,50 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
         # perform operations only when the assembly is changed
     
         whichmix = core.NE.regions[imix+1]
-        chit = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('chi_tot')[np.newaxis, :]
-        chid = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('chi_del')[np.newaxis, :]
-        chip = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('chi_pro')[np.newaxis, :]
-        beta = core.NE.MGClibrary.data[iPar][whichmix].get_MGC('beta')
+        material = core.NE.MGClibrary.data[iPar][whichmix]
+        chip = np.asarray(material.get_MGC('chi_pro'))
+        chid = np.asarray(material.get_MGC('chi_del'))
+        beta = np.asarray(material.get_MGC('beta'))
 
-        chit = chip*(1-beta.sum())
-        for ig in range(chip.shape[1]):
-             chit[0, ig] += np.dot(beta, chid[0, :, ig])
+        nGro = core.NE.MGClibrary.n_groups
+        if chip.shape != (nGro,):
+            raise FreneticNamelistError(
+                f"Invalid chi_pro shape {chip.shape} for mix {whichmix}; "
+                f"expected ({nGro},)!"
+            )
+
+        if chid.shape == (nGro,):
+            # One delayed spectrum shared by all precursor families.
+            delayed_contribution = beta.sum() * chid
+            chid_families = np.repeat(chid[np.newaxis, :], nPre, axis=0)
+        elif chid.ndim == 2 and chid.shape[1] == nGro:
+            if chid.shape[0] != beta.size:
+                raise FreneticNamelistError(
+                    f"Incompatible chi_del {chid.shape} and beta {beta.shape} "
+                    f"shapes for mix {whichmix}!"
+                )
+            delayed_contribution = np.dot(beta, chid)
+            if nPre == chid.shape[0]:
+                chid_families = chid
+            elif nPre == 1:
+                # Preserve the total delayed contribution when precursor
+                # families are collapsed into one effective family.
+                if beta.sum() > 0:
+                    chid_families = (delayed_contribution / beta.sum())[np.newaxis, :]
+                else:
+                    chid_families = chid[0, :][np.newaxis, :]
+            else:
+                raise FreneticNamelistError(
+                    f"Cannot map {chid.shape[0]} chi_del spectra to "
+                    f"nPre={nPre} for mix {whichmix}!"
+                )
+        else:
+            raise FreneticNamelistError(
+                f"Invalid chi_del shape {chid.shape} for mix {whichmix}; "
+                f"expected ({nGro},) or (nPre, {nGro})!"
+            )
+
+        chit = ((1-beta.sum())*chip + delayed_contribution)[np.newaxis, :]
 
         imixF = 0
         # look for root universe
@@ -169,11 +205,8 @@ def writemacro(core, path, nmix, vel, lambda0, beta0,
             f.write(f'\nzetaT0({imix+1:d},1:{core.NE.nGrp:d}) = 1.0E+0,')
             
         for igro in range(core.NE.MGClibrary.n_groups):
-            if len(chid.shape) > 2:
-                v = chid[imixF, 0, igro]
-            else:
-                v = chid[imixF, igro]
-            f.write(f'\nchiD0({imix+1:d},{igro+1:d},1:{nPre:d}) = {nPre:d}*{ff(v)},')
+            values = ','.join(ff(v) for v in chid_families[:, igro])
+            f.write(f'\nchiD0({imix+1:d},{igro+1:d},1:{nPre:d}) = {values},')
         f.write('\n')
         imixF = imixF+1
         f.write(f'beta0({imix+1},1:{nPre}) = ')
