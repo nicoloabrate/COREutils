@@ -936,7 +936,7 @@ class NE:
 
         SA_fiss = self.get_fissile_types(t=now)
         perturb_list = []
-        seen_reg = []
+        seen_reg = set()
         # impose criticality in each FA type
         for SA in SA_fiss:
             if hasattr(self, "AxialConfig"):
@@ -959,10 +959,11 @@ class NE:
             for reg in fiss_reg:
                 if reg in seen_reg:   # a region shared by two types must not be scaled twice
                     continue
-                seen_reg.append(reg)
+                seen_reg.add(reg)
                 perturb_list.append({"region": reg, "howmuch": [1/keff-1],
                                      "what": "nu_fiss", "which": "all"})
 
+        if perturb_list:
             self.perturb(core, perturb_list, time=time, action="crit")
 
     def perturb(self, core, prt, time=0, fixdata=True, isfren=True,
