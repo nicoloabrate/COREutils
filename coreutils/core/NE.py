@@ -1685,16 +1685,20 @@ class MGClibrary():
                 self.energy_grid_name = str(ename)
             elif not hasattr(self, "energy_grid_name"):
                 self.energy_grid_name = f'{len(self._energy_grid) - 1}G'
+        elif isinstance(energy_grid, (str, os.PathLike)) and Path(energy_grid).is_file():
+            egridpath = Path(energy_grid)
+            self._energy_grid = np.loadtxt(egridpath)
+            self.energy_grid_name = str(ename) if ename is not None else egridpath.stem
         # --- load pre-defined energy group structure
-        elif isinstance(energy_grid, (str, float, int, np.floating, np.integer)):
+        elif isinstance(energy_grid, (str, os.PathLike, float, int, np.floating, np.integer)):
             pwd = Path(__file__).parent.parent.parent
             if 'COREutils'.lower() not in str(pwd).lower():
                 raise NEError(f'Check COREutils tree for NEdata: {pwd}')
             else:
                 pwd = pwd.joinpath('NEdata')
-                if isinstance(energy_grid, str):
-                    fgname = f'{energy_grid}.txt'
+                if isinstance(energy_grid, (str, os.PathLike)):
                     self.energy_grid_name = str(energy_grid)
+                    fgname = f'{self.energy_grid_name}.txt'
                 else:
                     self.energy_grid_name = f'{energy_grid:g}G'
                     fgname = f'{self.energy_grid_name}.txt'
