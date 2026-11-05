@@ -527,6 +527,12 @@ def RadialMap(core, tallies=None, z=0, time=0, pre=0, gro=0, grp=0,
             ax.set_ylim(ymin - eps, ymax + eps)
 
         if tallies is not None:  # plot physics
+            if len(patches) == 0:
+                raise ValueError(
+                    "No assemblies to plot after applying selection and "
+                    f"thresh={thresh}. Check 'which' or use a threshold "
+                    "consistent with the plotted data units."
+                )
             coord = np.asarray(coord)
             values = np.asarray(values)
             patches = np.asarray(patches, dtype=object)
