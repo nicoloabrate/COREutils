@@ -17,6 +17,7 @@ from matplotlib.collections import PatchCollection
 from serpentTools.utils import formatPlot, normalizerFactory, addColorbar
 from coreutils.tools.plot import RadialMap
 from coreutils.core import Core
+from coreutils.tools.units import convert_units
 from matplotlib import rcParams
 rcParams['text.usetex']= True if sh.which('latex') else False
 
@@ -131,7 +132,7 @@ class THoutput:
         else:
             pass
 
-    def get(self, what, t=None, z=None, hex=None, metadata=False):
+    def get(self, what, t=None, z=None, hex=None, metadata=False, unit=None):
         """
         Get profile from output.
 
@@ -151,6 +152,10 @@ class THoutput:
         profile: array
             Output profile requested.
         """
+        if unit is not None and not metadata:
+            profile, _, _, _ = self.get(what, t=t, z=z, hex=hex, metadata=True, unit=unit)
+            return profile
+
         # select getter method according to the output version
         if self.version == "0.0":
             raise OSError("Old txt TH output not supported!")
@@ -169,6 +174,9 @@ class THoutput:
 
         else:
             raise THOutputError(f"v{self.version} unknown!")
+
+        if unit is not None:
+            profile, uom = convert_units(profile, uom, unit)
 
         if metadata:
             return profile, descr, uom, color
@@ -540,7 +548,7 @@ class THoutput:
         # --- parse metadata (unit of measure and description)
         if metadata:
             rel_path = path.split("/")[-1]
-            color = self.MapVersion["metadata"]["colormap"][rel_path]
+            color = self.MapVersion["metadata"]["colormap"].get(rel_path, "viridis")
 
             if not read_distr:
                 description = h5f[dsetpath].attrs["description"][0].decode()
@@ -766,7 +774,7 @@ class THoutput:
 
     def RadialMap(self, what, z=0, t=0,
                   label=False, figname=None, hex=None,
-                  vmin=None, vmax=None, uom=None, descr=None,
+                  vmin=None, vmax=None, unit=None, uom=None, descr=None,
                   usetex=False, fill=True, axes=None, cmap=None,
                   thresh=None, cbarLabel=True, xlabel=None, ylabel=None,
                   log=None, title=True, scale=1, fmt="%.2f", **kwargs):
@@ -821,7 +829,7 @@ class THoutput:
             tallies = np.zeros((nhex, len(what.keys())))
             for i, k in enumerate(what.keys()):
                 v2 = what[k]
-                v1, descr, uom, color = self.get(k, hex=what, t=t, z=z, pre=pre, gro=gro, metadata=True)
+                v1, descr, uom, color = self.get(k, hex=what, t=t, z=z, metadata=True, unit=unit)
                 v1 = np.squeeze(v1)
                 tmp = np.true_divide(norm(v1-v2), norm(v1))
                 tmp[tmp == np.inf] = 0
@@ -838,7 +846,7 @@ class THoutput:
         #         tallies[:, i] = np.squeeze(_tmp)
 
         elif isinstance(what, str):  # single output
-            tallies, descr, uom, color = self.get(what, t=t, z=z, metadata=True)
+            tallies, descr, uom, color = self.get(what, t=t, z=z, metadata=True, unit=unit)
             tallies = np.squeeze(tallies)
         elif isinstance(what, (np.ndarray)):
             tallies = what+0
@@ -847,6 +855,8 @@ class THoutput:
                 raise OSError("unit of measure should be provided!")
             if descr is None:
                 raise OSError("data legend should be provided!")
+            if unit is not None:
+                tallies, uom = convert_units(tallies, uom, unit)
             if cmap is None:
                 color = "inferno"
             else:

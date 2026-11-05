@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from numpy.linalg import norm
 from coreutils.core import Core
+from coreutils.tools.units import convert_units
 from matplotlib import rcParams
 from copy import deepcopy as cp
 from warnings import catch_warnings
@@ -134,7 +135,7 @@ class NEoutput:
         return self.core.NE.nGro
 
     def get(self, what, t=None, z=None, hex=None, pre=None,
-            gro=None, metadata=False):
+            gro=None, metadata=False, unit=None):
         """
         Get profile from output.
 
@@ -161,6 +162,11 @@ class NEoutput:
         profile: array
             Output profile requested.
         """
+        if unit is not None and not metadata:
+            profile, _, _, _ = self.get(what, t=t, z=z, hex=hex, pre=pre,
+                                        gro=gro, metadata=True, unit=unit)
+            return profile
+
         # select getter method according to the output version
         if self.version == "0.0":
             if metadata:
@@ -198,6 +204,9 @@ class NEoutput:
 
         else:
             raise NEOutputError(f"v{self.version} unknown!")
+
+        if unit is not None:
+            profile, uom = convert_units(profile, uom, unit)
 
         if metadata:
             return profile, descr, uom, color
@@ -856,7 +865,7 @@ class NEoutput:
                         rel_path = "power_density/" + rel_path
                     elif "temperatures" in path:
                         rel_path = "temperatures/" + rel_path
-                    color = self.MapVersion["metadata"]["colormap"][rel_path]
+                    color = self.MapVersion["metadata"]["colormap"].get(rel_path, "viridis")
                 else:
                     color = "Plasma"
         # --- close H5 file
@@ -1591,7 +1600,7 @@ class NEoutput:
 
     def RadialMap(self, what, z=0, t=0, pre=0, gro=1, grp=0,
                   hex=None, label=False, figname=None, 
-                  vmin=None, vmax=None,
+                  vmin=None, vmax=None, unit=None,
                   usetex=False, fill=True, axes=None, cmap=None,
                   thresh=None, cbarLabel=True, uom=None, descr=None,
                   xlabel=None, ylabel=None,
@@ -1664,7 +1673,9 @@ class NEoutput:
             tallies = np.zeros((nhex, len(what.keys())))
             for i, k in enumerate(what.keys()):
                 v2 = what[k]
-                v1, descr, uom, color = self.get(k, hex=what, t=t, z=z, pre=pre, gro=gro, metadata=True)
+                v1, descr, uom, color = self.get(k, hex=what, t=t, z=z,
+                                                  pre=pre, gro=gro,
+                                                  metadata=True, unit=unit)
                 v1 = np.squeeze(v1)
                 tmp = np.true_divide(norm(v1-v2), norm(v1))
                 tmp[tmp == np.inf] = 0
@@ -1681,7 +1692,9 @@ class NEoutput:
         #         tallies[:, i] = np.squeeze(_tmp)
 
         elif isinstance(what, str):  # single output
-            tallies, descr, uom, color = self.get(what, t=t, z=z, pre=pre, gro=gro, metadata=True)
+            tallies, descr, uom, color = self.get(what, t=t, z=z, pre=pre,
+                                                  gro=gro, metadata=True,
+                                                  unit=unit)
             tallies = np.squeeze(tallies)
         elif isinstance(what, (np.ndarray)):
             tallies = what+0
@@ -1690,6 +1703,8 @@ class NEoutput:
                 raise OSError("unit of measure should be provided!")
             if descr is None:
                 raise OSError("data legend should be provided!")
+            if unit is not None:
+                tallies, uom = convert_units(tallies, uom, unit)
             color = "inferno"
         else:
             raise TypeError('Input must be str, dict or list!')
